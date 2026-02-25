@@ -76,6 +76,12 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
 
         const sales = await syncVMPaySales(lastSync, now, cred);
 
+        // --- PERSISTENCE ---
+        if (sales.length > 0) {
+            const { upsertSales } = await import("../persistence");
+            await upsertSales(sales);
+        }
+
         // Update last sync time
         await supabase
             .from('stores')

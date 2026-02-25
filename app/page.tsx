@@ -284,6 +284,23 @@ export default function Home() {
   const [stores, setStores] = useState<string[]>([]);
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
 
+  // --- INITIAL DATA LOAD (Persistence) ---
+  useEffect(() => {
+    async function loadHistory() {
+      if (!mounted) return;
+
+      console.log("[Home] Loading initial history from Supabase...");
+      const { fetchSalesHistory } = await import("@/lib/persistence");
+      const { sales, orders } = await fetchSalesHistory();
+
+      if (sales.length > 0) {
+        setAllRecords(sales);
+        setAllOrders(orders);
+        setLogs(prev => [...prev, `[System] ${sales.length} registros carregados do histórico.`]);
+      }
+    }
+    loadHistory();
+  }, [mounted]);
 
   // Logic: Re-calculate 'data' (View) when 'allRecords' or 'selectedStore' changes
   useEffect(() => {
