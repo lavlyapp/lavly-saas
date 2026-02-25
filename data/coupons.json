@@ -1,0 +1,35 @@
+[
+  {
+    "store": "Lavly Cocó",
+    "code": "PARABENS10",
+    "description": "Parabéns! Ganhe 10% de desconto no seu aniversário.",
+    "discount": 10,
+    "expiry": "",
+    "days": "Todos",
+    "hours": "08:00-22:00",
+    "type": "ANIVERSARIO",
+    "active": true
+  },
+  {
+    "store": "Todas",
+    "code": "SECA_TERCA",
+    "description": "Terça da Secagem com 50% OFF.",
+    "discount": 50,
+    "expiry": "",
+    "days": "Terca",
+    "hours": "00:00-23:59",
+    "type": "SECA_TERCA",
+    "active": true
+  },
+  {
+    "store": "Todas",
+    "code": "CHUVA_OFF",
+    "description": "Dia de chuva? Seque com desconto!",
+    "discount": 20,
+    "expiry": "2024-12-31",
+    "days": "Todos",
+    "hours": "00:00-23:59",
+    "type": "CHUVA",
+    "active": true
+  }
+]
