@@ -38,9 +38,16 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
         .eq('cnpj', cred.cnpj)
         .single();
 
-    const lastSync = storeData?.last_sync_sales ? new Date(storeData.last_sync_sales) : new Date(Date.now() - 10 * 60 * 1000); // 10 min fallback
-    const acTurnOffAt = storeData?.ac_turn_off_at ? new Date(storeData.ac_turn_off_at) : null;
     const now = new Date();
+    const fallbackDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 dias de histórico
+    let lastSync = storeData?.last_sync_sales ? new Date(storeData.last_sync_sales) : fallbackDate;
+
+    // Se for manual, forçamos a busca de 30 dias para garantir que o histórico seja preenchido
+    if (isManual) {
+        lastSync = fallbackDate;
+    }
+
+    const acTurnOffAt = storeData?.ac_turn_off_at ? new Date(storeData.ac_turn_off_at) : null;
 
     let shouldSync = false;
     let syncIntervalReason = "";
