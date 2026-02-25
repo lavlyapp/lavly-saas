@@ -27,7 +27,8 @@ function isWithinStoreHours(cred: VMPayCredential): boolean {
 }
 
 export async function processStoreSync(cred: VMPayCredential, isManual: boolean = false) {
-    if (!isWithinStoreHours(cred)) {
+    // Permite sincronização manual mesmo fora do horário de funcionamento
+    if (!isManual && !isWithinStoreHours(cred)) {
         console.log(`[Sync Manager] Store ${cred.name} is CLOSED. Skipping sync.`);
         return;
     }
@@ -39,10 +40,10 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
         .single();
 
     const now = new Date();
-    const fallbackDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 dias de histórico
+    const fallbackDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); // 90 dias de histórico
     let lastSync = storeData?.last_sync_sales ? new Date(storeData.last_sync_sales) : fallbackDate;
 
-    // Se for manual, forçamos a busca de 30 dias para garantir que o histórico seja preenchido
+    // Se for manual, forçamos a busca de 90 dias para garantir que o histórico seja preenchido
     if (isManual) {
         lastSync = fallbackDate;
     }
