@@ -127,16 +127,24 @@ export function SettingsPage() {
     const handleSave = async () => {
         setIsLoading(true);
 
-        // 1. Save VMPay Account to Profile
+        // 1. Save VMPay Account to Profile (Using UPSERT for first-time creation)
         if (user) {
-            await supabase.from('profiles').update({
+            const { error: profileError } = await supabase.from('profiles').upsert({
+                id: user.id,
+                email: user.email,
                 vmpay_user: vmpayUser,
                 vmpay_password: vmpayPass,
                 updated_at: new Date().toISOString()
-            }).eq('id', user.id);
+            }, { onConflict: 'id' });
+
+            if (profileError) {
+                console.error("Profile Save Error:", profileError);
+                alert(`Erro ao salvar perfil: ${profileError.message}`);
+            }
         }
 
         // 2. Save Stores to Supabase
+        let storeErrors = 0;
         for (const store of stores) {
             const { error } = await supabase
                 .from('stores')
@@ -151,7 +159,14 @@ export function SettingsPage() {
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'cnpj' });
 
-            if (error) console.error(`Error saving store ${store.name}:`, error);
+            if (error) {
+                console.error(`Error saving store ${store.name}:`, error);
+                storeErrors++;
+            }
+        }
+
+        if (storeErrors > 0) {
+            alert(`Aviso: ${storeErrors} lojas não puderam ser salvas. Verifique o console.`);
         }
 
         // 3. Save Context-based settings
@@ -161,14 +176,20 @@ export function SettingsPage() {
         setAutomationSettings(localAutomation);
 
         // 4. Log Activity
-        await logActivity("STORE_UPDATE", user?.id || null, {
-            vmpayAccount: !!vmpayUser,
-            storeCount: stores.length
-        });
+        try {
+            await logActivity("STORE_UPDATE", user?.id || null, {
+                vmpayAccount: !!vmpayUser,
+                storeCount: stores.length
+            });
+        } catch (e) {
+            console.warn("Activity logging failed (RLS?):", e);
+        }
 
         setIsLoading(false);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
+        if (storeErrors === 0) {
+            setSaved(true);
+            setTimeout(() => setSaved(false), 3000);
+        }
         loadData(); // Refresh IDs for new stores
     };
 
