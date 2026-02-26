@@ -26,7 +26,7 @@ export interface VMPayMasterAccount {
 // Static fallback for initial setup or development
 export const STATIC_VMPAY_CREDENTIALS: VMPayCredential[] = [
     {
-        name: "Lavateria BEZERRA MENEZES",
+        name: "Lavateria Cascavel",
         cnpj: "43660010000166",
         apiKey: "e8689749-58b1-4a3e-8f1c-11d1a5e2b42e"
     },
