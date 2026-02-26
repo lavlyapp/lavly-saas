@@ -34,8 +34,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
         storage: customStorage,
         // Explicitly bypass navigator.locks which causes hangs in production
         lock: async (name: any, acquire: any) => {
-            if (typeof acquire === 'function') return await acquire();
-            if (typeof name === 'function') return await name();
+            const fn = typeof name === 'function' ? name : acquire;
+            if (typeof fn === 'function') return await fn();
         }
     }
 });
