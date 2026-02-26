@@ -92,6 +92,21 @@ export async function fetchSalesHistory() {
         if (ordersError) throw ordersError;
 
         // Transform back to Record types
+        // Optimization: Pre-group orders by sale_id to avoid O(N*M) search
+        const ordersBySaleId = new Map<string, any[]>();
+        orders.forEach(o => {
+            if (!ordersBySaleId.has(o.sale_id)) {
+                ordersBySaleId.set(o.sale_id, []);
+            }
+            ordersBySaleId.get(o.sale_id)!.push({
+                machine: o.machine,
+                service: o.service,
+                status: o.status,
+                startTime: new Date(o.data),
+                value: Number(o.valor)
+            });
+        });
+
         const transformedSales: SaleRecord[] = sales.map(s => ({
             id: s.id,
             data: new Date(s.data),
@@ -108,15 +123,7 @@ export async function fetchSalesHistory() {
             birthDate: s.birth_date ? new Date(s.birth_date) : undefined,
             age: s.age,
             originalRow: 0,
-            items: orders
-                .filter(o => o.sale_id === s.id)
-                .map(o => ({
-                    machine: o.machine,
-                    service: o.service,
-                    status: o.status,
-                    startTime: new Date(o.data),
-                    value: Number(o.valor)
-                }))
+            items: ordersBySaleId.get(s.id) || []
         }));
 
         const transformedOrders: OrderRecord[] = orders.map(o => ({

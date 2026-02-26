@@ -31,46 +31,45 @@ type PeriodOption = 'today' | 'yesterday' | 'thisMonth' | 'lastMonth' | 'custom'
 
 export function CrmDashboard({ data, customers }: CrmDashboardProps) {
     const { getStoreAddress } = useSettings();
-    // --- Smart Date Initialization (Lazy State) ---
-    const [period, setPeriod] = useState<PeriodOption>(() => {
-        if (!data?.records || data.records.length === 0) return 'thisMonth';
-
+    // --- Optimized Date Initialization ---
+    const { initialPeriod, initialRange } = useMemo(() => {
         const now = new Date();
-        const startOfCurrentMonth = startOfMonth(now);
-        const hasDataThisMonth = data.records.some((r) => {
-            const d = new Date(r.data);
-            return d >= startOfCurrentMonth && d <= endOfMonth(now);
-        });
+        const startOfCurrentMonthTs = startOfMonth(now).getTime();
+        const endOfCurrentMonthTs = endOfMonth(now).getTime();
 
-        return hasDataThisMonth ? 'thisMonth' : 'custom';
-    });
+        let hasDataThisMonth = false;
+        let maxTs = 0;
 
-    const [customRange, setCustomRange] = useState(() => {
+        for (let i = 0; i < (data.records?.length || 0); i++) {
+            const r = data.records[i];
+            const ts = r.data instanceof Date ? r.data.getTime() : new Date(r.data).getTime();
+            if (ts >= startOfCurrentMonthTs && ts <= endOfCurrentMonthTs) {
+                hasDataThisMonth = true;
+            }
+            if (ts > maxTs) maxTs = ts;
+        }
+
         const defaultRange = {
-            start: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
-            end: format(endOfMonth(new Date()), 'yyyy-MM-dd')
+            start: format(startOfMonth(now), 'yyyy-MM-dd'),
+            end: format(endOfMonth(now), 'yyyy-MM-dd')
         };
 
-        if (!data?.records || data.records.length === 0) return defaultRange;
-
-        const now = new Date();
-        const startOfCurrentMonth = startOfMonth(now);
-        const hasDataThisMonth = data.records.some((r) => {
-            const d = new Date(r.data);
-            return d >= startOfCurrentMonth && d <= endOfMonth(now);
-        });
-
-        if (!hasDataThisMonth) {
-            const timestamps = data.records.map((r) => new Date(r.data).getTime());
-            const maxDate = new Date(Math.max(...timestamps));
+        if (!hasDataThisMonth && maxTs > 0) {
+            const maxDate = new Date(maxTs);
             return {
-                start: format(startOfMonth(maxDate), 'yyyy-MM-dd'),
-                end: format(endOfMonth(maxDate), 'yyyy-MM-dd')
+                initialPeriod: 'custom' as PeriodOption,
+                initialRange: {
+                    start: format(startOfMonth(maxDate), 'yyyy-MM-dd'),
+                    end: format(endOfMonth(maxDate), 'yyyy-MM-dd')
+                }
             };
         }
 
-        return defaultRange;
-    });
+        return { initialPeriod: 'thisMonth' as PeriodOption, initialRange: defaultRange };
+    }, [data.records]);
+
+    const [period, setPeriod] = useState<PeriodOption>(initialPeriod);
+    const [customRange, setCustomRange] = useState(initialRange);
 
     // Wash/Dry Simulator State (Simplified for just Optimization)
     const [dryPriceSim, setDryPriceSim] = useState<string>("15.00");
@@ -134,8 +133,8 @@ export function CrmDashboard({ data, customers }: CrmDashboardProps) {
 
         return data.records.filter((r) => {
             if (!r.data) return false;
-            const recordDate = new Date(r.data);
-            return recordDate >= interval.start && recordDate <= interval.end;
+            const ts = r.data instanceof Date ? r.data.getTime() : new Date(r.data).getTime();
+            return ts >= interval.start.getTime() && ts <= interval.end.getTime();
         });
     }, [data.records, period, customRange]);
 

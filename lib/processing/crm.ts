@@ -116,82 +116,77 @@ function detectCycleType(service: string, machine: string, store: string): { isW
 }
 
 export function calculateCrmMetrics(records: SaleRecord[], customerRegistry?: CustomerRecord[]): CrmSummary {
+    const profilerLabel = `calculateCrmMetrics(${records.length})`;
+    console.time(profilerLabel);
+
     const customers: Record<string, SaleRecord[]> = {};
     let washCount = 0;
     let dryCount = 0;
-    let totalCycles = 0; // Global counter
-    const profiles: CustomerProfile[] = []; // Define profiles array
+    let totalCycles = 0;
+    const profiles: CustomerProfile[] = [];
 
-    // Build Registry Map for Fast Lookup
+    // Build Registry Maps
     const registryMap = new Map<string, CustomerRecord>();
     const registryMapById = new Map<string, CustomerRecord>();
     if (customerRegistry) {
-        customerRegistry.forEach(c => {
-            if (c.id) {
-                registryMapById.set(String(c.id), c);
-            }
+        for (let i = 0; i < customerRegistry.length; i++) {
+            const c = customerRegistry[i];
+            if (c.id) registryMapById.set(String(c.id), c);
             if (c.name && c.name.length > 2) {
                 registryMap.set(c.name.trim().toUpperCase(), c);
             }
-        });
+        }
     }
 
-    // Find the latest date in the dataset to act as "today" for recency calculations.
-    // This prevents historical data from showing everyone as churned simply because the file is old.
-    let latestDate = new Date(0);
+    // 1. Single Pass for Min/Max date, possible prices, and grouping
+    let latestTimestamp = 0;
     records.forEach(r => {
-        if (r.data > latestDate) latestDate = r.data;
+        const ts = r.data.getTime();
+        if (ts > latestTimestamp) latestTimestamp = ts;
     });
-    const today = latestDate.getTime() > 0 ? latestDate : new Date();
-    const phoneMap: Record<string, string> = {};
+    const today = latestTimestamp > 0 ? new Date(latestTimestamp) : new Date();
+    const todayTs = today.getTime();
 
-    // 1. DYNAMIC BASE PRICE DETECTION
-    // Instead of a hardcoded BASE_BASKET_PRICE = 18.0, we will find the minimum common transaction value
-    // (likely the cost of 1 cycle) across the dataset to use as our divider. We ignore tiny values like R$1.00 (soap).
     let globalMinCyclePrice = 18.0;
     const storeCyclePrices: Record<string, number> = {};
     const possibleCyclePrices: number[] = [];
+    const phoneMap: Record<string, string> = {};
 
-    records.forEach(r => {
-        // We assume a cycle price is typically between R$ 8.00 and R$ 25.00
+    for (let i = 0; i < records.length; i++) {
+        const r = records[i];
+
+        // Price detection logic
         if (r.valor >= 8.0 && r.valor <= 25.0) {
             possibleCyclePrices.push(r.valor);
             const store = (r.loja || 'DEFAULT').toUpperCase();
             if (!storeCyclePrices[store] || r.valor < storeCyclePrices[store]) {
-                // Try to establish the minimum cycle price per store
                 storeCyclePrices[store] = r.valor;
             }
         }
-    });
 
-    if (possibleCyclePrices.length > 0) {
-        // Sort and find the most common or 10th percentile to avoid outliers
-        possibleCyclePrices.sort((a, b) => a - b);
-        // Use a low percentile to find the "base" price rather than absolute minimum which might be a weird discount
-        const p10Index = Math.floor(possibleCyclePrices.length * 0.1);
-        globalMinCyclePrice = possibleCyclePrices[p10Index] || 18.0;
-    }
-
-    // Group by Customer & Build Phone Map
-    records.forEach(r => {
-        if (!r.cliente) return;
+        // Grouping logic
+        if (!r.cliente) continue;
         const name = r.cliente.trim().toUpperCase();
-
-        // Basic filtering
-        if (name === "CONSUMIDOR FINAL" || name === "PEDIDO BALCÃO") return;
-        if (name.includes("ADMIN") || name.includes("TESTE")) return;
+        if (name === "CONSUMIDOR FINAL" || name === "PEDIDO BALCÃO") continue;
+        if (name.includes("ADMIN") || name.includes("TESTE")) continue;
 
         if (r.telefone && r.telefone.length > 5) {
             phoneMap[name] = r.telefone;
         }
 
-        if (!customers[name]) {
-            customers[name] = [];
-        }
+        if (!customers[name]) customers[name] = [];
         customers[name].push(r);
-    });
+    }
 
-    Object.entries(customers).forEach(([name, sales]) => {
+    if (possibleCyclePrices.length > 0) {
+        possibleCyclePrices.sort((a, b) => a - b);
+        const p10Index = Math.floor(possibleCyclePrices.length * 0.1);
+        globalMinCyclePrice = possibleCyclePrices[p10Index] || 18.0;
+    }
+
+    const customerEntries = Object.entries(customers);
+    for (let i = 0; i < customerEntries.length; i++) {
+        const [name, sales] = customerEntries[i];
         // ... (sorting)
 
         // Calculate Visits & Last 5 Visits Details
@@ -295,18 +290,20 @@ export function calculateCrmMetrics(records: SaleRecord[], customerRegistry?: Cu
         let spent180d = 0;
         let baskets180d = 0;
 
-        const d30 = subDays(today, 30);
-        const d90 = subDays(today, 90);
-        const d180 = subDays(today, 180);
+        const d30Ts = todayTs - 30 * 24 * 60 * 60 * 1000;
+        const d90Ts = todayTs - 90 * 24 * 60 * 60 * 1000;
+        const d180Ts = todayTs - 180 * 24 * 60 * 60 * 1000;
 
-        sales.forEach(s => {
-            if (isAfter(s.data, d30)) spent30d += s.valor;
-            if (isAfter(s.data, d90)) spent90d += s.valor;
-            if (isAfter(s.data, d180)) {
+        for (let j = 0; j < sales.length; j++) {
+            const s = sales[j];
+            const sTs = s.data.getTime();
+            if (sTs > d30Ts) spent30d += s.valor;
+            if (sTs > d90Ts) spent90d += s.valor;
+            if (sTs > d180Ts) {
                 spent180d += s.valor;
                 baskets180d++;
             }
-        });
+        }
 
         // Preferences (kept same)
         const dayCounts: Record<string, number> = {};
@@ -459,7 +456,7 @@ export function calculateCrmMetrics(records: SaleRecord[], customerRegistry?: Cu
             gender,
             preferredStore
         });
-    });
+    }
 
     // ... (rest of function)
 
@@ -472,92 +469,60 @@ export function calculateCrmMetrics(records: SaleRecord[], customerRegistry?: Cu
     const totalUniqueCustomers = profiles.length;
     const totalBaskets = 0;
 
-    const totalRevenue = profiles.reduce((acc, p) => acc + p.totalSpent, 0);
-    const totalVisitsGlobal = profiles.reduce((acc, p) => acc + p.totalVisits, 0);
-    const globalAverageTicket = totalVisitsGlobal > 0 ? totalRevenue / totalVisitsGlobal : 0;
-    const globalAvgBasketsPerVisit = 0;
+    let active30d = 0;
+    let inactive30 = 0;
+    let inactive60 = 0;
+    let inactive90 = 0;
+    let newCustomers = 0;
+    let recurring = 0;
+    let totalRevenue = 0;
+    let totalVisitsGlobal = 0;
+    let sumFreq = 0;
+    let freqCount = 0;
+    const churnRiskStats = { high: 0, medium: 0, low: 0 };
 
-    // --- New Metrics Calculation ---
-
-    // 1. Identify "Active" / "Inactive"
     const startOf30d = subDays(today, 30);
     const startOf60d = subDays(today, 60);
     const startOf90d = subDays(today, 90);
 
-    let active30d = 0;
-    let inactive30 = 0; // 30-60
-    let inactive60 = 0; // 60-90
-    let inactive90 = 0; // >90
-
-    let newCustomers = 0;
-    let recurring = 0;
-
-    profiles.forEach(p => {
+    for (let i = 0; i < profiles.length; i++) {
+        const p = profiles[i];
         const last = p.lastVisitDate;
         const first = p.firstVisitDate;
 
-        // Status
-        if (isAfter(last, startOf30d)) {
-            active30d++;
-        } else if (isAfter(last, startOf60d)) {
-            inactive30++;
-        } else if (isAfter(last, startOf90d)) {
-            inactive60++;
-        } else {
-            inactive90++;
-        }
+        totalRevenue += p.totalSpent;
+        totalVisitsGlobal += p.totalVisits;
+        churnRiskStats[p.churnRisk]++;
 
-        // New Customers
-        if (isAfter(first, startOf30d)) {
-            newCustomers++;
-        }
+        if (isAfter(last, startOf30d)) active30d++;
+        else if (isAfter(last, startOf60d)) inactive30++;
+        else if (isAfter(last, startOf90d)) inactive60++;
+        else inactive90++;
 
-        // Recurring
-        if (p.totalVisits > 1) {
-            recurring++;
-        }
-    });
+        if (isAfter(first, startOf30d)) newCustomers++;
+        if (p.totalVisits > 1) recurring++;
 
-    // Avg LTV
-    const avgLtv = totalUniqueCustomers > 0 ? (totalRevenue / totalUniqueCustomers) : 0;
-
-    // Retention Rate
-    const retentionRate = totalUniqueCustomers > 0 ? recurring / totalUniqueCustomers : 0;
-
-    // Churn Rate
-    const churnRate = totalUniqueCustomers > 0 ? inactive90 / totalUniqueCustomers : 0;
-
-    // Frequency (Visits / Month)
-    let sumFreq = 0;
-    let freqCount = 0;
-
-    profiles.forEach(p => {
-        const daysSinceFirst = differenceInDays(today, p.firstVisitDate);
+        // Frequency (Visits / Month)
+        const daysSinceFirst = Math.max(todayTs - p.firstVisitDate.getTime(), 1000) / (1000 * 60 * 60 * 24);
         let months = Math.max(daysSinceFirst, 1) / 30;
         if (months < 1) months = 1;
-
-        const freq = p.totalVisits / months;
-        sumFreq += freq;
+        sumFreq += p.totalVisits / months;
         freqCount++;
-    });
+    }
 
     const avgTypeFrequency = freqCount > 0 ? sumFreq / freqCount : 0;
-
-    // Aggregated Risk Stats
-    const churnRiskStats = {
-        high: 0,
-        medium: 0,
-        low: 0
-    };
-
-    profiles.forEach(p => {
-        churnRiskStats[p.churnRisk]++;
-    });
+    const globalAverageTicket = totalVisitsGlobal > 0 ? totalRevenue / totalVisitsGlobal : 0;
+    const globalAvgBasketsPerVisit = 0;
+    const avgLtv = totalUniqueCustomers > 0 ? (totalRevenue / totalUniqueCustomers) : 0;
+    const retentionRate = totalUniqueCustomers > 0 ? recurring / totalUniqueCustomers : 0;
+    const churnRate = totalUniqueCustomers > 0 ? inactive90 / totalUniqueCustomers : 0;
 
     // Final Aggregates
     const activeCustomers = active30d + newCustomers + recurring;
     const totalCyclesGlobal = washCount + dryCount;
     const conversionRate = washCount > 0 ? (dryCount / washCount) * 100 : 0;
+
+    console.timeEnd(profilerLabel);
 
     return {
         profiles,
@@ -631,25 +596,25 @@ export interface PeriodStats {
 }
 
 export function calculatePeriodStats(periodRecords: SaleRecord[], allRecords: SaleRecord[]): PeriodStats {
+    const profilerLabel = `calculatePeriodStats(${periodRecords.length})`;
+    console.time(profilerLabel);
+
     // 1. Group Period Records by Customer
     const periodCustomers: Record<string, SaleRecord[]> = {};
     let totalRevenue = 0;
-
     let totalVisits = 0;
 
-    periodRecords.forEach(r => {
+    for (let i = 0; i < periodRecords.length; i++) {
+        const r = periodRecords[i];
         const name = r.cliente.trim().toUpperCase();
 
-        // Filter out generic/admin names
-        if (!name || name === "PEDIDO BALCÃO" || name === "CONSUMIDOR FINAL") return;
-        if (name.includes("ADMIN") || name.includes("TESTE")) return;
+        if (!name || name === "PEDIDO BALCÃO" || name === "CONSUMIDOR FINAL") continue;
+        if (name.includes("ADMIN") || name.includes("TESTE")) continue;
 
-        if (!periodCustomers[name]) {
-            periodCustomers[name] = [];
-        }
+        if (!periodCustomers[name]) periodCustomers[name] = [];
         periodCustomers[name].push(r);
         totalRevenue += r.valor;
-    });
+    }
 
     const activeCustomersKeys = Object.keys(periodCustomers);
     const activeCustomers = activeCustomersKeys.length;
@@ -828,6 +793,8 @@ export function calculatePeriodStats(periodRecords: SaleRecord[], allRecords: Sa
         }
     });
 
+    console.timeEnd(profilerLabel);
+
     return {
         activeCustomers,
         newCustomers,
@@ -990,3 +957,44 @@ function inferGender(name: string): 'M' | 'F' | 'U' {
     return 'U';
 }
 
+
+/**
+ * Lightweight version of visit counting logic for Dashboards.
+ * Uses the 180-minute window rule.
+ */
+export function calculateVisitCount(records: SaleRecord[]): number {
+    if (records.length === 0) return 0;
+
+    // 1. Group by customer first (essential for visit definition)
+    const customerSales: Record<string, number[]> = {};
+    for (let i = 0; i < records.length; i++) {
+        const r = records[i];
+        if (!r.cliente) continue;
+        const name = r.cliente.trim().toUpperCase();
+        if (name === "CONSUMIDOR FINAL" || name === "PEDIDO BALCÃO") continue;
+
+        if (!customerSales[name]) customerSales[name] = [];
+        customerSales[name].push(r.data.getTime());
+    }
+
+    let totalVisits = 0;
+    const windowMs = 180 * 60 * 1000;
+
+    const entries = Object.values(customerSales);
+    for (let i = 0; i < entries.length; i++) {
+        const timestamps = entries[i].sort((a, b) => a - b);
+        if (timestamps.length === 0) continue;
+
+        totalVisits++; // Start first visit
+        let currentVisitStart = timestamps[0];
+
+        for (let j = 1; j < timestamps.length; j++) {
+            if (timestamps[j] - currentVisitStart > windowMs) {
+                totalVisits++;
+                currentVisitStart = timestamps[j];
+            }
+        }
+    }
+
+    return totalVisits;
+}

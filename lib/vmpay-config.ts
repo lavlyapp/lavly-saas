@@ -29,6 +29,31 @@ export const STATIC_VMPAY_CREDENTIALS: VMPayCredential[] = [
         name: "Lavateria BEZERRA MENEZES",
         cnpj: "43660010000166",
         apiKey: "e8689749-58b1-4a3e-8f1c-11d1a5e2b42e"
+    },
+    {
+        name: "Lavateria SANTOS DUMONT",
+        cnpj: "53261645000144",
+        apiKey: "2bfcb6f6-144b-46c1-8fc3-cef8fbf41729"
+    },
+    {
+        name: "Lavateria JOSE WALTER",
+        cnpj: "53261614000193",
+        apiKey: "a2862031-5a98-4eb2-8b0a-e7b8cc195263"
+    },
+    {
+        name: "Lavateria SHOPPING (Maracanau)",
+        cnpj: "51638594000100",
+        apiKey: "f08c45c8-126a-4cb4-ab5d-5c8805c8130f"
+    },
+    {
+        name: "Lavateria SHOPPING SOLARES",
+        cnpj: "54539282000129",
+        apiKey: "68360f6d-fbec-4991-bd2e-c6ff89201e40"
+    },
+    {
+        name: "Lavateria JOQUEI",
+        cnpj: "50741565000106",
+        apiKey: "cc9c772c-ad36-43a6-a3af-582da70feb07"
     }
 ];
 

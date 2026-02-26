@@ -68,10 +68,13 @@ export function CustomerDemographics({ records, customers }: CustomerDemographic
 
         if (!interval) return records;
 
+        const startTs = interval.start.getTime();
+        const endTs = interval.end.getTime();
+
         return records.filter((r) => {
             if (!r.data) return false;
-            const d = new Date(r.data);
-            return d >= interval!.start && d <= interval!.end;
+            const ts = r.data instanceof Date ? r.data.getTime() : new Date(r.data).getTime();
+            return ts >= startTs && ts <= endTs;
         });
     }, [records, period, customRange]);
 
@@ -104,107 +107,91 @@ export function CustomerDemographics({ records, customers }: CustomerDemographic
     }
 
 
-    const genderStats = profiles.reduce((acc, p) => {
-        const g = p.gender || 'U';
-        acc[g] = (acc[g] || 0) + 1;
-        return acc;
-    }, {} as Record<string, number>);
+    // --- Metrics Aggregation (Single Pass) ---
+    const { genderData, ageData, ageStatsArray, maleStats, femaleStats, avgAge } = useMemo(() => {
+        console.time("Demographics Calculation");
+        const genderStats: Record<string, number> = { M: 0, F: 0, U: 0 };
+        const ageStatsAgg: Record<string, any> = {};
+        const maleGroup = { count: 0, totalSpent: 0, totalFreq: 0, totalTicket: 0, washCount: 0, dryCount: 0, churnHigh: 0, churnMedium: 0, churnLow: 0, days: {} as Record<string, number> };
+        const femaleGroup = { count: 0, totalSpent: 0, totalFreq: 0, totalTicket: 0, washCount: 0, dryCount: 0, churnHigh: 0, churnMedium: 0, churnLow: 0, days: {} as Record<string, number> };
+        let totalAgeSum = 0;
+        let totalAgeCount = 0;
 
-    const genderData = [
-        { name: 'Masculino', value: genderStats['M'] || 0, color: '#3b82f6' },
-        { name: 'Feminino', value: genderStats['F'] || 0, color: '#ec4899' },
-        { name: 'Indefinido', value: genderStats['U'] || 0, color: '#525252' },
-    ].filter(d => d.value > 0);
+        for (let i = 0; i < profiles.length; i++) {
+            const p = profiles[i];
 
-    // Age Stats & Advanced Aggregation
-    const ageStats = profiles.reduce((acc, p) => {
-        let range = 'N/A';
-        if (p.age) {
-            if (p.age >= 18 && p.age <= 24) range = '18-24';
-            else if (p.age >= 25 && p.age <= 34) range = '25-34';
-            else if (p.age >= 35 && p.age <= 44) range = '35-44';
-            else if (p.age >= 45 && p.age <= 54) range = '45-54';
-            else if (p.age >= 55) range = '55+';
+            // 1. Gender Distribution
+            const g = p.gender || 'U';
+            genderStats[g] = (genderStats[g] || 0) + 1;
+
+            // 2. Age Distribution
+            let range = 'N/A';
+            if (p.age) {
+                totalAgeSum += p.age;
+                totalAgeCount++;
+                if (p.age >= 18 && p.age <= 24) range = '18-24';
+                else if (p.age >= 25 && p.age <= 34) range = '25-34';
+                else if (p.age >= 35 && p.age <= 44) range = '35-44';
+                else if (p.age >= 45 && p.age <= 54) range = '45-54';
+                else if (p.age >= 55) range = '55+';
+            }
+            if (!ageStatsAgg[range]) {
+                ageStatsAgg[range] = { name: range, count: 0, spent: 0, visits: 0, baskets: 0, males: 0, females: 0, days: {} as Record<string, number> };
+            }
+            const a = ageStatsAgg[range];
+            a.count++;
+            a.spent += p.totalSpent;
+            a.visits += p.totalVisits;
+            a.baskets += (p.totalWashes || 0) + (p.totalDries || 0);
+            if (p.gender === 'M') a.males++;
+            if (p.gender === 'F') a.females++;
+            a.days[p.topDay] = (a.days[p.topDay] || 0) + 1;
+
+            // 3. Behavioral Comparison (Male vs Female)
+            if (p.gender === 'M' || p.gender === 'F') {
+                const target = p.gender === 'M' ? maleGroup : femaleGroup;
+                target.count++;
+                target.totalSpent += p.totalSpent;
+                target.totalFreq += p.totalVisits;
+                target.totalTicket += p.averageTicket;
+                target.washCount += (p.totalWashes || 0);
+                target.dryCount += (p.totalDries || 0);
+                if (p.churnRisk === 'high') target.churnHigh++;
+                else if (p.churnRisk === 'medium') target.churnMedium++;
+                else target.churnLow++;
+                target.days[p.topDay] = (target.days[p.topDay] || 0) + 1;
+            }
         }
 
-        if (!acc[range]) {
-            acc[range] = {
-                name: range,
-                count: 0,
-                spent: 0,
-                visits: 0,
-                baskets: 0,
-                males: 0,
-                females: 0,
-                days: {} as Record<string, number>
-            };
-        }
+        const finalizeGroup = (g: any) => ({
+            ...g,
+            ticket: g.count > 0 ? g.totalTicket / g.count : 0,
+            freq: g.count > 0 ? g.totalFreq / g.count : 0,
+            topDay: Object.entries(g.days).sort((a: any, b: any) => b[1] - a[1])[0]?.[0] || '-'
+        });
 
-        acc[range].count++;
-        acc[range].spent += p.totalSpent;
-        acc[range].visits += p.totalVisits;
-        acc[range].baskets += (p.totalWashes || 0) + (p.totalDries || 0);
-        if (p.gender === 'M') acc[range].males++;
-        if (p.gender === 'F') acc[range].females++;
+        const sortOrder = ['18-24', '25-34', '35-44', '45-54', '55+', 'N/A'];
+        const ageStatsArray = sortOrder.map(key => ageStatsAgg[key]).filter(Boolean);
+        const ageData = ageStatsArray
+            .filter((d: any) => d.name !== 'N/A')
+            .map((d: any) => ({ name: d.name, value: d.count }));
 
-        acc[range].days[p.topDay] = (acc[range].days[p.topDay] || 0) + 1;
+        const genderData = [
+            { name: 'Masculino', value: genderStats['M'] || 0, color: '#3b82f6' },
+            { name: 'Feminino', value: genderStats['F'] || 0, color: '#ec4899' },
+            { name: 'Indefinido', value: genderStats['U'] || 0, color: '#525252' },
+        ].filter(d => d.value > 0);
 
-        return acc;
-    }, {} as Record<string, { name: string, count: number, spent: number, visits: number, baskets: number, males: number, females: number, days: Record<string, number> }>);
-
-    // Sort Order
-    const sortOrder = ['18-24', '25-34', '35-44', '45-54', '55+', 'N/A'];
-    const ageStatsArray = sortOrder.map(key => ageStats[key]).filter(Boolean);
-
-    // Simple Age Data for Chart (Legacy support)
-    const ageData = ageStatsArray
-        .filter(d => d.name !== 'N/A')
-        .map(d => ({ name: d.name, value: d.count }));
-
-    const totalAgeKnown = profiles.filter(p => p.age).length;
-    const avgAge = totalAgeKnown > 0 ? Math.round(profiles.reduce((sum, p) => sum + (p.age || 0), 0) / totalAgeKnown) : 0;
-
-    // Behavioral Stats by Gender (Keep existing logic for Cards)
-    const getGroupStats = (filterFn: (p: CustomerProfile) => boolean) => {
-        const group = profiles.filter(filterFn);
-        if (group.length === 0) return {
-            ticket: 0, freq: 0, count: 0, topDay: '-', churnLow: 0, churnMedium: 0, churnHigh: 0,
-            washCount: 0, dryCount: 0, totalSpent: 0
-        };
-
-        const totalTicket = group.reduce((sum, p) => sum + p.averageTicket, 0);
-        const totalFreq = group.reduce((sum, p) => sum + p.totalVisits, 0);
-        const totalSpent = group.reduce((sum, p) => sum + p.totalSpent, 0);
-
-        // Churn
-        const churnHigh = group.filter(p => p.churnRisk === 'high').length;
-        const churnMedium = group.filter(p => p.churnRisk === 'medium').length;
-        const churnLow = group.filter(p => p.churnRisk === 'low').length;
-
-        // Machines
-        const washCount = group.reduce((sum, p) => sum + (p.totalWashes || 0), 0);
-        const dryCount = group.reduce((sum, p) => sum + (p.totalDries || 0), 0);
-
-        // Mode for Day
-        const days = group.reduce((acc, p) => { acc[p.topDay] = (acc[p.topDay] || 0) + 1; return acc; }, {} as any);
-        const topDay = Object.entries(days).sort((a: any, b: any) => b[1] - a[1])[0]?.[0] || '-';
-
+        console.timeEnd("Demographics Calculation");
         return {
-            ticket: totalTicket / group.length,
-            freq: totalFreq / group.length,
-            count: group.length,
-            topDay,
-            churnHigh,
-            churnMedium,
-            churnLow,
-            washCount,
-            dryCount,
-            totalSpent
+            genderData,
+            ageData,
+            ageStatsArray,
+            maleStats: finalizeGroup(maleGroup),
+            femaleStats: finalizeGroup(femaleGroup),
+            avgAge: totalAgeCount > 0 ? Math.round(totalAgeSum / totalAgeCount) : 0
         };
-    };
-
-    const maleStats = getGroupStats(p => p.gender === 'M');
-    const femaleStats = getGroupStats(p => p.gender === 'F');
+    }, [profiles]);
 
     // Comparative Data for Charts
     const ltvData = [
@@ -289,7 +276,7 @@ export function CustomerDemographics({ records, customers }: CustomerDemographic
                                         dataKey="value"
                                         stroke="none"
                                     >
-                                        {genderData.map((entry, index) => (
+                                        {genderData.map((entry: any, index: number) => (
                                             <Cell key={`cell-${index}`} fill={entry.color} />
                                         ))}
                                     </Pie>
@@ -301,7 +288,7 @@ export function CustomerDemographics({ records, customers }: CustomerDemographic
                             </ResponsiveContainer>
                         </div>
                         <div className="flex justify-center gap-6 mt-4">
-                            {genderData.map(d => (
+                            {genderData.map((d: any) => (
                                 <div key={d.name} className="flex flex-col items-center">
                                     <div className="flex items-center gap-2 text-xs text-neutral-400 mb-1">
                                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
@@ -379,8 +366,8 @@ export function CustomerDemographics({ records, customers }: CustomerDemographic
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-neutral-800">
-                            {ageStatsArray.map(stat => {
-                                const topDay = Object.entries(stat.days).sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
+                            {ageStatsArray.map((stat: any) => {
+                                const topDay = Object.entries(stat.days as Record<string, number>).sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
                                 const malePct = Math.round((stat.males / (stat.count || 1)) * 100);
                                 const femalePct = Math.round((stat.females / (stat.count || 1)) * 100);
                                 return (

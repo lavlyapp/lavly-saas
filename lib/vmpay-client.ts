@@ -10,7 +10,8 @@ async function fetchMachines(apiKey: string): Promise<EquipmentMap> {
     try {
         let page = 0;
         const size = 1000;
-        while (true) {
+        const MAX_PAGES = 50;
+        while (page < MAX_PAGES) {
             const res = await fetch(`${VMPAY_API_BASE_URL}/maquinas?pagina=${page}&quantidade=${size}`, {
                 headers: { 'x-api-key': apiKey }
             });
@@ -210,8 +211,9 @@ export async function syncVMPayCustomers(): Promise<CustomerRecord[]> {
             console.log(`[VMPay Client] Syncing Customers for ${cred.name}...`);
             let page = 0;
             const size = 1000;
+            const MAX_PAGES = 100;
 
-            while (true) {
+            while (page < MAX_PAGES) {
                 const url = `${VMPAY_API_BASE_URL}/clientes?pagina=${page}&quantidade=${size}`;
                 const res = await fetch(url, {
                     headers: { 'x-api-key': cred.apiKey }

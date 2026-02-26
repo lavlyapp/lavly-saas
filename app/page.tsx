@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Upload, FileUp, CheckCircle, AlertCircle, Building2, Filter, RefreshCw, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AppSidebar } from "@/components/layout/AppSidebar";
@@ -10,7 +10,7 @@ import { SaleRecord, OrderRecord, CustomerRecord } from "@/lib/processing/etl";
 import { CustomerProvider, useCustomerContext } from "@/components/context/CustomerContext";
 import { getProfile } from "@/lib/processing/crm";
 import { CustomerDetails } from "@/components/modules/CustomerDetails";
-import { CustomerDemographics } from "@/components/modules/CustomerDemographics"; // New
+// import { CustomerDemographics } from "@/components/modules/CustomerDemographics"; // Moved to dynamic
 import { mergeOrders } from "@/lib/processing/merger";
 import { SubscriptionProvider } from "@/components/context/SubscriptionContext";
 import { SettingsProvider } from "@/components/context/SettingsContext";
@@ -69,6 +69,11 @@ const SettingsPage = dynamic(
 
 const ActivityLogs = dynamic<any>(
   () => import('@/components/modules/ActivityLogs').then(mod => mod.ActivityLogs),
+  { ssr: false }
+);
+
+const CustomerDemographics = dynamic<any>(
+  () => import('@/components/modules/CustomerDemographics').then(mod => mod.CustomerDemographics),
   { ssr: false }
 );
 
@@ -285,36 +290,73 @@ export default function Home() {
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
 
   // --- INITIAL DATA LOAD (Persistence) ---
+  const isInitializing = useRef(false);
+
   useEffect(() => {
     async function loadHistory() {
-      if (!mounted) return;
+      if (!mounted || isInitializing.current) return;
+      isInitializing.current = true;
 
-      console.log("[Home] Loading initial history from Supabase...");
-      const { fetchSalesHistory } = await import("@/lib/persistence");
-      const { sales, orders } = await fetchSalesHistory();
+      console.log("[Home] Initializing app data...");
+      setLogs(prev => [...prev, "[System] Iniciando carregamento de dados..."]);
 
-      if (sales.length > 0) {
-        setAllRecords(sales);
-        setAllOrders(orders);
-        setLogs(prev => [...prev, `[System] ${sales.length} registros carregados do histórico.`]);
+      try {
+        // 1. Load active stores first
+        const { getVMPayCredentials } = await import("@/lib/vmpay-config");
+        const activeStores = await getVMPayCredentials();
+        const configuredNames = activeStores.map(s => s.name);
+
+        let initialStore = selectedStore;
+        if (configuredNames.length > 0 && !selectedStore) {
+          initialStore = configuredNames[0];
+          setSelectedStore(initialStore);
+        }
+
+        // 2. Load history from Supabase
+        const { fetchSalesHistory } = await import("@/lib/persistence");
+        const { sales, orders } = await fetchSalesHistory();
+        console.log(`[Home] History loaded: ${sales.length} sales, ${orders.length} orders`);
+
+        // 3. Process and Update State
+        if (sales.length > 0) {
+          setAllRecords(sales);
+          setAllOrders(orders);
+          setLogs(prev => [...prev, `[System] ${sales.length} registros carregados conforme histórico.`]);
+
+          // Extract stores from data and merge with configured ones
+          const dataStores = Array.from(new Set(sales.map(r => r.loja)));
+          const allStoreNames = Array.from(new Set([...configuredNames, ...dataStores])).sort();
+          setStores(allStoreNames);
+        } else {
+          setStores(configuredNames);
+          setLogs(prev => [...prev, "[System] Nenhum histórico encontrado. Aguardando novos dados."]);
+        }
+      } catch (err) {
+        console.error("[Home] Error during initialization:", err);
+        setLogs(prev => [...prev, `[Erro] Falha crítica ao carregar dados: ${(err as any).message}`]);
+        setStatus("error");
+        setMessage("Erro ao carregar dados do Supabase. Verifique sua conexão.");
+      } finally {
+        isInitializing.current = false;
       }
     }
     loadHistory();
   }, [mounted]);
 
-  // Logic: Re-calculate 'data' (View) when 'allRecords' or 'selectedStore' changes
+  // Logic: Re-calculate 'data' (View) when 'allRecords', 'allOrders' or 'selectedStore' changes
   useEffect(() => {
-    if (allRecords.length === 0) {
+    if (!mounted || allRecords.length === 0) {
       setData(null);
       return;
     }
 
-    // 1. Filter Records
+    console.time("[Page] calculate ViewData");
+
+    // 1. Filter Records & Orders
     const filteredRecords = !selectedStore
       ? allRecords
       : allRecords.filter(r => r.loja === selectedStore);
 
-    // 1b. Filter Orders
     const filteredOrders = !selectedStore
       ? allOrders
       : allOrders.filter(o => o.loja === selectedStore);
@@ -322,11 +364,16 @@ export default function Home() {
     // 2. Recalculate Summary for View
     const totalSales = filteredRecords.length;
     const totalValue = filteredRecords.reduce((acc, r) => acc + r.valor, 0);
-    const sorted = [...filteredRecords].sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
+
+    const sorted = [...filteredRecords].sort((a, b) => {
+      const timeA = a.data instanceof Date ? a.data.getTime() : new Date(a.data).getTime();
+      const timeB = b.data instanceof Date ? b.data.getTime() : new Date(b.data).getTime();
+      return timeA - timeB;
+    });
 
     const viewData = {
       records: filteredRecords,
-      orders: filteredOrders, // Pass to View
+      orders: filteredOrders,
       summary: {
         totalSales,
         totalValue,
@@ -334,16 +381,12 @@ export default function Home() {
         endDate: sorted.length > 0 ? sorted[sorted.length - 1].data : null
       },
       errors: [],
-      logs: logs // Pass logs to view
+      logs: logs
     };
 
     setData(viewData);
-
-    // 3. Update Stores List (Unique)
-    const uniqueStores = Array.from(new Set(allRecords.map(r => r.loja))).sort();
-    setStores(uniqueStores);
-
-  }, [allRecords, selectedStore, logs]);
+    console.timeEnd("[Page] calculate ViewData");
+  }, [allRecords, allOrders, selectedStore, mounted]);
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -713,46 +756,55 @@ export default function Home() {
       }
 
       // Convert date strings back to Date objects
-      const newRecords = result.records.map((r: any) => ({
-        ...r,
-        data: new Date(r.data),
-        items: r.items?.map((i: any) => ({
-          ...i,
-          startTime: i.startTime ? new Date(i.startTime) : null
-        })) || []
-      }));
+      const rawRecords = result.records || [];
+      const totalToProcess = rawRecords.length;
+      const CHUNK_SIZE = 500;
 
-      // Extract Orders from Sales (Synthetic Orders for Metrics)
-      const syntheticOrders: OrderRecord[] = newRecords.flatMap((sale: any) =>
-        (sale.items || []).map((item: any) => ({
-          data: item.startTime || sale.data,
-          loja: sale.loja,
-          cliente: sale.cliente,
-          machine: item.machine,
-          service: item.service,
-          status: item.status,
-          valor: item.value
-        }))
-      );
+      setLogs(prev => [...prev, `[VMPay] Iniciando processamento de ${totalToProcess} registros em blocos...`]);
 
-      // --- FUZZY MERGE ---
-      // This solves duplication by merging API orders with existing Excel orders (or vice-versa)
-      const mergedOrders = mergeOrders(allOrders, syntheticOrders);
-      setAllOrders(mergedOrders);
+      for (let i = 0; i < totalToProcess; i += CHUNK_SIZE) {
+        const chunk = rawRecords.slice(i, i + CHUNK_SIZE);
 
-      setAllRecords(prev => {
-        // Deduplicate by ID
-        const existingIds = new Set(prev.map(r => r.id));
-        const uniqueNew = newRecords.filter((r: any) => !existingIds.has(r.id));
+        // Update Message
+        const pct = Math.round((i / totalToProcess) * 100);
+        setMessage(`Processando novos dados... ${pct}% (${i}/${totalToProcess})`);
 
-        if (uniqueNew.length === 0) return prev;
+        // Convert dates for this chunk
+        const processedChunk = chunk.map((r: any) => ({
+          ...r,
+          data: new Date(r.data),
+          items: r.items?.map((i: any) => ({
+            ...i,
+            startTime: i.startTime ? new Date(i.startTime) : null
+          })) || []
+        }));
 
-        // If we have new records, we might want to sort them?
-        // The useEffect refilters and sorts anyway.
-        return [...prev, ...uniqueNew];
-      });
+        // Extract Synthetic Orders
+        const chunkOrders: OrderRecord[] = processedChunk.flatMap((sale: any) =>
+          (sale.items || []).map((item: any) => ({
+            data: item.startTime || sale.data,
+            loja: sale.loja,
+            cliente: sale.cliente,
+            machine: item.machine,
+            service: item.service,
+            status: item.status,
+            valor: item.value
+          }))
+        );
 
-      const newCount = newRecords.length;
+        // Update Global States in batches
+        setAllOrders(prev => mergeOrders(prev, chunkOrders));
+        setAllRecords(prev => {
+          const existingIds = new Set(prev.map(r => r.id));
+          const uniqueNew = processedChunk.filter((r: any) => !existingIds.has(r.id));
+          return [...prev, ...uniqueNew];
+        });
+
+        // Yield to browser
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+
+      const newCount = totalToProcess;
       const custCount = result.customers?.length || 0;
       setLogs(prev => [...prev, `[VMPay] Sincronização concluída. ${newCount} vendas, ${custCount} clientes.`]);
       setMessage(`Sincronização VMPay concluída! ${newCount} vendas, ${custCount} clientes.`);
@@ -899,6 +951,8 @@ export default function Home() {
 
     return null;
   };
+
+  if (!mounted) return null;
 
   return (
     <SettingsProvider>

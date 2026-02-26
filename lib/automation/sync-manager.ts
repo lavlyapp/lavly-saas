@@ -43,8 +43,8 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
     const fallbackDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); // 90 dias de histórico
     let lastSync = storeData?.last_sync_sales ? new Date(storeData.last_sync_sales) : fallbackDate;
 
-    // Se for manual, forçamos a busca de 90 dias para garantir que o histórico seja preenchido
-    if (isManual) {
+    // Se for manual e não tiver histórico, forçamos a busca de 90 dias
+    if (isManual && !storeData?.last_sync_sales) {
         lastSync = fallbackDate;
     }
 

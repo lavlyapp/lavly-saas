@@ -5,7 +5,7 @@ import { ArrowUpRight, DollarSign, Calendar, TrendingUp, CreditCard, Filter, Use
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, subMonths, format, getDaysInMonth, differenceInCalendarDays } from 'date-fns';
 import { MachineMonitor } from './MachineMonitor';
-import { calculateCrmMetrics } from '@/lib/processing/crm';
+import { calculateCrmMetrics, calculateVisitCount } from '@/lib/processing/crm';
 import { useAuth } from '@/components/context/AuthContext';
 
 // Add OrderRecord type or import if shared (currently relying on any for data.orders)
@@ -129,7 +129,8 @@ export function FinancialDashboard({ data, selectedStore = 'Todas' }: FinancialD
 
         return data.records.filter((r: any) => {
             if (!r.data) return false;
-            const recordDate = new Date(r.data);
+            // OPTIMIZATION: Assume r.data is already a Date or handle it safely
+            const recordDate = r.data instanceof Date ? r.data : new Date(r.data);
             return recordDate >= interval!.start && recordDate <= interval!.end;
         });
     }, [data?.records, period, customRange]);
@@ -173,7 +174,8 @@ export function FinancialDashboard({ data, selectedStore = 'Todas' }: FinancialD
 
         return data.orders.filter((o: any) => {
             if (!o.data) return false;
-            const recordDate = new Date(o.data);
+            // OPTIMIZATION: Assume o.data is already a Date or handle it safely
+            const recordDate = o.data instanceof Date ? o.data : new Date(o.data);
             return recordDate >= interval!.start && recordDate <= interval!.end;
         });
     }, [data?.orders, period, customRange]);
@@ -256,39 +258,36 @@ export function FinancialDashboard({ data, selectedStore = 'Todas' }: FinancialD
         };
     }, [filteredRecords]);
 
-    // NEW: Calculate CRM Metrics for accurate Visits & Ticket
-    const crmMetrics = useMemo(() => {
-        return calculateCrmMetrics(filteredRecords);
+    // OPTIMIZATION: Use lightweight visit counter instead of heavy CRM metrics
+    const visitCount = useMemo(() => {
+        return calculateVisitCount(filteredRecords);
     }, [filteredRecords]);
 
     const ticketAverage = useMemo(() => {
-        // Use the robust logic from CRM (180min grouping)
-        return crmMetrics.globalAverageTicket;
-    }, [crmMetrics]);
+        if (visitCount === 0) return 0;
+        return summary.totalValue / visitCount;
+    }, [summary.totalValue, visitCount]);
 
-    // Global Metrics (Independent of Filter)
+    // Global Metrics (Independent of Filter) - Optimized for large datasets
     const globalMetrics = useMemo(() => {
-        if (!data?.records) return { last30DaysAvg: 0, projection: 0 };
+        if (!data?.records || data.records.length === 0) return { last30DaysAvg: 0, projection: 0 };
 
-        const allTimestamps = data.records.map((r: any) => new Date(r.data).getTime());
-        // Safe max finding for large arrays to avoid Maximum Call Stack Size Exceeded
         let maxTs = 0;
-        if (allTimestamps.length > 0) {
-            maxTs = allTimestamps[0];
-            for (let i = 1; i < allTimestamps.length; i++) {
-                if (allTimestamps[i] > maxTs) maxTs = allTimestamps[i];
+        for (let i = 0; i < data.records.length; i++) {
+            const ts = data.records[i].data instanceof Date ? data.records[i].data.getTime() : new Date(data.records[i].data).getTime();
+            if (ts > maxTs) maxTs = ts;
+        }
+
+        const thirtyDaysAgoTs = maxTs - 30 * 24 * 60 * 60 * 1000;
+        let last30Revenue = 0;
+
+        for (let i = 0; i < data.records.length; i++) {
+            const r = data.records[i];
+            const ts = r.data instanceof Date ? r.data.getTime() : new Date(r.data).getTime();
+            if (ts >= thirtyDaysAgoTs && ts <= maxTs) {
+                last30Revenue += (r.valor || 0);
             }
         }
-        const maxDate = allTimestamps.length > 0 ? new Date(maxTs) : new Date();
-
-        const thirtyDaysAgo = subDays(maxDate, 30);
-
-        const last30Revenue = data.records
-            .filter((r: any) => {
-                const d = new Date(r.data);
-                return d >= thirtyDaysAgo && d <= endOfDay(maxDate);
-            })
-            .reduce((acc: number, r: any) => acc + (r.valor || 0), 0);
 
         const last30DaysAvg = last30Revenue / 30;
 
