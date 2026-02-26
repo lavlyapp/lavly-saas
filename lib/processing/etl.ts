@@ -96,7 +96,7 @@ const normalizeHeader = (header: any) => {
 const COLUMN_MAP: Record<string, string[]> = {
     id: ['id', 'id_venda', 'venda', 'cod_venda', 'codigo', 'numero', 'requisicao', 'idvenda'],
     data: ['data', 'data_venda', 'dt_venda', 'data_emissao', 'dia', 'data_da_venda', 'dta_venda', 'dt_emis', 'emissao'],
-    loja: ['loja', 'nome_loja', 'unidade', 'empresa', 'nome_fantasia', 'estabelecimento', 'lavanderia', 'filial'],
+    loja: ['lavanderia', 'unidade', 'loja', 'nome_loja', 'empresa', 'nome_fantasia', 'estabelecimento', 'filial'],
     cliente: ['cliente', 'nome_cliente', 'consumidor', 'sacado', 'nome', 'portador', 'nome_do_cliente', 'usuario', 'nome_usuario', 'nomecliente'],
     id_cliente: ['id_cliente', 'cod_cliente', 'codigo_cliente', 'id_usuario', 'customer_id', 'client_id', 'id_sacado', 'idcliente'],
     tipo_cartao: ['tipo_cartao', 'cartao_tipo', 'tipo_de_cartao', 'bandeira', 'tipo', 'cartao', 'bandeira_cartao', 'operadora', 'tipocartao'],
