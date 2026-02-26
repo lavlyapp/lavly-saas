@@ -32,5 +32,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
         detectSessionInUrl: true,
         storageKey: 'lavly-auth-token',
         storage: customStorage,
+        // Explicitly bypass navigator.locks which causes hangs in production
+        lock: async (name: any, acquire: any) => {
+            if (typeof acquire === 'function') return await acquire();
+            if (typeof name === 'function') return await name();
+        }
     }
 });
