@@ -7,4 +7,12 @@ if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_A
     console.warn('Supabase credentials missing. Database features will be unavailable.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+        // Using localStorage as a more stable storage engine to avoid Navigator Locks API issues in some browsers
+        storageKey: 'lavly-auth-token',
+    }
+});
