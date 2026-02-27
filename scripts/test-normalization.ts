@@ -1,4 +1,4 @@
-import { getCanonicalStoreName } from './lib/vmpay-config';
+import { getCanonicalStoreName } from '../lib/vmpay-config';
 
 const testCases = [
     { raw: "Lavateria BEZERRA MENEZES", expected: "Lavateria Cascavel" },
