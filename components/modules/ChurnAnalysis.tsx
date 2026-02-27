@@ -9,9 +9,10 @@ import { useAuth } from "@/components/context/AuthContext";
 
 interface ChurnAnalysisProps {
     data: any;
+    selectedStore?: string;
 }
 
-export function ChurnAnalysis({ data }: ChurnAnalysisProps) {
+export function ChurnAnalysis({ data, selectedStore }: ChurnAnalysisProps) {
     const { canAccess } = useSubscription();
     const { role } = useAuth();
     // ... rest of component until return ...

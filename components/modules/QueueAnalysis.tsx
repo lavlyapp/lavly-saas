@@ -13,12 +13,13 @@ import {
 
 interface QueueAnalysisProps {
     data: SaleRecord[];
+    selectedStore?: string;
 }
 
 const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
-export function QueueAnalysis({ data }: QueueAnalysisProps) {
+export function QueueAnalysis({ data, selectedStore }: QueueAnalysisProps) {
     const metrics = useMemo(() => calculateMachineAvailability(data), [data]);
     const [selectedHour, setSelectedHour] = useState<{ day: number, hour: number } | null>(null);
 

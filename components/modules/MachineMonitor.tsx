@@ -4,6 +4,7 @@ import { format, addMinutes, isAfter, differenceInMinutes } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { WashingMachine, Wind, Activity, Power, Clock, AlertCircle, Store } from "lucide-react";
 import { getCycleDuration } from "@/lib/processing/crm";
+import { getCanonicalStoreName } from "@/lib/vmpay-config";
 
 interface MachineMonitorProps {
     allRecords: SaleRecord[];  // We need ALL records to find the absolute latest for each machine
@@ -24,11 +25,13 @@ interface MachineStatus {
 export function MachineMonitor({ allRecords, selectedStore }: MachineMonitorProps) {
     if (!allRecords || allRecords.length === 0) return null;
 
+    const canonicalSelected = getCanonicalStoreName(selectedStore);
+
     // Robust check for "All Stores"
-    const isAllStores = !selectedStore || selectedStore === 'Todas' || selectedStore === '';
+    const isAllStores = !selectedStore || canonicalSelected === 'Todas' || selectedStore === 'Todas' || selectedStore === '';
 
     // If a specific store is selected, ensure it has records
-    if (!isAllStores && !allRecords.some(r => r.loja === selectedStore)) return null;
+    if (!isAllStores && !allRecords.some(r => getCanonicalStoreName(r.loja) === canonicalSelected)) return null;
 
     // 1. Process Data & Calculate Statuses
     const now = new Date();
@@ -42,7 +45,7 @@ export function MachineMonitor({ allRecords, selectedStore }: MachineMonitorProp
 
     const relevantRecords = isAllStores
         ? allRecords
-        : allRecords.filter(r => r.loja === selectedStore);
+        : allRecords.filter(r => getCanonicalStoreName(r.loja) === canonicalSelected);
 
     if (relevantRecords.length === 0) return null;
 

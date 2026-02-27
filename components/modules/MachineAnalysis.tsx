@@ -9,11 +9,12 @@ import { startOfDay, endOfDay, startOfMonth, endOfMonth, subDays, subMonths } fr
 
 interface MachineAnalysisProps {
     data: { records: SaleRecord[] };
+    selectedStore?: string;
 }
 
 type PeriodOption = 'today' | 'yesterday' | 'thisMonth' | 'lastMonth';
 
-export function MachineAnalysis({ data }: MachineAnalysisProps) {
+export function MachineAnalysis({ data, selectedStore }: MachineAnalysisProps) {
     const [period, setPeriod] = useState<PeriodOption>('today');
 
     // Filter records based on selected period

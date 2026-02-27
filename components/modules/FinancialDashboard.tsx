@@ -33,6 +33,10 @@ export function FinancialDashboard({ data, selectedStore = 'Todas' }: FinancialD
         if (role === 'attendant') return 'today';
         if (!data?.records || data.records.length === 0) return 'thisMonth';
 
+        // DEBUG: Check first record
+        const first = data.records[0];
+        console.log(`[FinancialDashboard] First record store: "${first.loja}" | Selected: "${selectedStore}" | Records: ${data.records.length}`);
+
         const now = new Date();
         const startOfCurrentMonth = startOfMonth(now);
 

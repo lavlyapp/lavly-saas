@@ -25,11 +25,12 @@ interface CrmDashboardProps {
         records: SaleRecord[];
     };
     customers?: CustomerRecord[];
+    selectedStore?: string;
 }
 
 type PeriodOption = 'today' | 'yesterday' | 'thisMonth' | 'lastMonth' | 'custom';
 
-export function CrmDashboard({ data, customers }: CrmDashboardProps) {
+export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardProps) {
     const { getStoreAddress } = useSettings();
     // --- Optimized Date Initialization ---
     const { initialPeriod, initialRange } = useMemo(() => {

@@ -11,7 +11,7 @@ const supabase = createClient(supabaseUrl!, supabaseAnonKey!);
 
 const stores = [
     {
-        name: "Lavateria BEZERRA MENEZES",
+        name: "Lavateria Cascavel",
         cnpj: "43660010000166",
         api_key: "e8689749-58b1-4a3e-8f1c-11d1a5e2b42e"
     },

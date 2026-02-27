@@ -2,6 +2,7 @@ import ExcelJS from 'exceljs';
 // @ts-ignore
 import Papa from 'papaparse';
 import { parse, isValid } from 'date-fns';
+import { getCanonicalStoreName } from '../vmpay-config';
 
 // Force Update: ETL Parsing Logic v2.3 (Nuclear Rewrite)
 export interface SaleItem {
@@ -134,7 +135,8 @@ function findColumnIndex(headers: string[], field: string): number {
 export async function parseFile(file: File): Promise<ParseResult> {
     const buffer = await file.arrayBuffer();
     const filename = file.name.toLowerCase();
-    const defaultStoreName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
+    const rawDefaultStoreName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
+    const defaultStoreName = getCanonicalStoreName(rawDefaultStoreName);
 
     if (filename.endsWith('.csv')) {
         return parseCSV(buffer, defaultStoreName);
@@ -481,7 +483,8 @@ async function parseExcel(buffer: ArrayBuffer, defaultStoreName: string): Promis
                 }
 
                 if (date && isValid(date)) {
-                    const loja = idxLoja > -1 ? String(row.getCell(idxLoja + 1).value || '').trim() : defaultStoreName;
+                    const rawLoja = idxLoja > -1 ? String(row.getCell(idxLoja + 1).value || '').trim() : defaultStoreName;
+                    const loja = getCanonicalStoreName(rawLoja);
                     const cliente = idxCliente > -1 ? String(row.getCell(idxCliente + 1).value || '').trim() : '';
 
                     if (isOrdersFile) {

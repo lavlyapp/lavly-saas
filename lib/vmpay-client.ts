@@ -170,7 +170,7 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                         const record: SaleRecord = {
                             id: String(sale.idVenda),
                             data: safeDate,
-                            loja: sale.lavanderia || cred.name,
+                            loja: cred.name, // Use canonical name from config
                             cliente: sale.nomeCliente || "Cliente Não Identificado",
                             customerId: sale.idCliente ? String(sale.idCliente) : undefined,
                             produto: items.length > 0 ? items[0].service : produto, // Main product label

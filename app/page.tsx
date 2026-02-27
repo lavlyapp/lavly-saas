@@ -18,6 +18,7 @@ import { calculateCrmMetrics } from "@/lib/processing/crm"; // New
 import { AuthProvider, useAuth } from "@/components/context/AuthContext";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { TermsOfUse } from "@/components/modules/TermsOfUse";
+import { getCanonicalStoreName } from "@/lib/vmpay-config";
 
 // Dynamically import CrmDashboard with SSR disabled to prevent hydration errors
 const CrmDashboard = dynamic(
@@ -275,21 +276,27 @@ export default function Home() {
 
   // Data States
   const [allRecords, setAllRecords] = useState<SaleRecord[]>([]);
-  const [allOrders, setAllOrders] = useState<OrderRecord[]>([]); // New: Separate Orders State
-  const [allCustomers, setAllCustomers] = useState<CustomerRecord[]>([]); // New: Customer Registry State
-  const [data, setData] = useState<any>(null); // View Data (Filtered)
+  const [allOrders, setAllOrders] = useState<OrderRecord[]>([]);
+  const [allCustomers, setAllCustomers] = useState<CustomerRecord[]>([]);
+  const [data, setData] = useState<any>(null);
 
-  // Hydration Fix: Ensure component only renders on client
+  // Filter States
+  const [dbStores, setDbStores] = useState<string[]>([]);
+  const [selectedStore, setSelectedStore] = useState<string | null>(null);
+
+  // Compute available stores from both DB and Data
+  const stores = useMemo(() => {
+    const dataStores = Array.from(new Set(allRecords.map(r => getCanonicalStoreName(r.loja))));
+    const combined = Array.from(new Set([...dbStores, ...dataStores])).filter(Boolean).sort();
+    return combined;
+  }, [allRecords, dbStores]);
+
+  // Hydration Fix
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Filter States
-  const [stores, setStores] = useState<string[]>([]);
-  const [selectedStore, setSelectedStore] = useState<string | null>(null);
-
-  // --- INITIAL DATA LOAD (Persistence) ---
   const isInitializing = useRef(false);
 
   useEffect(() => {
@@ -302,9 +309,9 @@ export default function Home() {
 
       try {
         // 1. Load active stores first
-        const { getVMPayCredentials } = await import("@/lib/vmpay-config");
+        const { getVMPayCredentials, getCanonicalStoreName } = await import("@/lib/vmpay-config");
         const activeStores = await getVMPayCredentials();
-        const configuredNames = activeStores.map(s => s.name);
+        const configuredNames = activeStores.map(s => getCanonicalStoreName(s.name));
 
         let initialStore = selectedStore;
         if (configuredNames.length > 0 && !selectedStore) {
@@ -315,20 +322,21 @@ export default function Home() {
         // 2. Load history from Supabase
         const { fetchSalesHistory } = await import("@/lib/persistence");
         const { sales, orders } = await fetchSalesHistory();
+
+        // Normalize names from DB just in case SQL migration wasn't 100% or cache exists
+        const normalizedSales = sales.map(s => ({ ...s, loja: getCanonicalStoreName(s.loja) }));
+        const normalizedOrders = orders.map(o => ({ ...o, loja: getCanonicalStoreName(o.loja) }));
+
         console.log(`[Home] History loaded: ${sales.length} sales, ${orders.length} orders`);
 
         // 3. Process and Update State
-        if (sales.length > 0) {
-          setAllRecords(sales);
-          setAllOrders(orders);
-          setLogs(prev => [...prev, `[System] ${sales.length} registros carregados conforme histórico.`]);
+        setDbStores(configuredNames);
 
-          // Extract stores from data and merge with configured ones
-          const dataStores = Array.from(new Set(sales.map(r => r.loja)));
-          const allStoreNames = Array.from(new Set([...configuredNames, ...dataStores])).sort();
-          setStores(allStoreNames);
+        if (sales.length > 0) {
+          setAllRecords(normalizedSales);
+          setAllOrders(normalizedOrders);
+          setLogs(prev => [...prev, `[System] ${sales.length} registros carregados conforme histórico.`]);
         } else {
-          setStores(configuredNames);
           setLogs(prev => [...prev, "[System] Nenhum histórico encontrado. Aguardando novos dados."]);
         }
       } catch (err) {
@@ -353,13 +361,40 @@ export default function Home() {
     console.time("[Page] calculate ViewData");
 
     // 1. Filter Records & Orders
-    const filteredRecords = !selectedStore
+    const filteredRecords = (!selectedStore || selectedStore === 'Todas')
       ? allRecords
-      : allRecords.filter(r => r.loja === selectedStore);
+      : allRecords.filter((r, idx) => {
+        const rLoja = getCanonicalStoreName(r.loja);
+        const sLoja = getCanonicalStoreName(selectedStore);
+        const match = rLoja === sLoja;
 
-    const filteredOrders = !selectedStore
+        // Log first 5 attempts to understand mismatch
+        if (idx < 5) {
+          console.log(`[Filter] Row ${idx}: DB="${r.loja}"(Can:${rLoja}) vs Selected="${selectedStore}"(Can:${sLoja}) Match:${match}`);
+        }
+        return match;
+      });
+
+    const filteredOrders = (!selectedStore || selectedStore === 'Todas')
       ? allOrders
-      : allOrders.filter(o => o.loja === selectedStore);
+      : allOrders.filter(o => {
+        const oLoja = getCanonicalStoreName(o.loja);
+        const sLoja = getCanonicalStoreName(selectedStore);
+        return oLoja === sLoja;
+      });
+
+    if (selectedStore && filteredRecords.length === 0 && allRecords.length > 0) {
+      const available = Array.from(new Set(allRecords.map(r => r.loja)));
+      const canonicalAvailable = Array.from(new Set(available.map(a => getCanonicalStoreName(a))));
+
+      console.warn(`[Page] Filter returned 0 results for ${selectedStore}. Available store names:`, available);
+      setLogs(prev => [
+        ...prev,
+        `[DEBUG] Filtro ZERO para "${selectedStore}" (Canônico: "${getCanonicalStoreName(selectedStore)}")`,
+        `[DEBUG] Lojas no Estado: ${available.join(', ')}`,
+        `[DEBUG] Lojas Canônicas: ${canonicalAvailable.join(', ')}`
+      ]);
+    }
 
     // 2. Recalculate Summary for View
     const totalSales = filteredRecords.length;
@@ -370,6 +405,13 @@ export default function Home() {
       const timeB = b.data instanceof Date ? b.data.getTime() : new Date(b.data).getTime();
       return timeA - timeB;
     });
+
+    // Expose for console debugging
+    if (typeof window !== 'undefined') {
+      (window as any).DEBUG_RECORDS = allRecords;
+      (window as any).DEBUG_SELECTED = selectedStore;
+      (window as any).DEBUG_FILTERED = filteredRecords;
+    }
 
     const viewData = {
       records: filteredRecords,
@@ -383,6 +425,8 @@ export default function Home() {
       errors: [],
       logs: logs
     };
+
+    console.log(`[v3-Filter] View recalculated. Selected: "${selectedStore}". Records: ${allRecords.length}. Filtered: ${filteredRecords.length}`);
 
     setData(viewData);
     console.timeEnd("[Page] calculate ViewData");
@@ -424,11 +468,14 @@ export default function Home() {
         }
 
         // Get new orders
-        const orders = result.records.map((r: any) => ({ ...r, data: new Date(r.data) }));
+        const orders = result.records.map((r: any) => ({
+          ...r,
+          data: new Date(r.data),
+          loja: getCanonicalStoreName(r.loja) // NORMALIZAÇÃO AQUI
+        }));
 
         // Deduplicate using fuzzy logic
         const mergedOrders = mergeOrders(allOrders, orders);
-        setAllOrders(mergedOrders);
 
         // --- ENRICHMENT LOGIC (Existing Sales Linking) ---
         let enrichedCount = 0;
@@ -441,7 +488,6 @@ export default function Home() {
         setLogs(prev => [...prev, "[DEBUG] Starting Sales Indexing..."]);
 
         // 1. Create a Date-based Index for Sales
-        // Map Key: YYYY-MM-DD -> Value: Array of SaleRecords on that day
         const salesByDay = new Map<string, any[]>();
 
         // Safety Check Counter
@@ -462,7 +508,6 @@ export default function Home() {
             validSales++;
           } catch (e) {
             invalidSales++;
-            console.error("Invalid sale date:", sale);
           }
         });
 
@@ -473,34 +518,20 @@ export default function Home() {
           daySales.sort((a, b) => a.data.getTime() - b.data.getTime());
         });
 
-        // Helper for normalization with cache
-        const normCache = new Map<string, string>();
-        const normalizeStr = (str: string) => {
-          if (!str) return '';
-          if (normCache.has(str)) return normCache.get(str)!;
-          let res = str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-          res = res.replace(/vendas|pedidos|relatorio/g, '').trim(); // Pre-clean store name noise
-          normCache.set(str, res);
-          return res;
-        };
-
         // Pre-calculate Store Logic
-        const uniqueStoreCount = new Set(newRecords.map(r => r.loja)).size;
+        const uniqueStoreCount = new Set(newRecords.map(r => getCanonicalStoreName(r.loja))).size;
         const isMultiStore = uniqueStoreCount > 1;
 
         // --- PRE-COMPUTATION OPTIMIZATION ---
-        // Pre-normalize sale properties once to avoid O(N*M) heavy string operations in the loop
         salesByDay.forEach(daySales => {
           daySales.forEach(sale => {
             sale._time = sale.data.getTime();
-            sale._nLoja = isMultiStore ? normalizeStr(sale.loja) : '';
-            sale._nCli = sale.cliente && sale.cliente !== 'Consumidor Final' ? normalizeStr(sale.cliente) : '';
+            sale._nLoja = isMultiStore ? getCanonicalStoreName(sale.loja).toUpperCase() : '';
+            sale._nCli = sale.cliente && sale.cliente !== 'Consumidor Final' ? sale.cliente.trim().toUpperCase() : '';
             sale._nCliFirst = sale._nCli ? sale._nCli.split(' ')[0] : '';
           });
         });
 
-        // Message to indicate processing start
-        setMessage(`Processando ${orders.length} pedidos. Iniciando cruzamento de dados...`);
         setLogs(prev => [...prev, `[DEBUG] Starting enrichment loop for ${orders.length} orders.`]);
 
         // BUFFER FOR ERRORS TO PREVENT UI FREEZE
@@ -508,132 +539,84 @@ export default function Home() {
         const MAX_ERRORS = 50;
         const loopErrors: string[] = [];
 
-        // --- ASYNC CHUNKING LOOP ---
-        const CHUNK_SIZE = 1000; // Increased massively since inner loop is now ~O(log N) + tiny linear search
-
-        for (let i = 0; i < orders.length; i += CHUNK_SIZE) {
-          const chunk = orders.slice(i, i + CHUNK_SIZE);
-
-          // Update Progress
-          const pct = Math.round((i / orders.length) * 100);
-          setMessage(`Processando pedidos... ${pct}% concluído.`);
-          if (i === 0 || i % 10000 === 0) setLogs(prev => [...prev, `[DEBUG] Loop Progress: ${pct}%`]);
-
-          // Yield to render via microtask
+        for (let i = 0; i < orders.length; i += 1000) {
+          const chunk = orders.slice(i, i + 1000);
           await new Promise(resolve => setTimeout(resolve, 0));
 
           chunk.forEach((order: any) => {
             try {
               if (!order.data || isNaN(order.data.getTime())) return;
+              const dateKey = order.data.toISOString().split('T')[0];
+              const daySales = salesByDay.get(dateKey);
+              if (!daySales) return;
 
-              let orderDateKey: string;
-              try {
-                orderDateKey = order.data.toISOString().split('T')[0];
-              } catch (e) { return; }
-
-              const allDayMatches = salesByDay.get(orderDateKey);
-              if (!allDayMatches || allDayMatches.length === 0) return;
-
-              // Optimization: Window Search
               const orderTime = order.data.getTime();
-              const minTime = orderTime - 7200000; // -2h
-              const maxTime = orderTime + 7200000; // +2h
+              const nLoja = isMultiStore ? order.loja.toUpperCase() : ''; // order.loja já normalizado
+              const nCli = order.cliente && order.cliente !== 'Consumidor Final' ? order.cliente.trim().toUpperCase() : '';
+              const nCliFirst = nCli ? nCli.split(' ')[0] : '';
 
-              let bestMatch: any = null;
+              const windowMs = 2 * 60 * 60 * 1000; // 2h window
+              const minTime = orderTime - windowMs;
+              const maxTime = orderTime + windowMs;
+
+              let bestMatch = null;
               let minTimeDiff = Infinity;
 
-              const oStore = isMultiStore ? normalizeStr(order.loja) : '';
-              const oCli = order.cliente && order.cliente !== 'Consumidor Final' ? normalizeStr(order.cliente) : '';
-              const oFirst = oCli ? oCli.split(' ')[0] : '';
-
-              // Optimization: Binary Search for minTime instead of Linear Scan
-              let left = 0;
-              let right = allDayMatches.length - 1;
+              let low = 0;
+              let high = daySales.length - 1;
               let startIndex = 0;
-              while (left <= right) {
-                const mid = Math.floor((left + right) / 2);
-                if (allDayMatches[mid]._time >= minTime) {
-                  startIndex = mid;
-                  right = mid - 1;
-                } else {
-                  left = mid + 1;
-                }
+              while (low <= high) {
+                const mid = (low + high) >> 1;
+                if (daySales[mid]._time < minTime) { low = mid + 1; }
+                else { startIndex = mid; high = mid - 1; }
               }
 
-              // Linear Scan on Sorted List starting strictly from startIndex with early exit
-              for (let j = startIndex; j < allDayMatches.length; j++) {
-                const sale = allDayMatches[j];
-                const saleTime = sale._time;
+              for (let k = startIndex; k < daySales.length; k++) {
+                const sale = daySales[k];
+                if (sale._time > maxTime) break;
 
-                // Break if too late (sorted list!)
-                if (saleTime > maxTime) break;
+                if (isMultiStore && sale._nLoja !== nLoja) continue;
+                if (nCli && sale._nCli !== nCli && sale._nCliFirst !== nCliFirst) continue;
 
-                // 1. Store Matching
-                if (isMultiStore) {
-                  const sStore = sale._nLoja;
-                  const nameMatch = sStore.includes(oStore) || oStore.includes(sStore) || sStore === oStore;
-
-                  if (!nameMatch && sStore !== "" && oStore !== "") continue;
-                }
-
-                // 2. Client Matching
-                if (sale._nCli && oCli) {
-                  const sCli = sale._nCli;
-                  if (sale._nCliFirst !== oFirst && (!sCli.includes(oCli) && !oCli.includes(sCli))) continue;
-                }
-
-                // 3. Time Matching
-                const timeDiff = Math.abs(saleTime - orderTime);
-                if (timeDiff < minTimeDiff) {
-                  minTimeDiff = timeDiff;
+                const diff = Math.abs(sale._time - orderTime);
+                if (diff < minTimeDiff) {
+                  minTimeDiff = diff;
                   bestMatch = sale;
                 }
               }
 
               if (bestMatch) {
                 if (!bestMatch.items) bestMatch.items = [];
-
-                // Use Fuzzy Check for linking as well to avoid duplicate items in the Sale Record
-                const exists = (bestMatch.items || []).some((i: any) => {
-                  if (!i.startTime) return false;
-                  const iTime = i.startTime instanceof Date ? i.startTime.getTime() : new Date(i.startTime).getTime();
-                  return i.machine === order.machine && Math.abs(iTime - order.data.getTime()) < 300000;
-                });
-
-                if (!exists) {
-                  if (!bestMatch.items) bestMatch.items = [];
+                const alreadyAdded = bestMatch.items.some((it: any) => it.id === order.id);
+                if (!alreadyAdded) {
                   bestMatch.items.push({
+                    id: order.id,
                     machine: order.machine,
-                    service: order.service,
+                    service: order.service || order.produto,
                     status: order.status,
                     startTime: order.data,
                     value: order.valor
                   });
                   enrichedCount++;
                 }
-
-                // Transfer Demographics if available
                 if (order.birthDate && !bestMatch.birthDate) {
                   bestMatch.birthDate = order.birthDate;
                   bestMatch.age = order.age;
                 }
               }
             } catch (error: any) {
-              if (errorCount < MAX_ERRORS) {
-                loopErrors.push(`[ERROR] Matching failed for order: ${error.message}`);
-                errorCount++;
-              }
+              if (errorCount < MAX_ERRORS) { loopErrors.push(`[ERROR] Matching failed: ${error.message}`); errorCount++; }
             }
           });
         }
 
-        if (loopErrors.length > 0) {
-          setLogs(prev => [...prev, ...loopErrors, `[SYSTEM] Suppressed further errors to maintain performance.`]);
-        }
-        setLogs(prev => [...prev, `[DEBUG] Enrichment Loop Complete. Added ${enrichedCount} links.`]);
+        // Final State Update (Garantindo Normalização)
+        setAllOrders(mergedOrders.map((o: any) => ({ ...o, loja: getCanonicalStoreName(o.loja) })));
+        setAllRecords(newRecords.map((r: any) => ({ ...r, loja: getCanonicalStoreName(r.loja) })));
 
-        // Update State
-        setAllRecords(newRecords);
+        setLogs(prev => [...prev, ...etlLogs, `[DEBUG] Loop Complete. Linked ${enrichedCount} sales.`]);
+        setMessage(`Sucesso! Pedidos importados e ${enrichedCount} vínculos criados.`);
+        setStatus("success");
 
         // LOGIC CHANGE: Only set message based on newly added items?
         // Actually, mergedOrders handles the state.
@@ -667,6 +650,7 @@ export default function Home() {
         const newRecords = result.records.map((r: any) => ({
           ...r,
           data: new Date(r.data),
+          loja: getCanonicalStoreName(r.loja), // NORMALIZAÇAO AQUI!
           items: (r.items || []).map((i: any) => ({
             ...i,
             startTime: i.startTime ? new Date(i.startTime) : null
@@ -773,6 +757,7 @@ export default function Home() {
         const processedChunk = chunk.map((r: any) => ({
           ...r,
           data: new Date(r.data),
+          loja: getCanonicalStoreName(r.loja), // Normalização aqui!
           items: r.items?.map((i: any) => ({
             ...i,
             startTime: i.startTime ? new Date(i.startTime) : null
@@ -914,27 +899,23 @@ export default function Home() {
     }
 
     if (activeTab === 'crm' && data) {
-      return <CrmDashboard data={data} customers={allCustomers} />;
+      return <CrmDashboard data={data} customers={allCustomers} selectedStore={selectedStore || undefined} />;
     }
 
     if (activeTab === 'churn' && data && data.records.length > 0) {
-      return <ChurnAnalysis data={data} />;
+      return <ChurnAnalysis data={data} selectedStore={selectedStore || undefined} />;
     }
 
     if (activeTab === 'machines' && data) {
-      return <MachineAnalysis data={data} />;
+      return <MachineAnalysis data={data} selectedStore={selectedStore || undefined} />;
     }
 
     if (activeTab === 'queue' && data) {
-      return <QueueAnalysis data={data.records} />;
-    }
-
-    if (activeTab === 'queue' && data) {
-      return <QueueAnalysis data={data.records} />;
+      return <QueueAnalysis data={data.records} selectedStore={selectedStore || undefined} />;
     }
 
     if (activeTab === 'demographics' && data) {
-      return <CustomerDemographics records={data.records} customers={allCustomers} />;
+      return <CustomerDemographics records={data.records} customers={allCustomers} selectedStore={selectedStore || undefined} />;
     }
 
     if (activeTab === 'reports' && data) {

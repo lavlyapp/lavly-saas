@@ -10,11 +10,12 @@ import { startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, subMonths, for
 interface CustomerDemographicsProps {
     records: SaleRecord[];
     customers: CustomerRecord[];
+    selectedStore?: string;
 }
 
 type PeriodOption = 'today' | 'yesterday' | 'thisMonth' | 'lastMonth' | 'custom' | 'allTime';
 
-export function CustomerDemographics({ records, customers }: CustomerDemographicsProps) {
+export function CustomerDemographics({ records, customers, selectedStore }: CustomerDemographicsProps) {
     const { canAccess } = useSubscription();
 
     // --- Filter State (Copied from FinancialDashboard) ---

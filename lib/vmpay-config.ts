@@ -18,9 +18,62 @@ export interface VMPayCredential {
     tuyaSceneOffId?: string;
 }
 
+// Store Name Normalization Map
+// Maps raw names from API/Spreadsheets to Canonical Names used in UI
+export const STORE_NAME_MAP: Record<string, string> = {
+    "LAVATERIA BEZERRA MENEZES": "Lavateria Cascavel",
+    "BEZERRA MENEZES": "Lavateria Cascavel",
+    "BEZERRA": "Lavateria Cascavel",
+    "CASCAVEL": "Lavateria Cascavel",
+    "LAVATERIA SANTOS DUMONT": "Lavateria SANTOS DUMONT",
+    "SANTOS DUMONT": "Lavateria SANTOS DUMONT",
+    "LAVATERIA JOSE WALTER": "Lavateria JOSE WALTER",
+    "JOSE WALTER": "Lavateria JOSE WALTER",
+    "LAVATERIA SHOPPING (MARACANAU)": "Lavateria SHOPPING (Maracanau)",
+    "MARACANAU": "Lavateria SHOPPING (Maracanau)",
+    "LAVATERIA SHOPPING SOLARES": "Lavateria SHOPPING SOLARES",
+    "SOLARES": "Lavateria SHOPPING SOLARES",
+    "LAVATERIA JOQUEI": "Lavateria JOQUEI",
+    "JOQUEI": "Lavateria JOQUEI"
+};
+
 export interface VMPayMasterAccount {
     user: string;
     pass: string;
+}
+
+/**
+ * Normalizes a store name to its canonical version.
+ */
+export function getCanonicalStoreName(rawName: string): string {
+    if (!rawName) return "Desconhecido";
+
+    // Normalize string: Remove accents and convert to uppercase
+    const normalize = (s: string) =>
+        (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+
+    const normalizedRaw = normalize(rawName);
+
+    // 1. Check direct mapping (with normalization)
+    for (const [key, val] of Object.entries(STORE_NAME_MAP)) {
+        if (normalize(key) === normalizedRaw) {
+            console.log(`[v3-Config] Match: "${rawName}" -> "${val}"`);
+            return val;
+        }
+    }
+
+    // 2. Check partial matches (Greedy - find the most specific key)
+    const sortedKeys = Object.keys(STORE_NAME_MAP).sort((a, b) => b.length - a.length);
+    for (const key of sortedKeys) {
+        const normalizedKey = normalize(key);
+        if (normalizedRaw.includes(normalizedKey) || normalizedKey.includes(normalizedRaw)) {
+            console.log(`[v3-Config] Partial Match: "${rawName}" (key: "${key}") -> "${STORE_NAME_MAP[key]}"`);
+            return STORE_NAME_MAP[key];
+        }
+    }
+
+    // console.log(`[v3-Config] No Match: "${rawName}" (normalized: "${normalizedRaw}")`);
+    return rawName;
 }
 
 // Static fallback for initial setup or development
@@ -111,7 +164,7 @@ export async function getVMPayCredentials(): Promise<VMPayCredential[]> {
         if (data && data.length > 0) {
             return data.map(d => ({
                 id: d.id,
-                name: d.name,
+                name: getCanonicalStoreName(d.name),
                 cnpj: d.cnpj,
                 apiKey: d.api_key,
                 openTime: d.open_time,

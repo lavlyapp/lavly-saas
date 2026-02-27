@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { SaleRecord, OrderRecord } from "./processing/etl";
+import { getCanonicalStoreName } from "./vmpay-config";
 
 /**
  * Persists sales and their related orders to the database using Upsert.
@@ -14,7 +15,7 @@ export async function upsertSales(records: SaleRecord[]) {
         const salesToUpsert = records.map(r => ({
             id: r.id,
             data: r.data.toISOString(),
-            loja: r.loja,
+            loja: getCanonicalStoreName(r.loja),
             cliente: r.cliente,
             customer_id: r.customerId,
             produto: r.produto,
@@ -41,7 +42,7 @@ export async function upsertSales(records: SaleRecord[]) {
             (r.items || []).map(item => ({
                 sale_id: r.id,
                 data: item.startTime ? item.startTime.toISOString() : r.data.toISOString(),
-                loja: r.loja,
+                loja: getCanonicalStoreName(r.loja),
                 cliente: r.cliente,
                 machine: item.machine,
                 service: item.service,
@@ -110,7 +111,7 @@ export async function fetchSalesHistory() {
         const transformedSales: SaleRecord[] = sales.map(s => ({
             id: s.id,
             data: new Date(s.data),
-            loja: s.loja,
+            loja: getCanonicalStoreName(s.loja),
             cliente: s.cliente,
             customerId: s.customer_id,
             produto: s.produto,
@@ -128,7 +129,7 @@ export async function fetchSalesHistory() {
 
         const transformedOrders: OrderRecord[] = orders.map(o => ({
             data: new Date(o.data),
-            loja: o.loja,
+            loja: getCanonicalStoreName(o.loja),
             cliente: o.cliente,
             machine: o.machine,
             service: o.service,

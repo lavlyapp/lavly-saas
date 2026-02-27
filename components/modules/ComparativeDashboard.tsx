@@ -10,6 +10,8 @@ import { ptBR } from 'date-fns/locale';
 import { calculateCrmMetrics } from '@/lib/processing/crm';
 import { CustomerRecord, SaleRecord } from '@/lib/processing/etl';
 
+import { getCanonicalStoreName } from '@/lib/vmpay-config';
+
 interface ComparativeDashboardProps {
     data: {
         records: SaleRecord[];
@@ -36,18 +38,20 @@ const safeFormatWeek = (date: Date) => {
 
 export function ComparativeDashboard({ data, customers, selectedStore = 'Todas' }: ComparativeDashboardProps) {
 
+    const canonicalSelected = getCanonicalStoreName(selectedStore);
+
     // --- Store Filter Logic ---
     const filteredRecords = useMemo(() => {
         if (!data?.records) return [];
-        if (!selectedStore || selectedStore === 'Todas') return data.records;
-        return data.records.filter((r: any) => r.loja === selectedStore);
-    }, [data?.records, selectedStore]);
+        if (!selectedStore || selectedStore === 'Todas' || canonicalSelected === 'Todas') return data.records;
+        return data.records.filter((r: any) => getCanonicalStoreName(r.loja) === canonicalSelected);
+    }, [data?.records, selectedStore, canonicalSelected]);
 
     const filteredOrders = useMemo(() => {
         if (!data?.orders) return [];
-        if (!selectedStore || selectedStore === 'Todas') return data.orders;
-        return data.orders.filter((o: any) => o.loja === selectedStore);
-    }, [data?.orders, selectedStore]);
+        if (!selectedStore || selectedStore === 'Todas' || canonicalSelected === 'Todas') return data.orders;
+        return data.orders.filter((o: any) => getCanonicalStoreName(o.loja) === canonicalSelected);
+    }, [data?.orders, selectedStore, canonicalSelected]);
 
 
     // --- 12-Month Array Generator ---
