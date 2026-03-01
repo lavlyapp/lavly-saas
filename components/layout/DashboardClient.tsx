@@ -309,7 +309,9 @@ export default function DashboardClient({ initialSession }: { initialSession?: a
 
       try {
         // 1. Load active stores first
+        setLogs(prev => [...prev, "[System-Debug] 1/4 Importando vmpay-config..."]);
         const { getVMPayCredentials, getCanonicalStoreName } = await import("@/lib/vmpay-config");
+        setLogs(prev => [...prev, "[System-Debug] 2/4 Buscando credenciais VMPay..."]);
         const activeStores = await getVMPayCredentials();
         const configuredNames = activeStores.map(s => getCanonicalStoreName(s.name));
 
@@ -320,7 +322,9 @@ export default function DashboardClient({ initialSession }: { initialSession?: a
         }
 
         // 2. Load history from Supabase
+        setLogs(prev => [...prev, "[System-Debug] 3/4 Importando persistence.ts..."]);
         const { fetchSalesHistory } = await import("@/lib/persistence");
+        setLogs(prev => [...prev, "[System-Debug] 4/4 Aguardando fetchSalesHistory() (Banco de Dados)..."]);
         const { sales, orders } = await fetchSalesHistory();
 
         // Normalize names from DB just in case SQL migration wasn't 100% or cache exists
