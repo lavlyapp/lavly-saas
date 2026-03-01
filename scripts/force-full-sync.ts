@@ -7,8 +7,11 @@ dotenv.config({ path: '.env.local' });
 async function runFullSync() {
     console.log("Starting forced full historical sync (180 days) to backfill missing orders...");
     try {
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 180);
         // Fetch 180 days to cover the historical gap
-        const records = await syncVMPaySales(180);
+        const records = await syncVMPaySales(startDate, endDate);
         console.log(`Fetched ${records.length} records including items. Updating DB...`);
 
         // This will update sales AND insert the missing orders

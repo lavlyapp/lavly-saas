@@ -9,7 +9,10 @@ export const maxDuration = 300; // 5 minutes for Vercel Hobby
 export async function GET(request: Request) {
     console.log("[Force API] Starting 180-day backfill...");
     try {
-        const records = await syncVMPaySales(180);
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 180);
+        const records = await syncVMPaySales(startDate, endDate);
         console.log(`[Force API] Fetched ${records.length} historical records.`);
         const result = await upsertSales(records);
         return NextResponse.json({ success: true, count: records.length, result });

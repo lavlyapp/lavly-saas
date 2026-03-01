@@ -207,32 +207,67 @@ export async function fetchSalesHistory() {
  * Persists customers to the database using Upsert.
  */
 export async function upsertCustomers(records: CustomerRecord[], supabaseClient?: any) {
-    if (!records || records.length === 0) return;
+    if (!records || records.length === 0) return { success: true };
     const db = supabaseClient || supabase;
 
     try {
-        console.log(`[Persistence] Upserting ${records.length} customers...`);
+        console.log(`[Persistence] Safely merging ${records.length} customers...`);
 
-        const customersToUpsert = records.map(r => ({
-            id: r.id, // optional
-            cpf: r.cpf,
-            name: r.name,
-            phone: r.phone,
-            email: r.email,
-            gender: r.gender || 'U',
-            registration_date: r.registrationDate ? r.registrationDate.toISOString() : null,
-            updated_at: new Date().toISOString()
-        }));
+        // 1. Fetch existing customers to match by name
+        const { data: existingData, error: fetchErr } = await db.from('customers').select('id, name, cpf, phone');
+        if (fetchErr) throw fetchErr;
 
-        // We use CPF or name as unique conflict identifier, assuming CPF is UNIQUE.
-        // Wait, if CPF is not always present, name/phone might conflict. We'll use CPF if possible.
-        // For now, let's just insert with no onConflict if we don't know the exact unique constraint yet, or rely on id.
-        // The SQL script created UNIQUE(cpf). But if cpf is null? Supabase allows multiple nulls in unique constraints.
-        const { error } = await db
-            .from('customers')
-            .upsert(customersToUpsert, { onConflict: 'cpf', ignoreDuplicates: false });
+        const existingMap = new Map();
+        (existingData || []).forEach((c: any) => {
+            if (c.name) existingMap.set(c.name.trim().toUpperCase(), c);
+        });
 
-        if (error) throw error;
+        const toInsert: any[] = [];
+        const toUpdate: any[] = [];
+
+        records.forEach(r => {
+            if (!r.name) return;
+            const normName = r.name.trim().toUpperCase();
+            const existing = existingMap.get(normName);
+
+            const payload = {
+                name: normName,
+                cpf: r.cpf || null,
+                phone: r.phone || null,
+                email: r.email || null,
+                gender: r.gender || 'U',
+                registration_date: r.registrationDate ? r.registrationDate.toISOString() : null,
+                updated_at: new Date().toISOString()
+            };
+
+            if (existing) {
+                // Update only if we have new information
+                toUpdate.push({ id: existing.id, ...payload });
+            } else {
+                toInsert.push(payload);
+            }
+        });
+
+        console.log(`[Persistence] Inserting ${toInsert.length}, Updating ${toUpdate.length} customers...`);
+
+        if (toInsert.length > 0) {
+            // Batch inserts
+            for (let i = 0; i < toInsert.length; i += 1000) {
+                const chunk = toInsert.slice(i, i + 1000);
+                const { error: insErr } = await db.from('customers').insert(chunk);
+                if (insErr) console.error("Insert chunk error:", insErr.message);
+            }
+        }
+
+        if (toUpdate.length > 0) {
+            // Batch updates using upsert on ID since we pulled the real Supabase UUIDs
+            for (let i = 0; i < toUpdate.length; i += 1000) {
+                const chunk = toUpdate.slice(i, i + 1000);
+                const { error: upErr } = await db.from('customers').upsert(chunk, { onConflict: 'id' });
+                if (upErr) console.error("Update chunk error:", upErr.message);
+            }
+        }
+
         return { success: true };
     } catch (e: any) {
         console.error("[Persistence] Failed to upsert customers:", e);

@@ -619,25 +619,30 @@ export default function DashboardClient({ initialSession }: { initialSession?: a
         }
 
         // Final State Update (Garantindo Normalização)
-        setAllOrders(mergedOrders.map((o: any) => ({ ...o, loja: getCanonicalStoreName(o.loja) })));
-        setAllRecords(newRecords.map((r: any) => ({ ...r, loja: getCanonicalStoreName(r.loja) })));
+        const finalOrders = mergedOrders.map((o: any) => ({ ...o, loja: getCanonicalStoreName(o.loja) }));
+        const finalRecords = newRecords.map((r: any) => ({ ...r, loja: getCanonicalStoreName(r.loja) }));
+
+        setAllOrders(finalOrders);
+        setAllRecords(finalRecords);
 
         setLogs(prev => [...prev, ...etlLogs, `[DEBUG] Loop Complete. Linked ${enrichedCount} sales.`]);
-        setMessage(`Sucesso! Pedidos importados e ${enrichedCount} vínculos criados.`);
-        setStatus("success");
+        setMessage(`Fazendo persistência dos vínculos no banco de dados...`);
 
-        // LOGIC CHANGE: Only set message based on newly added items?
-        // Actually, mergedOrders handles the state.
-        // We calculate if new items were added roughly by size invalidation or just assume success logic.
-
-        setLogs(prev => [...prev, ...etlLogs]);
+        try {
+          const { upsertSales } = await import('@/lib/persistence');
+          // upsertSales also inserts the .items related to each sale into the orders table
+          await upsertSales(finalRecords);
+        } catch (e: any) {
+          console.error("Falha ao persistir vínculos:", e);
+          setLogs(prev => [...prev, `[ERRO] Falha ao persistir dados no Supabase: ${e.message}`]);
+        }
 
         const addedCount = mergedOrders.length - allOrders.length;
         if (addedCount > 0) {
-          setMessage(`Sucesso! ${addedCount} novos pedidos adicionados via Fusão. ${enrichedCount} vínculos criados.`);
+          setMessage(`Sucesso! ${addedCount} novos pedidos adicionados via Fusão. ${enrichedCount} vínculos salvos no banco.`);
           setStatus("success");
         } else if (enrichedCount > 0) {
-          setMessage(`Sucesso! Pedidos atualizados, ${enrichedCount} novos vínculos criados.`);
+          setMessage(`Sucesso! Pedidos atualizados, ${enrichedCount} novos vínculos salvos no banco.`);
           setStatus("success");
         } else {
           setMessage(`Nenhum pedido novo detectado (todos duplicados).`);
