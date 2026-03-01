@@ -12,13 +12,10 @@ export async function POST(req: NextRequest) {
         }
 
         console.log(`[UPLOAD API] Received file: ${file.name}, size: ${file.size} bytes`);
-        const fs = require('fs');
-        fs.appendFileSync('debug_upload.log', `[${new Date().toISOString()}] Received ${file.name} - ${file.size} bytes\n`);
 
         const result = await parseFile(file);
 
         console.log(`[UPLOAD API] Parsed Records: ${result.records?.length}, Errors: ${result.errors?.length}`);
-        fs.appendFileSync('debug_upload.log', `[${new Date().toISOString()}] Parsed ${result.records?.length} records. Errors: ${result.errors?.length}\n`);
 
         // 3. Log the upload activity
         await logActivity("UPLOAD_FILE", null, {
