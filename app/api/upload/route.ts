@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
             type: result.type, // Make sure type is returned!
             summary: (result as any).summary, // Type guard needed if result is union
             records: result.type === 'customers' ? [] : result.records,
-            customers: result.type === 'customers' ? result.records : undefined,
+            customers: result.type === 'customers' ? (result as any).customers : undefined,
             logs: (result as any).logs || [],
             errors: result.errors
         });
