@@ -45,9 +45,10 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
     const fallbackDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); // 90 dias de histórico
     let lastSync = storeData?.last_sync_sales ? new Date(storeData.last_sync_sales) : fallbackDate;
 
-    // Se for manual e não tiver histórico, forçamos a busca de 90 dias
+    // Se for manual e não tiver histórico, forçamos a busca de apenas 3 dias para não travar o sistema. O upload inicial (90 dias) deve ser feito via arquivo Excel.
     if (isManual && !storeData?.last_sync_sales) {
-        lastSync = fallbackDate;
+        lastSync = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+        console.log(`[Sync Manager] No last sync found for ${cred.name}. Using 3-day manual fallback: ${lastSync.toISOString()}`);
     }
 
     const acTurnOffAt = storeData?.ac_turn_off_at ? new Date(storeData.ac_turn_off_at) : null;
@@ -135,10 +136,14 @@ export async function runGlobalSync(isManual: boolean = false, supabaseClient?: 
     // 1. Handle AC Turn Off for expired timers (independente do sync de vendas)
     await checkAndTurnOffAll();
 
-    // 2. Process all stores
+    // 2. Process all stores in parallel for massive speedup
     const credentials = await getVMPayCredentials();
-    for (const cred of credentials) {
-        const sales = await processStoreSync(cred, isManual, supabaseClient);
+
+    console.log(`[Sync Manager] Processing ${credentials.length} stores in parallel...`);
+    const syncPromises = credentials.map(cred => processStoreSync(cred, isManual, supabaseClient));
+    const results = await Promise.all(syncPromises);
+
+    for (const sales of results) {
         if (sales && sales.length > 0) {
             allNewSales.push(...sales);
         }
