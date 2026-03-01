@@ -90,14 +90,27 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
         // --- PERSISTENCE ---
         if (sales.length > 0) {
             const { upsertSales } = await import("../persistence");
-            await upsertSales(sales, db);
+            const persistenceRes = await upsertSales(sales, db);
+            if (persistenceRes && !persistenceRes.success) {
+                // Return descriptive error immediately so Vercel logs and frontend surfaces it
+                throw new Error("Falha Crítica ao Salvar no Banco (RLS/Schema): " + persistenceRes.error);
+            }
         }
 
         // Update last sync time
-        await db
+        const { data: updateRes, error: updateError } = await db
             .from('stores')
             .update({ last_sync_sales: now.toISOString() })
-            .eq('cnpj', cred.cnpj);
+            .eq('cnpj', cred.cnpj)
+            .select();
+
+        if (updateError) {
+            throw new Error(`Erro SQL ao atualizar timestamp VMPay Pós-Sync: ${updateError.message}`);
+        }
+
+        if (!updateRes || updateRes.length === 0) {
+            throw new Error(`Bloqueio de Segurança (RLS Supabase): O usuário atual não tem permissões suficientes para gravar o novo horário de sincronização na tabela 'stores' da loja ${cred.name}. Rode o script 'fix_stores_supabase.sql' no seu Supabase para consertar! Sem isso, o Lavly será incapaz de guardar as atualizações.`);
+        }
 
         // --- AUTOMATION TRIGGER ---
         if (cred.hasAcSubscription && sales.length > 0) {
