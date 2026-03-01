@@ -745,15 +745,28 @@ export default function DashboardClient({ initialSession }: { initialSession?: a
       const isFirstSync = allRecords.length === 0;
       const url = isFirstSync ? "/api/vmpay/sync?source=manual&force=true" : "/api/vmpay/sync?source=manual";
 
+      // Set an abort controller to prevent infinite freeze if Vercel drops connection without 50x
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 55000); // Vercel times out at 60s max, we abort slightly before
+
       const res = await fetch(url, {
         method: "GET",
         headers: {
           ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        }
+        },
+        signal: controller.signal
       });
-      const result = await res.json();
+      clearTimeout(timeoutId);
 
-      if (!result.success) throw new Error(result.error);
+      // Robust check for Vercel 504 timeouts (HTML instead of JSON)
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const textStr = await res.text();
+        throw new Error(`A sincronização demorou muito e o servidor (Vercel) encerrou a conexão (Timeout). Tente atualizar a página ou sincronizar uma loja por vez. Resposta bruta: ${textStr.substring(0, 50)}...`);
+      }
+
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || `HTTP ${res.status}`);
 
       // --- CUSTOMERS SYNC ---
       if (result.customers && Array.isArray(result.customers)) {
