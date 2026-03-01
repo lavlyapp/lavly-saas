@@ -306,6 +306,8 @@ export default function DashboardClient({ initialSession }: { initialSession?: a
 
       console.log("[Home] Initializing app data...");
       setLogs(prev => [...prev, "[System] Iniciando carregamento de dados..."]);
+      setStatus("uploading");
+      setMessage("Carregando histórico do banco de dados...");
 
       try {
         // 1. Load active stores first
@@ -343,6 +345,8 @@ export default function DashboardClient({ initialSession }: { initialSession?: a
         } else {
           setLogs(prev => [...prev, "[System] Nenhum histórico encontrado. Aguardando novos dados."]);
         }
+        setStatus("idle");
+        setMessage("");
       } catch (err) {
         console.error("[Home] Error during initialization:", err);
         setLogs(prev => [...prev, `[Erro] Falha crítica ao carregar dados: ${(err as any).message}`]);

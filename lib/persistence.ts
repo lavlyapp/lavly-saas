@@ -81,29 +81,46 @@ export async function fetchSalesHistory() {
     try {
         console.log("[Persistence] Fetching sales history from Supabase with pagination...");
 
-        // Helper to fetch all pages
+        // Helper to fetch all pages with concurrent batches
         const fetchAll = async (tableName: string, orderColumn?: string) => {
+            const { count, error: countErr } = await supabase
+                .from(tableName)
+                .select('*', { count: 'exact', head: true });
+
+            if (countErr) {
+                console.warn(`[Persistence] Could not get count for ${tableName}:`, countErr);
+                return [];
+            }
+            if (!count) return [];
+
+            const pageSize = 1000;
+            const pages = Math.ceil(count / pageSize);
+            const queryFns = [];
+
+            for (let i = 0; i < pages; i++) {
+                queryFns.push(async () => {
+                    const start = i * pageSize;
+                    const end = start + pageSize - 1;
+                    let query = supabase.from(tableName).select('*').range(start, end);
+                    if (orderColumn) {
+                        query = query.order(orderColumn, { ascending: false });
+                    }
+                    return query;
+                });
+            }
+
             let allData: any[] = [];
-            let r_count = 1000;
-            let start = 0;
-            let end = 999;
-
-            while (r_count === 1000) {
-                let query = supabase.from(tableName).select('*').range(start, end);
-                if (orderColumn) {
-                    query = query.order(orderColumn, { ascending: false });
-                }
-
-                const { data, error } = await query;
-                if (error) throw error;
-
-                if (data) {
-                    allData = [...allData, ...data];
-                    r_count = data.length;
-                    start += 1000;
-                    end += 1000;
-                } else {
-                    r_count = 0;
+            // Run 10 requests concurrently
+            for (let i = 0; i < queryFns.length; i += 10) {
+                const chunk = queryFns.slice(i, i + 10);
+                const chunkResults = await Promise.all(chunk.map(fn => fn()));
+                for (const res of chunkResults) {
+                    if (res.error) throw res.error;
+                    if (res.data) {
+                        for (let j = 0; j < res.data.length; j++) {
+                            allData.push(res.data[j]);
+                        }
+                    }
                 }
             }
 
