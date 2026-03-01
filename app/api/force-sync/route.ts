@@ -7,15 +7,22 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minutes for Vercel Hobby
 
 export async function GET(request: Request) {
-    console.log("[Force API] Starting 180-day backfill...");
+    const { searchParams } = new URL(request.url);
+    const chunkDays = parseInt(searchParams.get('chunk') || "15");
+    const offsetDays = parseInt(searchParams.get('offset') || "0");
+
+    console.log(`[Force API] Chunk: ${chunkDays} days, offset: ${offsetDays}...`);
     try {
         const endDate = new Date();
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() - 180);
+        endDate.setDate(endDate.getDate() - offsetDays);
+
+        const startDate = new Date(endDate);
+        startDate.setDate(startDate.getDate() - chunkDays);
+
         const records = await syncVMPaySales(startDate, endDate);
         console.log(`[Force API] Fetched ${records.length} historical records.`);
         const result = await upsertSales(records);
-        return NextResponse.json({ success: true, count: records.length, result });
+        return NextResponse.json({ success: true, count: records.length, startDate, endDate, result });
     } catch (e: any) {
         return NextResponse.json({ success: false, error: e.message });
     }

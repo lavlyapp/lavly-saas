@@ -224,10 +224,16 @@ export async function upsertCustomers(records: CustomerRecord[], supabaseClient?
 
         const toInsert: any[] = [];
         const toUpdate: any[] = [];
+        const incomingMap = new Map();
 
+        // Deduplicate records in the incoming batch
         records.forEach(r => {
             if (!r.name) return;
             const normName = r.name.trim().toUpperCase();
+            incomingMap.set(normName, r);
+        });
+
+        incomingMap.forEach((r, normName) => {
             const existing = existingMap.get(normName);
 
             const payload = {
@@ -255,7 +261,10 @@ export async function upsertCustomers(records: CustomerRecord[], supabaseClient?
             for (let i = 0; i < toInsert.length; i += 1000) {
                 const chunk = toInsert.slice(i, i + 1000);
                 const { error: insErr } = await db.from('customers').insert(chunk);
-                if (insErr) console.error("Insert chunk error:", insErr.message);
+                if (insErr) {
+                    console.error("Insert chunk error:", insErr.message);
+                    throw new Error(`Falha ao inserir clientes: ${insErr.message}`);
+                }
             }
         }
 
@@ -264,13 +273,16 @@ export async function upsertCustomers(records: CustomerRecord[], supabaseClient?
             for (let i = 0; i < toUpdate.length; i += 1000) {
                 const chunk = toUpdate.slice(i, i + 1000);
                 const { error: upErr } = await db.from('customers').upsert(chunk, { onConflict: 'id' });
-                if (upErr) console.error("Update chunk error:", upErr.message);
+                if (upErr) {
+                    console.error("Update chunk error:", upErr.message);
+                    throw new Error(`Falha ao atualizar clientes: ${upErr.message}`);
+                }
             }
         }
 
         return { success: true };
     } catch (e: any) {
         console.error("[Persistence] Failed to upsert customers:", e);
-        return { success: false, error: e.message };
+        throw e; // Throw so DashboardClient catches it and shows in UI
     }
 }

@@ -93,6 +93,7 @@ function AppContent({
   setSelectedStore,
   handleFileUpload,
   handleSyncVMPay,
+  handleForceSync,
   renderContent
 }: any) {
   const { selectedCustomerName, closeCustomerDetails } = useCustomerContext();
@@ -172,6 +173,19 @@ function AppContent({
             >
               <RefreshCw className={cn("w-4 h-4", status === 'uploading' && "animate-spin")} />
               {status === 'uploading' ? 'Sincronizando...' : 'Sync VMPay'}
+            </button>
+
+            <button
+              onClick={handleForceSync}
+              disabled={status === 'uploading'}
+              title="Baixar todos os milhares de cestos dos últimos 180 dias"
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                status === 'uploading' ? "bg-neutral-800 text-neutral-400" : "bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-500/20"
+              )}
+            >
+              <FileUp className={cn("w-4 h-4", status === 'uploading' && "animate-bounce")} />
+              <span>Resgatar Cestos (180d)</span>
             </button>
 
             <div className="relative group">
@@ -739,6 +753,51 @@ export default function DashboardClient({ initialSession }: { initialSession?: a
 
   }
 
+  async function handleForceSync() {
+    setStatus("uploading");
+    setLogs(prev => [...prev, "[System] Iniciando resgate completo do histórico (180 dias)..."]);
+
+    // We fetch in chunks of 15 days, going back up to 180 days (12 chunks)
+    const chunks = 12;
+    const chunkSize = 15;
+    let totalFetched = 0;
+    const errors = [];
+
+    for (let i = 0; i < chunks; i++) {
+      const offset = i * chunkSize;
+      setMessage(`Recuperando histórico... Etapa ${i + 1} de ${chunks} (${offset} dias atrás)`);
+      try {
+        const response = await fetch(`/api/force-sync?chunk=${chunkSize}&offset=${offset}`);
+        if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+        const result = await response.json();
+
+        if (result.success) {
+          totalFetched += result.count;
+          setLogs(prev => [...prev, `[System] Etapa ${i + 1}/${chunks} concluída: ${result.count} registros adicionados.`]);
+        } else {
+          setLogs(prev => [...prev, `[Erro] Etapa ${i + 1}/${chunks} falhou: ${result.error}`]);
+          errors.push(result.error);
+        }
+      } catch (err: any) {
+        setLogs(prev => [...prev, `[Erro] Falha na requisição da etapa ${i + 1}: ${err.message}`]);
+        errors.push(err.message);
+      }
+    }
+
+    if (errors.length < chunks) {
+      if (errors.length > 0) {
+        setMessage(`Resgate parcial: ${totalFetched} registros salvos, mas houve erros em algumas etapas. Atualize a página e tente novamente mais tarde.`);
+        setStatus("error");
+      } else {
+        setMessage(`Sucesso! Histórico completo de 180 dias recuperado. Atualize a página (F5) para ver os milhares de Cestos.`);
+        setStatus("success");
+      }
+    } else {
+      setMessage("Falha ao resgatar o histórico. Todas as etapas falharam.");
+      setStatus("error");
+    }
+  }
+
   async function handleSyncVMPay() {
     setStatus("uploading");
     setMessage("Sincronizando dados com VMPay... (Isso pode demorar alguns segundos)");
@@ -1001,6 +1060,7 @@ export default function DashboardClient({ initialSession }: { initialSession?: a
               setSelectedStore={setSelectedStore}
               handleFileUpload={handleFileUpload}
               handleSyncVMPay={handleSyncVMPay}
+              handleForceSync={handleForceSync}
               renderContent={renderContent}
             />
           </CustomerProvider>
