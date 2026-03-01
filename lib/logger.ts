@@ -7,6 +7,7 @@ export type ActivityAction =
     | "UPLOAD_FILE"
     | "AC_TRIGGER"
     | "STORE_UPDATE"
+    | "SYNC_VMPAY_CRON"
     | "COUPON_UPLOAD";
 
 /**
