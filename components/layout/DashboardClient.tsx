@@ -641,7 +641,16 @@ export default function DashboardClient({ initialSession }: { initialSession?: a
         // --- CUSTOMERS IMPORT ---
         const customers = result.customers || [];
         setAllCustomers(customers);
-        setMessage(`Sucesso! ${customers.length} clientes importados. O CRM será atualizado.`);
+
+        try {
+          const { upsertCustomers } = await import('@/lib/persistence');
+          await upsertCustomers(customers);
+          setMessage(`Sucesso! ${customers.length} clientes importados e salvos no banco de dados. O CRM será atualizado.`);
+        } catch (e: any) {
+          console.error("Falha ao salvar clientes no banco", e);
+          setMessage(`Sucesso na leitura, mas falha ao salvar: ${e.message}`);
+        }
+
         setStatus("success");
         if (result.logs) setLogs(prev => [...prev, ...result.logs]);
 

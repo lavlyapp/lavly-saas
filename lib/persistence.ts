@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { SaleRecord, OrderRecord } from "./processing/etl";
+import { SaleRecord, OrderRecord, CustomerRecord } from "./processing/etl";
 import { getCanonicalStoreName } from "./vmpay-config";
 
 /**
@@ -114,6 +114,13 @@ export async function fetchSalesHistory() {
         const sales = await fetchAll('sales', 'data');
         const orders = await fetchAll('orders', 'data');
 
+        let customers: any[] = [];
+        try {
+            customers = await fetchAll('customers', 'name');
+        } catch (e: any) {
+            console.warn("[Persistence] Customers table not found or error fetching. Skipping customer demographic preset.", e.message);
+        }
+
         // Transform back to Record types
         // Optimization: Pre-group orders by sale_id to avoid O(N*M) search
         const ordersBySaleId = new Map<string, any[]>();
@@ -161,9 +168,57 @@ export async function fetchSalesHistory() {
             originalRow: 0
         }));
 
-        return { sales: transformedSales, orders: transformedOrders };
+        const transformedCustomers: CustomerRecord[] = customers.map(c => ({
+            id: c.id,
+            cpf: c.cpf,
+            name: c.name,
+            phone: c.phone,
+            email: c.email,
+            gender: c.gender,
+            registrationDate: c.registration_date ? new Date(c.registration_date) : undefined,
+            originalRow: 0
+        }));
+
+        return { sales: transformedSales, orders: transformedOrders, customers: transformedCustomers };
     } catch (e: any) {
         console.error("[Persistence] Failed to fetch sales:", e);
         return { sales: [], orders: [] };
+    }
+}
+
+/**
+ * Persists customers to the database using Upsert.
+ */
+export async function upsertCustomers(records: CustomerRecord[], supabaseClient?: any) {
+    if (!records || records.length === 0) return;
+    const db = supabaseClient || supabase;
+
+    try {
+        console.log(`[Persistence] Upserting ${records.length} customers...`);
+
+        const customersToUpsert = records.map(r => ({
+            id: r.id, // optional
+            cpf: r.cpf,
+            name: r.name,
+            phone: r.phone,
+            email: r.email,
+            gender: r.gender || 'U',
+            registration_date: r.registrationDate ? r.registrationDate.toISOString() : null,
+            updated_at: new Date().toISOString()
+        }));
+
+        // We use CPF or name as unique conflict identifier, assuming CPF is UNIQUE.
+        // Wait, if CPF is not always present, name/phone might conflict. We'll use CPF if possible.
+        // For now, let's just insert with no onConflict if we don't know the exact unique constraint yet, or rely on id.
+        // The SQL script created UNIQUE(cpf). But if cpf is null? Supabase allows multiple nulls in unique constraints.
+        const { error } = await db
+            .from('customers')
+            .upsert(customersToUpsert, { onConflict: 'cpf', ignoreDuplicates: false });
+
+        if (error) throw error;
+        return { success: true };
+    } catch (e: any) {
+        console.error("[Persistence] Failed to upsert customers:", e);
+        return { success: false, error: e.message };
     }
 }
