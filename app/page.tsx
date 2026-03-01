@@ -728,8 +728,11 @@ export default function Home() {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
 
-      // Default sync: last 30 days (handled by API if no params)
-      const res = await fetch("/api/vmpay/sync?source=manual", {
+      // Force full sync (180 days) if dashboard is completely empty
+      const isFirstSync = allRecords.length === 0;
+      const url = isFirstSync ? "/api/vmpay/sync?source=manual&force=true" : "/api/vmpay/sync?source=manual";
+
+      const res = await fetch(url, {
         method: "GET",
         headers: {
           ...(token ? { "Authorization": `Bearer ${token}` } : {})
