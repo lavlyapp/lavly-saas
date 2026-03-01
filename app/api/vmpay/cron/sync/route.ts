@@ -26,7 +26,7 @@ export async function GET(request: Request) {
         }
 
         // Run sync
-        const newSales = await runGlobalSync(false, supabaseClient);
+        const newSales = await runGlobalSync(false, false, supabaseClient);
 
         // Sync customers as part of the daily routine
         const { syncVMPayCustomers } = await import('@/lib/vmpay-client');

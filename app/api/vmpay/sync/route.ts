@@ -8,6 +8,7 @@ export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const isManual = searchParams.get('source') === 'manual';
+        const force = searchParams.get('force') === 'true';
 
         // Retrieve token from Authorization header (sent by the frontend)
         const authHeader = request.headers.get('Authorization');
@@ -37,7 +38,7 @@ export async function GET(request: Request) {
 
         // 1. Run sync (checks hours, ac states, etc.)
         // Pass the authenticated client so sync-manager can use it for RLS-protected updates
-        const newSales = await runGlobalSync(isManual, supabaseClient);
+        const newSales = await runGlobalSync(isManual, force, supabaseClient);
 
         // 2. Sync customers - REMOVED for performance, as requested
 
