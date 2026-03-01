@@ -54,7 +54,9 @@ export async function middleware(request: NextRequest) {
         }
     )
 
-    const { data: { user } } = await supabase.auth.getUser()
+    // Removed supabase.auth.getUser() from middleware logic 
+    // because Vercel Edge frequently drops the connection to Supabase during high volume
+    // or throws 500 when no token is present. The session is already verified in layout/page.tsx.
 
     // Protect dashboard routes
     // For now, let's assume the root page is the dashboard and it handles its own login redirect via AuthContext
