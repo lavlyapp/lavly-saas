@@ -5,8 +5,10 @@ import { getCanonicalStoreName } from "./vmpay-config";
 /**
  * Persists sales and their related orders to the database using Upsert.
  */
-export async function upsertSales(records: SaleRecord[]) {
+export async function upsertSales(records: SaleRecord[], supabaseClient?: any) {
     if (!records || records.length === 0) return;
+
+    const db = supabaseClient || supabase;
 
     try {
         console.log(`[Persistence] Upserting ${records.length} sales...`);
@@ -30,7 +32,7 @@ export async function upsertSales(records: SaleRecord[]) {
             updated_at: new Date().toISOString()
         }));
 
-        const { error: salesError } = await supabase
+        const { error: salesError } = await db
             .from('sales')
             .upsert(salesToUpsert, { onConflict: 'id' });
 
@@ -56,7 +58,7 @@ export async function upsertSales(records: SaleRecord[]) {
             console.log(`[Persistence] Upserting ${ordersToUpsert.length} related orders...`);
             // Note: Orders table uses auto-generated UUID, but we want to avoid duplicates if possible.
             // For now, we'll just insert, but in a production app we might want a unique key for orders too.
-            const { error: ordersError } = await supabase
+            const { error: ordersError } = await db
                 .from('orders')
                 .upsert(ordersToUpsert, { onConflict: 'sale_id, machine, data' }); // Hypothetical unique key
 

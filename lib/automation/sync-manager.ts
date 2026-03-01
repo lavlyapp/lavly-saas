@@ -26,14 +26,16 @@ function isWithinStoreHours(cred: VMPayCredential): boolean {
     }
 }
 
-export async function processStoreSync(cred: VMPayCredential, isManual: boolean = false) {
+export async function processStoreSync(cred: VMPayCredential, isManual: boolean = false, supabaseClient?: any) {
+    const db = supabaseClient || supabase;
+
     // Permite sincronização manual mesmo fora do horário de funcionamento
     if (!isManual && !isWithinStoreHours(cred)) {
         console.log(`[Sync Manager] Store ${cred.name} is CLOSED. Skipping sync.`);
         return;
     }
 
-    const { data: storeData } = await supabase
+    const { data: storeData } = await db
         .from('stores')
         .select('last_sync_sales, ac_turn_off_at')
         .eq('cnpj', cred.cnpj)
@@ -87,11 +89,11 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
         // --- PERSISTENCE ---
         if (sales.length > 0) {
             const { upsertSales } = await import("../persistence");
-            await upsertSales(sales);
+            await upsertSales(sales, db);
         }
 
         // Update last sync time
-        await supabase
+        await db
             .from('stores')
             .update({ last_sync_sales: now.toISOString() })
             .eq('cnpj', cred.cnpj);
@@ -126,7 +128,7 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
 /**
  * Global entry point for the Sync loop
  */
-export async function runGlobalSync(isManual: boolean = false) {
+export async function runGlobalSync(isManual: boolean = false, supabaseClient?: any) {
     console.log(`[Sync Manager] Starting global loop at ${new Date().toISOString()} (Manual: ${isManual})`);
     const allNewSales: any[] = [];
 
@@ -136,7 +138,7 @@ export async function runGlobalSync(isManual: boolean = false) {
     // 2. Process all stores
     const credentials = await getVMPayCredentials();
     for (const cred of credentials) {
-        const sales = await processStoreSync(cred, isManual);
+        const sales = await processStoreSync(cred, isManual, supabaseClient);
         if (sales && sales.length > 0) {
             allNewSales.push(...sales);
         }

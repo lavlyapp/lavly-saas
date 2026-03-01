@@ -723,8 +723,18 @@ export default function Home() {
     setLogs(prev => [...prev, "[VMPay] Iniciando sincronização via API..."]);
 
     try {
+      // Fetch current session for auth token
+      const { supabase } = await import("@/lib/supabase");
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
       // Default sync: last 30 days (handled by API if no params)
-      const res = await fetch("/api/vmpay/sync?source=manual");
+      const res = await fetch("/api/vmpay/sync?source=manual", {
+        method: "GET",
+        headers: {
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        }
+      });
       const result = await res.json();
 
       if (!result.success) throw new Error(result.error);
