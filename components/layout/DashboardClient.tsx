@@ -314,8 +314,8 @@ export default function DashboardClient({ initialSession }: { initialSession?: a
         const configuredNames = activeStores.map(s => getCanonicalStoreName(s.name));
 
         let initialStore = selectedStore;
-        if (configuredNames.length > 0 && !selectedStore) {
-          initialStore = configuredNames[0];
+        if (!selectedStore) {
+          initialStore = 'Todas';
           setSelectedStore(initialStore);
         }
 
