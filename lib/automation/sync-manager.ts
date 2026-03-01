@@ -42,13 +42,13 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
         .single();
 
     const now = new Date();
-    const fallbackDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); // 90 dias de histórico
+    const fallbackDate = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000); // 180 dias de histórico
     let lastSync = storeData?.last_sync_sales ? new Date(storeData.last_sync_sales) : fallbackDate;
 
-    // Se for manual e não tiver histórico, forçamos a busca de apenas 3 dias para não travar o sistema. O upload inicial (90 dias) deve ser feito via arquivo Excel.
+    // A pedido do usuário, se for manual e não houver histórico, puxamos 180 dias 
     if (isManual && !storeData?.last_sync_sales) {
-        lastSync = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
-        console.log(`[Sync Manager] No last sync found for ${cred.name}. Using 3-day manual fallback: ${lastSync.toISOString()}`);
+        lastSync = fallbackDate;
+        console.log(`[Sync Manager] No last sync found for ${cred.name}. Fetching 180-day history: ${lastSync.toISOString()}`);
     }
 
     const acTurnOffAt = storeData?.ac_turn_off_at ? new Date(storeData.ac_turn_off_at) : null;
