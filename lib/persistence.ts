@@ -79,20 +79,38 @@ export async function upsertSales(records: SaleRecord[], supabaseClient?: any) {
  */
 export async function fetchSalesHistory() {
     try {
-        console.log("[Persistence] Fetching sales history from Supabase...");
+        console.log("[Persistence] Fetching sales history from Supabase with pagination...");
 
-        const { data: sales, error: salesError } = await supabase
-            .from('sales')
-            .select('*')
-            .order('data', { ascending: false });
+        // Helper to fetch all pages
+        const fetchAll = async (tableName: string, orderColumn?: string) => {
+            let allData: any[] = [];
+            let r_count = 1000;
+            let start = 0;
+            let end = 999;
 
-        if (salesError) throw salesError;
+            while (r_count === 1000) {
+                let query = supabase.from(tableName).select('*').range(start, end);
+                if (orderColumn) {
+                    query = query.order(orderColumn, { ascending: false });
+                }
 
-        const { data: orders, error: ordersError } = await supabase
-            .from('orders')
-            .select('*');
+                const { data, error } = await query;
+                if (error) throw error;
 
-        if (ordersError) throw ordersError;
+                if (data) {
+                    allData = [...allData, ...data];
+                    r_count = data.length;
+                    start += 1000;
+                    end += 1000;
+                } else {
+                    r_count = 0;
+                }
+            }
+            return allData;
+        };
+
+        const sales = await fetchAll('sales', 'data');
+        const orders = await fetchAll('orders');
 
         // Transform back to Record types
         // Optimization: Pre-group orders by sale_id to avoid O(N*M) search

@@ -170,13 +170,16 @@ export async function runGlobalSync(isManual: boolean = false, force: boolean = 
     // 2. Process all stores in parallel for massive speedup
     const credentials = await getVMPayCredentials();
 
-    console.log(`[Sync Manager] Processing ${credentials.length} stores in parallel...`);
-    const syncPromises = credentials.map(cred => processStoreSync(cred, isManual, force, supabaseClient));
-    const results = await Promise.all(syncPromises);
+    console.log(`[Sync Manager] Processing ${credentials.length} stores sequentially to protect external API rate limits...`);
 
-    for (const sales of results) {
-        if (sales && sales.length > 0) {
-            allNewSales.push(...sales);
+    for (const cred of credentials) {
+        try {
+            const sales = await processStoreSync(cred, isManual, force, supabaseClient);
+            if (sales && sales.length > 0) {
+                allNewSales.push(...sales);
+            }
+        } catch (storeError) {
+            console.error(`[Sync Manager] Store sync failed for ${cred.name}`, storeError);
         }
     }
 

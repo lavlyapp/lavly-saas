@@ -13,7 +13,8 @@ async function fetchMachines(apiKey: string): Promise<EquipmentMap> {
         const MAX_PAGES = 50;
         while (page < MAX_PAGES) {
             const res = await fetch(`${VMPAY_API_BASE_URL}/maquinas?pagina=${page}&quantidade=${size}`, {
-                headers: { 'x-api-key': apiKey }
+                headers: { 'x-api-key': apiKey },
+                signal: AbortSignal.timeout(15000)
             });
 
             if (!res.ok) break;
@@ -72,7 +73,8 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                 while (true) {
                     const url = `${VMPAY_API_BASE_URL}/vendas?dataInicio=${startStr}&dataTermino=${endStr}&somenteSucesso=true&pagina=${page}&quantidade=${size}`;
                     const res = await fetch(url, {
-                        headers: { 'x-api-key': cred.apiKey }
+                        headers: { 'x-api-key': cred.apiKey },
+                        signal: AbortSignal.timeout(20000) // 20 sec timeout for sales fetch
                     });
 
                     if (!res.ok) {
