@@ -106,11 +106,13 @@ export async function fetchSalesHistory() {
                     r_count = 0;
                 }
             }
+
+            console.log(`[Persistence] fetchAll completed for ${tableName}. Total rows: ${allData.length}`);
             return allData;
         };
 
         const sales = await fetchAll('sales', 'data');
-        const orders = await fetchAll('orders');
+        const orders = await fetchAll('orders', 'data');
 
         // Transform back to Record types
         // Optimization: Pre-group orders by sale_id to avoid O(N*M) search
