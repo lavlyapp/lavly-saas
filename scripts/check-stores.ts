@@ -1,34 +1,26 @@
 import { createClient } from '@supabase/supabase-js';
-import * as dotenv from 'dotenv';
-import * as path from 'path';
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
 
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('Supabase credentials missing.');
-    process.exit(1);
-}
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 async function checkStores() {
-    console.log('Checking stores table...');
-    const { data, error } = await supabase
-        .from('stores')
-        .select('*');
-
-    if (error) {
-        console.error('Error fetching stores:', error);
+    console.log("Checking unique store names recorded in Orders table...");
+    const { data: stores, error: sErr } = await supabase.from('orders').select('loja');
+    if (sErr) {
+        console.error("Error fetching stores:", sErr);
         return;
     }
 
-    console.log(`Found ${data.length} stores:`);
-    data.forEach(s => {
-        console.log(`- ${s.name} (CNPJ: ${s.cnpj}, Active: ${s.is_active}, HasSyncLink: ${!!s.api_key})`);
-    });
+    const unique = new Set(stores?.map(s => s.loja));
+    console.log("Unique Lojas in Orders:", Array.from(unique));
+
+    // Check specific records for Jóquei
+    const { data: joquei, error: jErr } = await supabase.from('orders').select('*').ilike('loja', '%JOQUEI%').limit(5);
+    console.log("Jóquei Sample Orders:", joquei);
 }
 
 checkStores();
