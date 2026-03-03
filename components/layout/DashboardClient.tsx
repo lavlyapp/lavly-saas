@@ -341,7 +341,10 @@ export default function DashboardClient({ initialSession }: { initialSession?: a
         setLogs(prev => [...prev, "[System-Debug] 3/4 Importando persistence.ts..."]);
         const { fetchSalesHistory } = await import("@/lib/persistence");
         setLogs(prev => [...prev, "[System-Debug] 4/4 Aguardando fetchSalesHistory() (Banco de Dados)..."]);
-        const { sales, orders } = await fetchSalesHistory();
+        const { sales, orders, customers } = await fetchSalesHistory();
+        if (customers) {
+          setAllCustomers(customers);
+        }
 
         // Normalize names from DB just in case SQL migration wasn't 100% or cache exists
         const normalizedSales = sales.map(s => ({ ...s, loja: getCanonicalStoreName(s.loja) }));
@@ -896,10 +899,9 @@ export default function DashboardClient({ initialSession }: { initialSession?: a
         await new Promise(resolve => setTimeout(resolve, 0));
       }
 
-      const newCount = totalToProcess;
       const custCount = result.customers?.length || 0;
-      setLogs(prev => [...prev, `[VMPay] Sincronização concluída. ${newCount} vendas, ${custCount} clientes.`]);
-      setMessage(`Sincronização VMPay concluída! ${newCount} vendas, ${custCount} clientes.`);
+      setLogs(prev => [...prev, `[VMPay] Sincronização concluída. ${totalToProcess} vendas, ${custCount} clientes.`]);
+      setMessage(`Sincronização VMPay concluída! ${totalToProcess} vendas, ${custCount} clientes.`);
       setStatus("success");
 
     } catch (e: any) {

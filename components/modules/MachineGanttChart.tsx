@@ -61,12 +61,14 @@ export function MachineGanttChart({ records }: MachineGanttChartProps) {
             const nameB = b[0].toLowerCase();
 
             // Identify type
-            const isDryA = nameA.includes('secadora') || nameA.includes('sec');
-            const isDryB = nameB.includes('secadora') || nameB.includes('sec');
+            const isDryA = nameA.includes('secadora') || nameA.includes('sec') || nameA.includes('superior');
+            const isDryB = nameB.includes('secadora') || nameB.includes('sec') || nameB.includes('superior');
+            const isWashA = nameA.includes('lavadora') || nameA.includes('lav') || nameA.includes('inferior');
+            const isWashB = nameB.includes('lavadora') || nameB.includes('lav') || nameB.includes('inferior');
 
             // 1. Primary Sort: Type (Wash before Dry)
             if (isDryA !== isDryB) {
-                return isDryA ? 1 : -1; // If A is dry, it goes after
+                return (isDryA && !isWashA) ? 1 : -1; // If A is strictly dry, it goes after
             }
 
             // 2. Secondary Sort: Number

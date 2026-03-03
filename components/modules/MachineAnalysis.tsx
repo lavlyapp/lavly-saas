@@ -71,8 +71,8 @@ export function MachineAnalysis({ data, selectedStore }: MachineAnalysisProps) {
                 const machineId = item.machine;
                 if (!machineId) return;
 
-                const isWash = item.service.toLowerCase().includes('lav') || item.machine.toLowerCase().includes('lav');
-                const isDry = item.service.toLowerCase().includes('sec') || item.machine.toLowerCase().includes('sec');
+                const isWash = item.service.toLowerCase().includes('lav') || item.machine.toLowerCase().includes('lav') || item.machine.toLowerCase().includes('inferior');
+                const isDry = item.service.toLowerCase().includes('sec') || item.machine.toLowerCase().includes('sec') || item.machine.toLowerCase().includes('superior');
                 const type = isWash ? 'Lavadora' : (isDry ? 'Secadora' : 'Outro');
 
                 const current = machineMap.get(machineId) || {
@@ -104,7 +104,7 @@ export function MachineAnalysis({ data, selectedStore }: MachineAnalysisProps) {
             avgTicket: m.cycles > 0 ? m.totalRevenue / m.cycles : 0
         }));
 
-        // Sort by Type (Lavadora < Secadora), then by ID
+        // Sort by Type (Lavadora < Secadora < Outro), then by ID
         machineList.sort((a, b) => {
             if (a.type !== b.type) {
                 if (a.type === 'Lavadora') return -1;

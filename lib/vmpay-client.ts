@@ -245,13 +245,18 @@ export async function syncVMPayCustomers(): Promise<CustomerRecord[]> {
                 console.log(`[VMPay Client] Page ${page} received ${data.length} customers.`);
 
                 for (const c of data) {
+                    const genderRaw = (c.genero || c.sexo || '').trim().toUpperCase();
+                    let gender: 'M' | 'F' | 'U' = 'U';
+                    if (genderRaw.startsWith('M') || genderRaw === 'MASCULINO') gender = 'M';
+                    else if (genderRaw.startsWith('F') || genderRaw === 'FEMININO') gender = 'F';
+
                     const record: CustomerRecord = {
                         id: String(c.id),
                         name: c.nome.trim().toUpperCase(),
                         phone: c.telefone,
                         email: c.email,
                         cpf: c.cpf,
-                        gender: c.genero === 'M' || c.genero === 'F' ? c.genero : 'U',
+                        gender,
                         registrationDate: c.dataCadastro ? new Date(c.dataCadastro) : undefined,
                         originalRow: 0
                     };
