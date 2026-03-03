@@ -784,15 +784,17 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
     try {
       setStatus("uploading");
       setMessage("Preparando sincronização...");
-      setLogs(prev => [...prev, "[VMPay] Iniciando ciclo de sincronização por loja..."]);
-
+      setLogs(prev => [...prev, "[VMPay] Verificando sessão segura..."]);
       const { supabase } = await import("@/lib/supabase");
-      const { data: sessionData } = await supabase.auth.getSession();
+      const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+      if (sessionErr) setLogs(prev => [...prev, `[Aviso] Erro de sessão: ${sessionErr.message}`]);
       const token = sessionData.session?.access_token;
 
+      setLogs(prev => [...prev, "[VMPay] Buscando lista de lojas cadastradas..."]);
       // 1. Get available store credentials first
       const { getVMPayCredentials } = await import("@/lib/vmpay-config");
       const credentials = await getVMPayCredentials();
+      setLogs(prev => [...prev, `[VMPay] ${credentials.length} lojas identificadas. Iniciando ciclo...`]);
 
       const isFirstSync = allRecords.length === 0;
       const allNewRawRecords: any[] = [];
