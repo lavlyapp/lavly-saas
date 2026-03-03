@@ -128,15 +128,15 @@ export async function fetchSalesHistory() {
             return allData;
         };
 
-        const sales = await fetchAll('sales', 'data');
-        const orders = await fetchAll('orders', 'data');
-
-        let customers: any[] = [];
-        try {
-            customers = await fetchAll('customers', 'name');
-        } catch (e: any) {
-            console.warn("[Persistence] Customers table not found or error fetching. Skipping customer demographic preset.", e.message);
-        }
+        console.log("[Persistence] Fetching sales, orders, and customers in parallel...");
+        const [sales, orders, customers] = await Promise.all([
+            fetchAll('sales', 'data'),
+            fetchAll('orders', 'data'),
+            fetchAll('customers', 'name').catch(e => {
+                console.warn("[Persistence] Customers table not found or error fetching. Skipping customer demographic preset.", e.message);
+                return [];
+            })
+        ]);
 
         // Transform back to Record types
         // Optimization: Pre-group orders by sale_id to avoid O(N*M) search

@@ -110,9 +110,13 @@ export function SettingsPage() {
     };
 
     const handleStoreChange = (idx: number, field: keyof StoreCredential, value: any) => {
-        const newStores = [...stores];
-        newStores[idx] = { ...newStores[idx], [field]: value };
-        setStores(newStores);
+        setStores(prev => {
+            const newStores = [...prev];
+            if (newStores[idx]) {
+                newStores[idx] = { ...newStores[idx], [field]: value };
+            }
+            return newStores;
+        });
     };
 
     const addStore = () => {
@@ -139,22 +143,31 @@ export function SettingsPage() {
 
         if (cleanCep.length === 8) {
             try {
+                console.log(`SettingsPage: Searching CEP ${cleanCep}...`);
                 const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+                if (!res.ok) throw new Error("ViaCEP unreachable");
                 const data = await res.json();
 
                 if (!data.erro) {
-                    const newStores = [...stores];
-                    newStores[idx] = {
-                        ...newStores[idx],
-                        address: data.logradouro,
-                        neighborhood: data.bairro,
-                        city: data.localidade,
-                        state: data.uf
-                    };
-                    setStores(newStores);
+                    setStores(prev => {
+                        const newStores = [...prev];
+                        if (newStores[idx]) {
+                            newStores[idx] = {
+                                ...newStores[idx],
+                                address: data.logradouro || "",
+                                neighborhood: data.bairro || "",
+                                city: data.localidade || "",
+                                state: data.uf || ""
+                            };
+                        }
+                        return newStores;
+                    });
+                    console.log(`SettingsPage: CEP ${cleanCep} found and applied.`);
+                } else {
+                    console.warn(`SettingsPage: CEP ${cleanCep} not found.`);
                 }
             } catch (e) {
-                console.error("CEP Lookup failed:", e);
+                console.error("SettingsPage: CEP Lookup failed", e);
             }
         }
     };
@@ -193,27 +206,30 @@ export function SettingsPage() {
                 if (profileError) throw profileError;
             }
 
-            // 2. Save Stores to Supabase
-            for (const store of stores) {
+            // 2. Save ALL Stores to Supabase in a SINGLE batch
+            if (stores.length > 0) {
+                const storesPayload = stores.map(store => ({
+                    id: store.id,
+                    cnpj: store.cnpj,
+                    name: store.name || "Sem Nome",
+                    api_key: store.api_key || "",
+                    open_time: store.open_time || "07:00:00",
+                    close_time: store.close_time || "23:00:00",
+                    is_active: store.is_active,
+                    cep: store.cep || "",
+                    address: store.address || "",
+                    number: store.number || "",
+                    complement: store.complement || "",
+                    neighborhood: store.neighborhood || "",
+                    city: store.city || "",
+                    state: store.state || "",
+                    updated_at: new Date().toISOString()
+                }));
+
+                console.log(`SettingsPage: Batch upserting ${storesPayload.length} stores...`);
                 const { error } = await supabase
                     .from('stores')
-                    .upsert({
-                        id: store.id,
-                        cnpj: store.cnpj,
-                        name: store.name,
-                        api_key: store.api_key,
-                        open_time: store.open_time,
-                        close_time: store.close_time,
-                        is_active: store.is_active,
-                        cep: store.cep,
-                        address: store.address,
-                        number: store.number,
-                        complement: store.complement,
-                        neighborhood: store.neighborhood,
-                        city: store.city,
-                        state: store.state,
-                        updated_at: new Date().toISOString()
-                    }, { onConflict: 'cnpj' });
+                    .upsert(storesPayload, { onConflict: 'cnpj' });
 
                 if (error) throw error;
             }

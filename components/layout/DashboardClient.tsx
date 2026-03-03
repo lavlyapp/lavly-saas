@@ -243,7 +243,7 @@ function AppContent({
             )}
 
             {/* Content Area - Only force remount on tab change to preserve form state (Settings) */}
-            <div key={activeTab}>
+            <div key={`${activeTab}-${data ? 'hasData' : 'noData'}`}>
               {renderContent()}
             </div>
           </div>
@@ -292,11 +292,11 @@ export default function DashboardClient({ initialSession }: { initialSession?: a
   const [allRecords, setAllRecords] = useState<SaleRecord[]>([]);
   const [allOrders, setAllOrders] = useState<OrderRecord[]>([]);
   const [allCustomers, setAllCustomers] = useState<CustomerRecord[]>([]);
-  const [data, setData] = useState<any>(null);
 
   // Filter States
   const [dbStores, setDbStores] = useState<string[]>([]);
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   // Compute available stores from both DB and Data
   const stores = useMemo(() => {
@@ -306,10 +306,50 @@ export default function DashboardClient({ initialSession }: { initialSession?: a
   }, [allRecords, dbStores]);
 
   // Hydration Fix
-  const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const data = useMemo(() => {
+    if (!mounted || allRecords.length === 0) return null;
+
+    console.time("[Page] calculate ViewData");
+
+    // Filter Records & Orders
+    const filteredRecords = (!selectedStore || selectedStore === 'Todas')
+      ? allRecords
+      : allRecords.filter(r => getCanonicalStoreName(r.loja) === getCanonicalStoreName(selectedStore));
+
+    const filteredOrders = (!selectedStore || selectedStore === 'Todas')
+      ? allOrders
+      : allOrders.filter(o => getCanonicalStoreName(o.loja) === getCanonicalStoreName(selectedStore));
+
+    const totalSales = filteredRecords.length;
+    const totalValue = filteredRecords.reduce((acc, r) => acc + r.valor, 0);
+
+    const sorted = [...filteredRecords].sort((a, b) => {
+      const timeA = a.data instanceof Date ? a.data.getTime() : new Date(a.data).getTime();
+      const timeB = b.data instanceof Date ? b.data.getTime() : new Date(b.data).getTime();
+      return timeA - timeB;
+    });
+
+    const viewData = {
+      records: filteredRecords,
+      orders: filteredOrders,
+      summary: {
+        totalSales,
+        totalValue,
+        startDate: sorted.length > 0 ? sorted[0].data : null,
+        endDate: sorted.length > 0 ? sorted[sorted.length - 1].data : null
+      },
+      errors: [],
+      logs: logs
+    };
+
+    console.log(`[v3-Filter] View recalculated. Selected: "${selectedStore}". Records: ${allRecords.length}. Filtered: ${filteredRecords.length}`);
+    console.timeEnd("[Page] calculate ViewData");
+    return viewData;
+  }, [allRecords, allOrders, selectedStore, mounted, logs]);
 
   const isInitializing = useRef(false);
 
@@ -375,87 +415,6 @@ export default function DashboardClient({ initialSession }: { initialSession?: a
     }
     loadHistory();
   }, [mounted]);
-
-  // Logic: Re-calculate 'data' (View) when 'allRecords', 'allOrders' or 'selectedStore' changes
-  useEffect(() => {
-    if (!mounted || allRecords.length === 0) {
-      setData(null);
-      return;
-    }
-
-    console.time("[Page] calculate ViewData");
-
-    // 1. Filter Records & Orders
-    const filteredRecords = (!selectedStore || selectedStore === 'Todas')
-      ? allRecords
-      : allRecords.filter((r, idx) => {
-        const rLoja = getCanonicalStoreName(r.loja);
-        const sLoja = getCanonicalStoreName(selectedStore);
-        const match = rLoja === sLoja;
-
-        // Log first 5 attempts to understand mismatch
-        if (idx < 5) {
-          console.log(`[Filter] Row ${idx}: DB="${r.loja}"(Can:${rLoja}) vs Selected="${selectedStore}"(Can:${sLoja}) Match:${match}`);
-        }
-        return match;
-      });
-
-    const filteredOrders = (!selectedStore || selectedStore === 'Todas')
-      ? allOrders
-      : allOrders.filter(o => {
-        const oLoja = getCanonicalStoreName(o.loja);
-        const sLoja = getCanonicalStoreName(selectedStore);
-        return oLoja === sLoja;
-      });
-
-    if (selectedStore && filteredRecords.length === 0 && allRecords.length > 0) {
-      const available = Array.from(new Set(allRecords.map(r => r.loja)));
-      const canonicalAvailable = Array.from(new Set(available.map(a => getCanonicalStoreName(a))));
-
-      console.warn(`[Page] Filter returned 0 results for ${selectedStore}. Available store names:`, available);
-      setLogs(prev => [
-        ...prev,
-        `[DEBUG] Filtro ZERO para "${selectedStore}" (Canônico: "${getCanonicalStoreName(selectedStore)}")`,
-        `[DEBUG] Lojas no Estado: ${available.join(', ')}`,
-        `[DEBUG] Lojas Canônicas: ${canonicalAvailable.join(', ')}`
-      ]);
-    }
-
-    // 2. Recalculate Summary for View
-    const totalSales = filteredRecords.length;
-    const totalValue = filteredRecords.reduce((acc, r) => acc + r.valor, 0);
-
-    const sorted = [...filteredRecords].sort((a, b) => {
-      const timeA = a.data instanceof Date ? a.data.getTime() : new Date(a.data).getTime();
-      const timeB = b.data instanceof Date ? b.data.getTime() : new Date(b.data).getTime();
-      return timeA - timeB;
-    });
-
-    // Expose for console debugging
-    if (typeof window !== 'undefined') {
-      (window as any).DEBUG_RECORDS = allRecords;
-      (window as any).DEBUG_SELECTED = selectedStore;
-      (window as any).DEBUG_FILTERED = filteredRecords;
-    }
-
-    const viewData = {
-      records: filteredRecords,
-      orders: filteredOrders,
-      summary: {
-        totalSales,
-        totalValue,
-        startDate: sorted.length > 0 ? sorted[0].data : null,
-        endDate: sorted.length > 0 ? sorted[sorted.length - 1].data : null
-      },
-      errors: [],
-      logs: logs
-    };
-
-    console.log(`[v3-Filter] View recalculated. Selected: "${selectedStore}". Records: ${allRecords.length}. Filtered: ${filteredRecords.length}`);
-
-    setData(viewData);
-    console.timeEnd("[Page] calculate ViewData");
-  }, [allRecords, allOrders, selectedStore, mounted]);
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
