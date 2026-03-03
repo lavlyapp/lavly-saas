@@ -13,6 +13,15 @@ export interface StoreCredential {
     open_time: string;
     close_time: string;
     is_active: boolean;
+
+    // Novos campos de endereço
+    cep?: string;
+    address?: string;
+    number?: string;
+    complement?: string;
+    neighborhood?: string;
+    city?: string;
+    state?: string;
 }
 
 export function SettingsPage() {
@@ -28,12 +37,7 @@ export function SettingsPage() {
     const [stores, setStores] = useState<StoreCredential[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Local state for editing addresses (Context-based)
-    const [localSettings, setLocalSettings] = useState<{ store: string, address: string }[]>(() => {
-        const entries = Object.entries(storeSettings);
-        if (entries.length === 0) return [{ store: '', address: '' }];
-        return entries.map(([store, val]) => ({ store, address: val.address }));
-    });
+
 
     const [localAutomation, setLocalAutomation] = useState(automationSettings);
     const [saved, setSaved] = useState(false);
@@ -71,7 +75,14 @@ export function SettingsPage() {
                     api_key: s.api_key,
                     open_time: s.open_time,
                     close_time: s.close_time,
-                    is_active: s.is_active
+                    is_active: s.is_active,
+                    cep: s.cep || "",
+                    address: s.address || "",
+                    number: s.number || "",
+                    complement: s.complement || "",
+                    neighborhood: s.neighborhood || "",
+                    city: s.city || "",
+                    state: s.state || ""
                 })));
             }
         }
@@ -91,8 +102,41 @@ export function SettingsPage() {
             api_key: "",
             open_time: "07:00:00",
             close_time: "23:00:00",
-            is_active: true
+            is_active: true,
+            cep: "",
+            address: "",
+            number: "",
+            complement: "",
+            neighborhood: "",
+            city: "",
+            state: ""
         }]);
+    };
+
+    const handleCepLookup = async (idx: number, cep: string) => {
+        const cleanCep = cep.replace(/\D/g, '');
+        handleStoreChange(idx, 'cep', cleanCep);
+
+        if (cleanCep.length === 8) {
+            try {
+                const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+                const data = await res.json();
+
+                if (!data.erro) {
+                    const newStores = [...stores];
+                    newStores[idx] = {
+                        ...newStores[idx],
+                        address: data.logradouro,
+                        neighborhood: data.bairro,
+                        city: data.localidade,
+                        state: data.uf
+                    };
+                    setStores(newStores);
+                }
+            } catch (e) {
+                console.error("CEP Lookup failed:", e);
+            }
+        }
     };
 
     const removeStore = async (idx: number) => {
@@ -108,21 +152,7 @@ export function SettingsPage() {
         setStores(stores.filter((_, i) => i !== idx));
     };
 
-    const handleAddressChange = (index: number, field: 'store' | 'address', value: string) => {
-        const newSettings = [...localSettings];
-        newSettings[index][field] = value;
-        setLocalSettings(newSettings);
-    };
 
-    const addStoreSetting = () => {
-        setLocalSettings([...localSettings, { store: '', address: '' }]);
-    };
-
-    const removeStoreSetting = (index: number) => {
-        const newSettings = localSettings.filter((_, i) => i !== index);
-        if (newSettings.length === 0) newSettings.push({ store: '', address: '' });
-        setLocalSettings(newSettings);
-    };
 
     const handleSave = async () => {
         setIsLoading(true);
@@ -156,6 +186,13 @@ export function SettingsPage() {
                     open_time: store.open_time,
                     close_time: store.close_time,
                     is_active: store.is_active,
+                    cep: store.cep,
+                    address: store.address,
+                    number: store.number,
+                    complement: store.complement,
+                    neighborhood: store.neighborhood,
+                    city: store.city,
+                    state: store.state,
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'cnpj' });
 
@@ -169,10 +206,7 @@ export function SettingsPage() {
             alert(`Aviso: ${storeErrors} lojas não puderam ser salvas. Verifique o console.`);
         }
 
-        // 3. Save Context-based settings
-        localSettings.forEach(s => {
-            if (s.store.trim()) setStoreAddress(s.store.trim(), s.address);
-        });
+        // 3. Save Automation Settings
         setAutomationSettings(localAutomation);
 
         // 4. Log Activity
@@ -396,6 +430,92 @@ export function SettingsPage() {
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Address Section */}
+                                <div className="pt-4 border-t border-neutral-800 space-y-4">
+                                    <div className="flex items-center gap-2 text-indigo-400">
+                                        <MapPin className="w-3 h-3" />
+                                        <span className="text-[10px] font-bold uppercase tracking-wider">Endereço & Localização</span>
+                                    </div>
+
+                                    <div className="grid md:grid-cols-4 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-neutral-500 uppercase">CEP</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none"
+                                                placeholder="00000-000"
+                                                maxLength={9}
+                                                value={store.cep || ''}
+                                                onChange={(e) => handleCepLookup(idx, e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="md:col-span-2 space-y-2">
+                                            <label className="text-[10px] font-bold text-neutral-500 uppercase">Logradouro</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none"
+                                                placeholder="Rua, Avenida..."
+                                                value={store.address || ''}
+                                                onChange={(e) => handleStoreChange(idx, 'address', e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-neutral-500 uppercase">Número</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none"
+                                                placeholder="123"
+                                                value={store.number || ''}
+                                                onChange={(e) => handleStoreChange(idx, 'number', e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid md:grid-cols-4 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-neutral-500 uppercase">Complemento</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none"
+                                                placeholder="Sala, Andar..."
+                                                value={store.complement || ''}
+                                                onChange={(e) => handleStoreChange(idx, 'complement', e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-neutral-500 uppercase">Bairro</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none"
+                                                placeholder="Bairro"
+                                                value={store.neighborhood || ''}
+                                                onChange={(e) => handleStoreChange(idx, 'neighborhood', e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-neutral-500 uppercase">Cidade</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none"
+                                                placeholder="Cidade"
+                                                value={store.city || ''}
+                                                onChange={(e) => handleStoreChange(idx, 'city', e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-neutral-500 uppercase">Estado (UF)</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none"
+                                                placeholder="CE"
+                                                maxLength={2}
+                                                value={store.state || ''}
+                                                onChange={(e) => handleStoreChange(idx, 'state', e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         ))}
                         {stores.length === 0 && (
@@ -408,41 +528,7 @@ export function SettingsPage() {
                 )}
             </div>
 
-            {/* Endereços para Clima */}
-            <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 shadow-lg">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
-                    <MapPin className="w-5 h-5 text-indigo-500" />
-                    Geolocalização (Clima/Tempo)
-                </h3>
-                <div className="space-y-4">
-                    {localSettings.map((setting, idx) => (
-                        <div key={idx} className="flex flex-col md:flex-row gap-3 items-end p-4 border border-neutral-800 rounded-lg bg-neutral-950/50">
-                            <div className="space-y-2 flex-1 w-full">
-                                <label className="text-xs font-bold text-neutral-500 uppercase">Loja</label>
-                                <input
-                                    type="text"
-                                    className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-2 text-white outline-none"
-                                    value={setting.store}
-                                    onChange={(e) => handleAddressChange(idx, 'store', e.target.value)}
-                                />
-                            </div>
-                            <div className="space-y-2 flex-[2] w-full">
-                                <label className="text-xs font-bold text-neutral-500 uppercase">Endereço</label>
-                                <input
-                                    type="text"
-                                    className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-2 text-white outline-none"
-                                    value={setting.address}
-                                    onChange={(e) => handleAddressChange(idx, 'address', e.target.value)}
-                                />
-                            </div>
-                            <button onClick={() => removeStoreSetting(idx)} className="p-2 text-red-500 hover:bg-neutral-800 rounded-lg transition-colors">Excluir</button>
-                        </div>
-                    ))}
-                    <button onClick={addStoreSetting} className="w-full py-2 border border-dashed border-neutral-700 rounded-lg text-neutral-500 text-sm hover:border-indigo-500 hover:text-indigo-400 transition-colors">
-                        + Adicionar Loja
-                    </button>
-                </div>
-            </div>
+
 
             {/* Save Button (Sticky/Bottom) */}
             <div className="flex justify-end pt-4 pb-12 border-t border-neutral-800">

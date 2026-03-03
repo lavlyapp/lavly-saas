@@ -16,6 +16,15 @@ export interface VMPayCredential {
     tuyaClientSecret?: string;
     tuyaSceneOnId?: string;
     tuyaSceneOffId?: string;
+
+    // Novas informações de endereço
+    cep?: string;
+    address?: string;
+    number?: string;
+    complement?: string;
+    neighborhood?: string;
+    city?: string;
+    state?: string;
 }
 
 // Store Name Normalization Map
@@ -155,7 +164,14 @@ export async function getVMPayCredentials(): Promise<VMPayCredential[]> {
                 tuya_client_id,
                 tuya_client_secret,
                 tuya_scene_on_id,
-                tuya_scene_off_id
+                tuya_scene_off_id,
+                cep,
+                address,
+                number,
+                complement,
+                neighborhood,
+                city,
+                state
             `)
             .eq('is_active', true);
 
@@ -175,7 +191,14 @@ export async function getVMPayCredentials(): Promise<VMPayCredential[]> {
                 tuyaClientId: d.tuya_client_id,
                 tuyaClientSecret: d.tuya_client_secret,
                 tuyaSceneOnId: d.tuya_scene_on_id,
-                tuyaSceneOffId: d.tuya_scene_off_id
+                tuyaSceneOffId: d.tuya_scene_off_id,
+                cep: d.cep,
+                address: d.address,
+                number: d.number,
+                complement: d.complement,
+                neighborhood: d.neighborhood,
+                city: d.city,
+                state: d.state
             }));
         }
     } catch (e) {

@@ -1,6 +1,8 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { supabase } from "@/lib/supabase";
+
 
 interface StoreSettings {
     address: string;
@@ -57,7 +59,26 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                 console.error("Failed to parse saved automation settings", e);
             }
         }
+
+        // 3. Fetch canonical store data from Supabase (Centralization)
+        fetchDbStores();
     }, []);
+
+    const fetchDbStores = async () => {
+        const { data, error } = await supabase
+            .from('stores')
+            .select('name, address, neighborhood, city, state');
+
+        if (data && !error) {
+            const dbMap: Record<string, StoreSettings> = {};
+            data.forEach(s => {
+                // Construct full address string for backward compatibility with components using it
+                const fullAddress = `${s.address || ''}${s.neighborhood ? `, ${s.neighborhood}` : ''}${s.city ? `, ${s.city}` : ''}${s.state ? ` - ${s.state}` : ''}`;
+                dbMap[s.name.toUpperCase()] = { address: fullAddress };
+            });
+            setStoreSettings(prev => ({ ...prev, ...dbMap }));
+        }
+    };
 
     // Keep LocalStorage in sync for storeSettings
     useEffect(() => {
