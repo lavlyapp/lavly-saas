@@ -53,6 +53,10 @@ export function SettingsPage() {
     }, [user]);
 
     const loadData = async (force = false) => {
+        if (!user) {
+            setIsLoading(false);
+            return;
+        }
         if (isInitialized && !force) return;
         setIsLoading(true);
         try {

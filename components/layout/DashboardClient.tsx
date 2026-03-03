@@ -243,7 +243,7 @@ function AppContent({
             )}
 
             {/* Content Area - Only force remount on tab change to preserve form state (Settings) */}
-            <div key={`${activeTab}-${data ? 'hasData' : 'noData'}`}>
+            <div key={activeTab}>
               {renderContent()}
             </div>
           </div>
