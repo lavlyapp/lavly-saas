@@ -167,17 +167,25 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
 /**
  * Global entry point for the Sync loop
  */
-export async function runGlobalSync(isManual: boolean = false, force: boolean = false, supabaseClient?: any) {
-    console.log(`[Sync Manager] Starting global loop at ${new Date().toISOString()} (Manual: ${isManual}, Force: ${force})`);
+export async function runGlobalSync(isManual: boolean = false, force: boolean = false, supabaseClient?: any, cnpj?: string) {
+    console.log(`[Sync Manager] Starting global loop at ${new Date().toISOString()} (Manual: ${isManual}, Force: ${force}, Filter: ${cnpj || 'None'})`);
     const allNewSales: any[] = [];
 
     // 1. Handle AC Turn Off for expired timers (independente do sync de vendas)
     await checkAndTurnOffAll();
 
-    // 2. Process all stores in parallel for massive speedup
-    const credentials = await getVMPayCredentials();
+    // 2. Process stores
+    const allCredentials = await getVMPayCredentials();
+    const credentials = cnpj
+        ? allCredentials.filter(c => c.cnpj === cnpj)
+        : allCredentials;
 
-    console.log(`[Sync Manager] Processing ${credentials.length} stores sequentially to protect external API rate limits...`);
+    if (credentials.length === 0) {
+        console.warn(`[Sync Manager] No credentials found for sync ${cnpj ? `(CNPJ: ${cnpj})` : ''}`);
+        return [];
+    }
+
+    console.log(`[Sync Manager] Processing ${credentials.length} stores sequentially...`);
 
     for (const cred of credentials) {
         try {

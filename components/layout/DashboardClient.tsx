@@ -783,65 +783,75 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
   async function handleSyncVMPay() {
     try {
       setStatus("uploading");
-      setMessage("Conectando com VMPay...");
-      setLogs(prev => [...prev, "[VMPay] Iniciando sincronização manual..."]);
+      setMessage("Preparando sincronização...");
+      setLogs(prev => [...prev, "[VMPay] Iniciando ciclo de sincronização por loja..."]);
 
       const { supabase } = await import("@/lib/supabase");
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
 
+      // 1. Get available store credentials first
+      const { getVMPayCredentials } = await import("@/lib/vmpay-config");
+      const credentials = await getVMPayCredentials();
+
       const isFirstSync = allRecords.length === 0;
-      const url = isFirstSync ? "/api/vmpay/sync?source=manual&force=true" : "/api/vmpay/sync?source=manual";
+      const allNewRawRecords: any[] = [];
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 55000);
+      for (const cred of credentials) {
+        setMessage(`Sincronizando ${cred.name}...`);
+        setLogs(prev => [...prev, `[VMPay] Sincronizando ${cred.name} (${cred.cnpj})...`]);
 
-      const res = await fetch(url, {
-        method: "GET",
-        headers: {
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
+        const url = `/api/vmpay/sync?source=manual&cnpj=${cred.cnpj}${isFirstSync ? "&force=true" : ""}`;
 
-      const contentType = res.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        const textStr = await res.text();
-        throw new Error(`Servidor ocupado. Tente novamente em instantes. (${textStr.substring(0, 20)})`);
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s per store
+
+          const res = await fetch(url, {
+            method: "GET",
+            headers: {
+              ...(token ? { "Authorization": `Bearer ${token}` } : {})
+            },
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+
+          if (!res.ok) {
+            const errResult = await res.json().catch(() => ({ error: `Status ${res.status}` }));
+            setLogs(prev => [...prev, `[Aviso] Falha na Loja ${cred.name}: ${errResult.error || 'Erro desconhecido'}`]);
+            continue;
+          }
+
+          const result = await res.json();
+          if (result.success && result.records) {
+            allNewRawRecords.push(...result.records);
+            setLogs(prev => [...prev, `[Sync] ${cred.name}: ${result.records.length} novas vendas.`]);
+          }
+        } catch (storeErr: any) {
+          setLogs(prev => [...prev, `[Erro] Loja ${cred.name} falhou: ${storeErr.message}`]);
+        }
       }
 
-      const result = await res.json();
-      if (!res.ok || !result.success) throw new Error(result.error || `Erro ${res.status}`);
-
-      // Customers
-      if (result.customers && Array.isArray(result.customers)) {
-        const customers = result.customers.map((c: any) => ({
-          ...c,
-          registrationDate: c.registrationDate ? new Date(c.registrationDate) : undefined
-        }));
-        setAllCustomers(customers);
-      } else {
-        setLogs(prev => [...prev, "[VMPay] Sincronização de clientes ignorada (Performance)."]);
+      if (allNewRawRecords.length === 0) {
+        setLogs(prev => [...prev, "[VMPay] Nenhuma venda nova encontrada em nenhuma loja."]);
+        setStatus("success");
+        setMessage("Sincronização concluída (Sem novos dados)");
+        return;
       }
 
-      const rawRecords = result.records || [];
+      const rawRecords = allNewRawRecords;
       const totalToProcess = rawRecords.length;
       const CHUNK_SIZE = 500;
 
       const allProcessedRecords: any[] = [];
       const allProcessedOrders: OrderRecord[] = [];
 
-      setLogs(prev => [...prev, `[VMPay] Processando ${totalToProcess} registros...`]);
-
-      const storeCounts: Record<string, number> = {};
+      setLogs(prev => [...prev, `[VMPay] Processando total de ${totalToProcess} registros retornados...`]);
 
       for (let i = 0; i < totalToProcess; i += CHUNK_SIZE) {
         const chunk = rawRecords.slice(i, i + CHUNK_SIZE);
         const processedChunk = chunk.map((r: any) => {
           const storeName = getCanonicalStoreName(r.loja);
-          storeCounts[storeName] = (storeCounts[storeName] || 0) + 1;
-
           return {
             ...r,
             data: new Date(r.data),
@@ -870,7 +880,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         allProcessedOrders.push(...chunkOrders);
 
         const pct = Math.round((i / totalToProcess) * 100);
-        setMessage(`Processando... ${pct}%`);
+        setMessage(`Processando dados... ${pct}%`);
         await new Promise(resolve => setTimeout(resolve, 0));
       }
 
@@ -882,7 +892,6 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
       });
 
       setAllOrders(prev => {
-        // Improved Key includes Loja and Machine to avoid collisions across stores
         const getOrderKey = (o: OrderRecord) => {
           const time = o.data instanceof Date ? o.data.getTime() : new Date(o.data).getTime();
           return `${o.loja}-${o.machine}-${time}-${o.valor}`;
@@ -893,19 +902,14 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         return [...prev, ...unique];
       });
 
-      // Log per-store summary
-      Object.entries(storeCounts).forEach(([store, count]) => {
-        setLogs(prev => [...prev, `[Sync] ${store}: ${count} vendas encontradas.`]);
-      });
-
-      setLogs(prev => [...prev, `[VMPay] Sincronização concluída: ${totalToProcess} registros.`]);
+      setLogs(prev => [...prev, `[VMPay] Ciclo completo: ${totalToProcess} novos registros integrados.`]);
       setStatus("success");
-      setMessage("Sincronização concluída!");
+      setMessage("Sincronização concluída com sucesso!");
     } catch (e: any) {
       console.error(e);
       setStatus("error");
       setMessage(`Erro: ${e.message}`);
-      setLogs(prev => [...prev, `[Erro] ${e.message}`]);
+      setLogs(prev => [...prev, `[Erro Fatal] ${e.message}`]);
     }
   }
 

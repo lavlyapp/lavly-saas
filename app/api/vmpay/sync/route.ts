@@ -9,12 +9,13 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url);
         const isManual = searchParams.get('source') === 'manual';
         const force = searchParams.get('force') === 'true';
+        const cnpj = searchParams.get('cnpj') || undefined;
 
         // Retrieve token from Authorization header (sent by the frontend)
         const authHeader = request.headers.get('Authorization');
         const token = authHeader?.replace('Bearer ', '');
 
-        console.log(`[Sync API] 🚀 Triggering Global Adaptive Sync (Manual: ${isManual})...`);
+        console.log(`[Sync API] 🚀 Triggering Sync (Manual: ${isManual}, CNPJ: ${cnpj || 'ALL'})...`);
 
         // Create an authenticated Supabase client to perform the updates
         const cookieStore = await cookies();
@@ -38,7 +39,7 @@ export async function GET(request: Request) {
 
         // 1. Run sync (checks hours, ac states, etc.)
         // Pass the authenticated client so sync-manager can use it for RLS-protected updates
-        const newSales = await runGlobalSync(isManual, force, supabaseClient);
+        const newSales = await runGlobalSync(isManual, force, supabaseClient, cnpj);
 
         // 2. Sync customers - REMOVED for performance, as requested
 
