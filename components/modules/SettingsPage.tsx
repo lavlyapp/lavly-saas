@@ -36,9 +36,8 @@ export function SettingsPage() {
     // Store Management State
     const [stores, setStores] = useState<StoreCredential[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-
-
-
+    const [isSaving, setIsSaving] = useState(false);
+    const [isInitialized, setIsInitialized] = useState(false);
     const [localAutomation, setLocalAutomation] = useState<AutomationSettingsMap>({});
     const [saved, setSaved] = useState(false);
 
@@ -53,7 +52,8 @@ export function SettingsPage() {
         loadData();
     }, [user]);
 
-    const loadData = async () => {
+    const loadData = async (force = false) => {
+        if (isInitialized && !force) return;
         setIsLoading(true);
         try {
             console.log("SettingsPage: Loading configuration data...");
@@ -65,7 +65,7 @@ export function SettingsPage() {
                     .eq('id', user.id)
                     .single();
 
-                if (profileErr && profileErr.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+                if (profileErr && profileErr.code !== 'PGRST116') {
                     console.error("SettingsPage: Profile fetch error", profileErr);
                 }
 
@@ -75,7 +75,6 @@ export function SettingsPage() {
                 }
 
                 // 2. Fetch Stores
-                console.log("SettingsPage: Fetching stores from Supabase...");
                 const { data: storeData, error: storesErr } = await supabase
                     .from('stores')
                     .select('*')
@@ -84,8 +83,7 @@ export function SettingsPage() {
                 if (storesErr) throw storesErr;
 
                 if (storeData) {
-                    console.log(`SettingsPage: Mapping ${storeData.length} store records...`);
-                    const mappedStores = storeData.map(s => ({
+                    setStores(storeData.map(s => ({
                         id: s.id,
                         cnpj: s.cnpj || "",
                         name: s.name || "Sem Nome",
@@ -100,14 +98,12 @@ export function SettingsPage() {
                         neighborhood: s.neighborhood || "",
                         city: s.city || "",
                         state: s.state || ""
-                    }));
-                    setStores(mappedStores);
+                    })));
                 }
+                setIsInitialized(true);
             }
-            console.log("SettingsPage: Data load complete.");
         } catch (e: any) {
             console.error("SettingsPage: Critical error in loadData", e);
-            // Optionally set an error state here if you want to show it in the UI
         } finally {
             setIsLoading(false);
         }
@@ -179,11 +175,10 @@ export function SettingsPage() {
 
 
     const handleSave = async () => {
-        if (isLoading) return;
-        setIsLoading(true);
+        if (isSaving) return;
+        setIsSaving(true);
         setSaved(false);
 
-        console.log("SettingsPage: Starting handleSave...");
         try {
             // 1. Save VMPay Account to Profile
             if (user) {
@@ -199,7 +194,6 @@ export function SettingsPage() {
             }
 
             // 2. Save Stores to Supabase
-            console.log(`SettingsPage: Saving ${stores.length} stores...`);
             for (const store of stores) {
                 const { error } = await supabase
                     .from('stores')
@@ -221,14 +215,10 @@ export function SettingsPage() {
                         updated_at: new Date().toISOString()
                     }, { onConflict: 'cnpj' });
 
-                if (error) {
-                    console.error(`Error saving store ${store.name}:`, error);
-                    throw error;
-                }
+                if (error) throw error;
             }
 
             // 3. Save Automation Settings
-            console.log("SettingsPage: Updating automation context...");
             setAutomationSettings(localAutomation);
 
             // 4. Log Activity
@@ -237,20 +227,16 @@ export function SettingsPage() {
                     vmpayAccount: !!vmpayUser,
                     storeCount: stores.length
                 });
-            } catch (e) {
-                console.warn("Activity logging failed:", e);
-            }
+            } catch (e) { }
 
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);
-            console.log("SettingsPage: Save successful, reloading data...");
-            await loadData();
+            await loadData(true);
         } catch (e: any) {
             console.error("SettingsPage: Save Error", e);
             alert(`Erro ao salvar: ${e.message || "Erro desconhecido"}`);
         } finally {
-            console.log("SettingsPage: handleSave finished (loading set to false)");
-            setIsLoading(false);
+            setIsSaving(false);
         }
     };
 
@@ -561,7 +547,7 @@ export function SettingsPage() {
             <div className="flex justify-end pt-4 pb-12 border-t border-neutral-800">
                 <button
                     onClick={handleSave}
-                    disabled={isLoading}
+                    disabled={isLoading || isSaving}
                     className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white px-10 py-4 rounded-2xl font-bold transition-all shadow-xl shadow-indigo-500/20 active:scale-95"
                 >
                     {saved ? (
@@ -572,7 +558,7 @@ export function SettingsPage() {
                     ) : (
                         <>
                             <Save className="w-5 h-5" />
-                            {isLoading ? 'Salvando...' : 'Salvar Alterações'}
+                            {isSaving ? 'Salvando...' : 'Salvar Alterações'}
                         </>
                     )}
                 </button>

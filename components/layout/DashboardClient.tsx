@@ -242,8 +242,8 @@ function AppContent({
               </div>
             )}
 
-            {/* Content Area with Forced Remount on View Change */}
-            <div key={`${activeTab}-${status}-${allRecords.length}-${data ? 'hasData' : 'noData'}`}>
+            {/* Content Area - Only force remount on tab change to preserve form state (Settings) */}
+            <div key={activeTab}>
               {renderContent()}
             </div>
           </div>
