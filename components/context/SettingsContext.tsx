@@ -65,18 +65,22 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const fetchDbStores = async () => {
-        const { data, error } = await supabase
-            .from('stores')
-            .select('name, address, neighborhood, city, state');
+        try {
+            const { data, error } = await supabase
+                .from('stores')
+                .select('name, address, neighborhood, city, state');
 
-        if (data && !error) {
-            const dbMap: Record<string, StoreSettings> = {};
-            data.forEach(s => {
-                // Construct full address string for backward compatibility with components using it
-                const fullAddress = `${s.address || ''}${s.neighborhood ? `, ${s.neighborhood}` : ''}${s.city ? `, ${s.city}` : ''}${s.state ? ` - ${s.state}` : ''}`;
-                dbMap[s.name.toUpperCase()] = { address: fullAddress };
-            });
-            setStoreSettings(prev => ({ ...prev, ...dbMap }));
+            if (data && !error) {
+                const dbMap: Record<string, StoreSettings> = {};
+                data.forEach(s => {
+                    // Construct full address string for backward compatibility with components using it
+                    const fullAddress = `${s.address || ''}${s.neighborhood ? `, ${s.neighborhood}` : ''}${s.city ? `, ${s.city}` : ''}${s.state ? ` - ${s.state}` : ''}`;
+                    dbMap[s.name.toUpperCase()] = { address: fullAddress };
+                });
+                setStoreSettings(prev => ({ ...prev, ...dbMap }));
+            }
+        } catch (e) {
+            console.error("SettingsContext: Failed to fetch stores from DB", e);
         }
     };
 

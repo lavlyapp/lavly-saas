@@ -156,75 +156,80 @@ export function SettingsPage() {
 
     const handleSave = async () => {
         setIsLoading(true);
-
-        // 1. Save VMPay Account to Profile (Using UPSERT for first-time creation)
-        if (user) {
-            const { error: profileError } = await supabase.from('profiles').upsert({
-                id: user.id,
-                email: user.email,
-                vmpay_user: vmpayUser,
-                vmpay_password: vmpayPass,
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'id' });
-
-            if (profileError) {
-                console.error("Profile Save Error:", profileError);
-                alert(`Erro ao salvar perfil: ${profileError.message}`);
-            }
-        }
-
-        // 2. Save Stores to Supabase
-        let storeErrors = 0;
-        for (const store of stores) {
-            const { error } = await supabase
-                .from('stores')
-                .upsert({
-                    id: store.id,
-                    cnpj: store.cnpj,
-                    name: store.name,
-                    api_key: store.api_key,
-                    open_time: store.open_time,
-                    close_time: store.close_time,
-                    is_active: store.is_active,
-                    cep: store.cep,
-                    address: store.address,
-                    number: store.number,
-                    complement: store.complement,
-                    neighborhood: store.neighborhood,
-                    city: store.city,
-                    state: store.state,
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'cnpj' });
-
-            if (error) {
-                console.error(`Error saving store ${store.name}:`, error);
-                storeErrors++;
-            }
-        }
-
-        if (storeErrors > 0) {
-            alert(`Aviso: ${storeErrors} lojas não puderam ser salvas. Verifique o console.`);
-        }
-
-        // 3. Save Automation Settings
-        setAutomationSettings(localAutomation);
-
-        // 4. Log Activity
         try {
-            await logActivity("STORE_UPDATE", user?.id || null, {
-                vmpayAccount: !!vmpayUser,
-                storeCount: stores.length
-            });
-        } catch (e) {
-            console.warn("Activity logging failed (RLS?):", e);
-        }
+            // 1. Save VMPay Account to Profile (Using UPSERT for first-time creation)
+            if (user) {
+                const { error: profileError } = await supabase.from('profiles').upsert({
+                    id: user.id,
+                    email: user.email,
+                    vmpay_user: vmpayUser,
+                    vmpay_password: vmpayPass,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'id' });
 
-        setIsLoading(false);
-        if (storeErrors === 0) {
-            setSaved(true);
-            setTimeout(() => setSaved(false), 3000);
+                if (profileError) {
+                    console.error("Profile Save Error:", profileError);
+                    alert(`Erro ao salvar perfil: ${profileError.message}`);
+                }
+            }
+
+            // 2. Save Stores to Supabase
+            let storeErrors = 0;
+            for (const store of stores) {
+                const { error } = await supabase
+                    .from('stores')
+                    .upsert({
+                        id: store.id,
+                        cnpj: store.cnpj,
+                        name: store.name,
+                        api_key: store.api_key,
+                        open_time: store.open_time,
+                        close_time: store.close_time,
+                        is_active: store.is_active,
+                        cep: store.cep,
+                        address: store.address,
+                        number: store.number,
+                        complement: store.complement,
+                        neighborhood: store.neighborhood,
+                        city: store.city,
+                        state: store.state,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'cnpj' });
+
+                if (error) {
+                    console.error(`Error saving store ${store.name}:`, error);
+                    storeErrors++;
+                }
+            }
+
+            if (storeErrors > 0) {
+                alert(`Aviso: ${storeErrors} lojas não puderam ser salvas. Verifique o console.`);
+            }
+
+            // 3. Save Automation Settings
+            setAutomationSettings(localAutomation);
+
+            // 4. Log Activity
+            try {
+                await logActivity("STORE_UPDATE", user?.id || null, {
+                    vmpayAccount: !!vmpayUser,
+                    storeCount: stores.length
+                });
+            } catch (e) {
+                console.warn("Activity logging failed (RLS?):", e);
+            }
+
+            if (storeErrors === 0) {
+                setSaved(true);
+                setTimeout(() => setSaved(false), 3000);
+            }
+            await loadData(); // Refresh IDs for new stores
+        } catch (e: any) {
+            console.error("SettingsPage: Critical Save Error", e);
+            alert("Erro crítico ao salvar as configurações. Verifique o console.");
+        } finally {
+            setIsLoading(false);
         }
-        loadData(); // Refresh IDs for new stores
     };
 
     const testStoreConnection = async (idx: number) => {
