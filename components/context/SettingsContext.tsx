@@ -66,17 +66,23 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
     const fetchDbStores = async () => {
         try {
+            console.log("SettingsContext: Fetching stores from DB...");
             const { data, error } = await supabase
                 .from('stores')
                 .select('name, address, neighborhood, city, state');
 
-            if (data && !error) {
+            if (error) throw error;
+
+            if (data) {
                 const dbMap: Record<string, StoreSettings> = {};
                 data.forEach(s => {
-                    // Construct full address string for backward compatibility with components using it
-                    const fullAddress = `${s.address || ''}${s.neighborhood ? `, ${s.neighborhood}` : ''}${s.city ? `, ${s.city}` : ''}${s.state ? ` - ${s.state}` : ''}`;
-                    dbMap[s.name.toUpperCase()] = { address: fullAddress };
+                    if (s.name) {
+                        // Construct full address string for backward compatibility with components using it
+                        const fullAddress = `${s.address || ''}${s.neighborhood ? `, ${s.neighborhood}` : ''}${s.city ? `, ${s.city}` : ''}${s.state ? ` - ${s.state}` : ''}`;
+                        dbMap[s.name.toUpperCase()] = { address: fullAddress };
+                    }
                 });
+                console.log(`SettingsContext: Loaded ${Object.keys(dbMap).length} stores from DB.`);
                 setStoreSettings(prev => ({ ...prev, ...dbMap }));
             }
         } catch (e) {
@@ -102,6 +108,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     };
 
     const getStoreAddress = (storeName: string): string => {
+        if (!storeName) return '';
         return storeSettings[storeName.toUpperCase()]?.address || '';
     };
 

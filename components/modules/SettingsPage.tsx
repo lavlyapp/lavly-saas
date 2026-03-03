@@ -48,45 +48,62 @@ export function SettingsPage() {
 
     const loadData = async () => {
         setIsLoading(true);
-        if (user) {
-            // 1. Fetch Profile (VMPay Master Account)
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('vmpay_user, vmpay_password')
-                .eq('id', user.id)
-                .single();
+        try {
+            console.log("SettingsPage: Loading configuration data...");
+            if (user) {
+                // 1. Fetch Profile (VMPay Master Account)
+                const { data: profile, error: profileErr } = await supabase
+                    .from('profiles')
+                    .select('vmpay_user, vmpay_password')
+                    .eq('id', user.id)
+                    .single();
 
-            if (profile) {
-                setVmpayUser(profile.vmpay_user || "");
-                setVmpayPass(profile.vmpay_password || "");
+                if (profileErr && profileErr.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+                    console.error("SettingsPage: Profile fetch error", profileErr);
+                }
+
+                if (profile) {
+                    setVmpayUser(profile.vmpay_user || "");
+                    setVmpayPass(profile.vmpay_password || "");
+                }
+
+                // 2. Fetch Stores
+                console.log("SettingsPage: Fetching stores from Supabase...");
+                const { data: storeData, error: storesErr } = await supabase
+                    .from('stores')
+                    .select('*')
+                    .order('name');
+
+                if (storesErr) throw storesErr;
+
+                if (storeData) {
+                    console.log(`SettingsPage: Mapping ${storeData.length} store records...`);
+                    const mappedStores = storeData.map(s => ({
+                        id: s.id,
+                        cnpj: s.cnpj || "",
+                        name: s.name || "Sem Nome",
+                        api_key: s.api_key || "",
+                        open_time: s.open_time || "07:00:00",
+                        close_time: s.close_time || "23:00:00",
+                        is_active: s.is_active !== false,
+                        cep: s.cep || "",
+                        address: s.address || "",
+                        number: s.number || "",
+                        complement: s.complement || "",
+                        neighborhood: s.neighborhood || "",
+                        city: s.city || "",
+                        state: s.state || ""
+                    }));
+                    setStores(mappedStores);
+                }
             }
-
-            // 2. Fetch Stores
-            const { data: storeData } = await supabase
-                .from('stores')
-                .select('*')
-                .order('name');
-
-            if (storeData) {
-                setStores(storeData.map(s => ({
-                    id: s.id,
-                    cnpj: s.cnpj,
-                    name: s.name,
-                    api_key: s.api_key,
-                    open_time: s.open_time,
-                    close_time: s.close_time,
-                    is_active: s.is_active,
-                    cep: s.cep || "",
-                    address: s.address || "",
-                    number: s.number || "",
-                    complement: s.complement || "",
-                    neighborhood: s.neighborhood || "",
-                    city: s.city || "",
-                    state: s.state || ""
-                })));
-            }
+            console.log("SettingsPage: Data load complete.");
+        } catch (e: any) {
+            console.error("SettingsPage: Critical error in loadData", e);
+            // Optionally set an error state here if you want to show it in the UI
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
     };
 
     const handleStoreChange = (idx: number, field: keyof StoreCredential, value: any) => {
