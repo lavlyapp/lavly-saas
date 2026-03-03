@@ -1,4 +1,4 @@
-import { useSettings } from "@/components/context/SettingsContext";
+import { useSettings, AutomationSettingsMap } from "@/components/context/SettingsContext";
 import { Settings, MapPin, Key, Save, CheckCircle, Store, Clock, RefreshCw, Trash2, Plus, User, Eye, EyeOff } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
@@ -39,8 +39,15 @@ export function SettingsPage() {
 
 
 
-    const [localAutomation, setLocalAutomation] = useState(automationSettings);
+    const [localAutomation, setLocalAutomation] = useState<AutomationSettingsMap>({});
     const [saved, setSaved] = useState(false);
+
+    // Sync local automation when context loads
+    useEffect(() => {
+        if (Object.keys(automationSettings).length > 0 && Object.keys(localAutomation).length === 0) {
+            setLocalAutomation(automationSettings);
+        }
+    }, [automationSettings]);
 
     useEffect(() => {
         loadData();
@@ -172,9 +179,13 @@ export function SettingsPage() {
 
 
     const handleSave = async () => {
+        if (isLoading) return;
         setIsLoading(true);
+        setSaved(false);
+
+        console.log("SettingsPage: Starting handleSave...");
         try {
-            // 1. Save VMPay Account to Profile (Using UPSERT for first-time creation)
+            // 1. Save VMPay Account to Profile
             if (user) {
                 const { error: profileError } = await supabase.from('profiles').upsert({
                     id: user.id,
@@ -184,14 +195,11 @@ export function SettingsPage() {
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'id' });
 
-                if (profileError) {
-                    console.error("Profile Save Error:", profileError);
-                    alert(`Erro ao salvar perfil: ${profileError.message}`);
-                }
+                if (profileError) throw profileError;
             }
 
             // 2. Save Stores to Supabase
-            let storeErrors = 0;
+            console.log(`SettingsPage: Saving ${stores.length} stores...`);
             for (const store of stores) {
                 const { error } = await supabase
                     .from('stores')
@@ -215,15 +223,12 @@ export function SettingsPage() {
 
                 if (error) {
                     console.error(`Error saving store ${store.name}:`, error);
-                    storeErrors++;
+                    throw error;
                 }
             }
 
-            if (storeErrors > 0) {
-                alert(`Aviso: ${storeErrors} lojas não puderam ser salvas. Verifique o console.`);
-            }
-
             // 3. Save Automation Settings
+            console.log("SettingsPage: Updating automation context...");
             setAutomationSettings(localAutomation);
 
             // 4. Log Activity
@@ -233,18 +238,18 @@ export function SettingsPage() {
                     storeCount: stores.length
                 });
             } catch (e) {
-                console.warn("Activity logging failed (RLS?):", e);
+                console.warn("Activity logging failed:", e);
             }
 
-            if (storeErrors === 0) {
-                setSaved(true);
-                setTimeout(() => setSaved(false), 3000);
-            }
-            await loadData(); // Refresh IDs for new stores
+            setSaved(true);
+            setTimeout(() => setSaved(false), 3000);
+            console.log("SettingsPage: Save successful, reloading data...");
+            await loadData();
         } catch (e: any) {
-            console.error("SettingsPage: Critical Save Error", e);
-            alert("Erro crítico ao salvar as configurações. Verifique o console.");
+            console.error("SettingsPage: Save Error", e);
+            alert(`Erro ao salvar: ${e.message || "Erro desconhecido"}`);
         } finally {
+            console.log("SettingsPage: handleSave finished (loading set to false)");
             setIsLoading(false);
         }
     };
@@ -270,7 +275,7 @@ export function SettingsPage() {
     };
 
     const handleTuyaChange = (storeName: string, field: string, value: string | number) => {
-        setLocalAutomation(prev => {
+        setLocalAutomation((prev: AutomationSettingsMap) => {
             const current = prev[storeName] || {
                 status: 'DESATIVADO',
                 minLavagem: 30,
