@@ -32,11 +32,17 @@ export async function upsertSales(records: SaleRecord[], supabaseClient?: any) {
             updated_at: new Date().toISOString()
         }));
 
+        console.log(`[Persistence] Upserting ${salesToUpsert.length} sales records...`);
         const { error: salesError } = await db
             .from('sales')
             .upsert(salesToUpsert, { onConflict: 'id' });
 
-        if (salesError) throw salesError;
+        if (salesError) {
+            console.error(`[Persistence] ❌ Error in upsertSales (sales table): ${salesError.message}`);
+            console.error("[Persistence] Sales records sample (first 1):", JSON.stringify(salesToUpsert.slice(0, 1), null, 2));
+            throw salesError;
+        }
+        console.log(`[Persistence] ✅ Successfully upserted ${salesToUpsert.length} sales records.`);
 
         // 2. Prepare Orders for DB
         // We flat map items from sales to ensure relationship
@@ -82,66 +88,88 @@ export async function fetchSalesHistory() {
         console.log("[Persistence] Fetching sales history from Supabase with pagination...");
 
         // Helper to fetch all pages with concurrent batches
+        const withTimeout = async (promise: Promise<any>, timeoutMs: number) => {
+            let timeoutId: any;
+            const timeoutPromise = new Promise((_, reject) => {
+                timeoutId = setTimeout(() => reject(new Error("Timeout")), timeoutMs);
+            });
+            return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
+        };
+
         const fetchAll = async (tableName: string, orderColumn?: string) => {
-            const { count, error: countErr } = await supabase
-                .from(tableName)
-                .select('*', { count: 'exact', head: true });
+            try {
+                const { count, error: countErr } = await withTimeout(
+                    supabase
+                        .from(tableName)
+                        .select('*', { count: 'exact', head: true }) as any,
+                    5000
+                );
 
-            if (countErr) {
-                console.warn(`[Persistence] Could not get count for ${tableName}:`, countErr);
-                return [];
-            }
-            if (!count) return [];
+                if (countErr) {
+                    console.warn(`[Persistence] Could not get count for ${tableName}:`, countErr);
+                    return [];
+                }
+                if (!count) return [];
 
-            const pageSize = 1000;
-            const pages = Math.ceil(count / pageSize);
-            const queryFns = [];
+                const pageSize = 1000;
+                const pages = Math.ceil(count / pageSize);
+                const queryFns = [];
 
-            for (let i = 0; i < pages; i++) {
-                queryFns.push(async () => {
-                    const start = i * pageSize;
-                    const end = start + pageSize - 1;
-                    let query = supabase.from(tableName).select('*').range(start, end);
-                    if (orderColumn) {
-                        query = query.order(orderColumn, { ascending: false });
-                    }
-                    return query;
-                });
-            }
+                for (let i = 0; i < pages; i++) {
+                    queryFns.push(async () => {
+                        const start = i * pageSize;
+                        const end = start + pageSize - 1;
+                        let query: any = supabase.from(tableName).select('*').range(start, end);
+                        if (orderColumn) {
+                            query = query.order(orderColumn, { ascending: false });
+                        }
+                        return withTimeout(query as any, 5000);
+                    });
+                }
 
-            let allData: any[] = [];
-            // Run 10 requests concurrently
-            for (let i = 0; i < queryFns.length; i += 10) {
-                const chunk = queryFns.slice(i, i + 10);
-                const chunkResults = await Promise.all(chunk.map(fn => fn()));
-                for (const res of chunkResults) {
-                    if (res.error) throw res.error;
-                    if (res.data) {
-                        for (let j = 0; j < res.data.length; j++) {
-                            allData.push(res.data[j]);
+                let allData: any[] = [];
+                // Run 10 requests concurrently
+                for (let i = 0; i < queryFns.length; i += 10) {
+                    const chunk = queryFns.slice(i, i + 10);
+                    const chunkResults = await Promise.all(chunk.map(fn => fn()));
+                    for (const res of chunkResults) {
+                        if (res.error) throw res.error;
+                        if (res.data) {
+                            for (let j = 0; j < res.data.length; j++) {
+                                allData.push(res.data[j]);
+                            }
                         }
                     }
                 }
-            }
 
-            console.log(`[Persistence] fetchAll completed for ${tableName}. Total rows: ${allData.length}`);
-            return allData;
+                console.log(`[Persistence] fetchAll completed for ${tableName}. Total rows: ${allData.length}`);
+                return allData;
+            } catch (err: any) {
+                console.warn(`[Persistence] fetchAll failed for ${tableName} (timeout or error): ${err.message}`);
+                return [];
+            }
         };
 
-        console.log("[Persistence] Fetching sales, orders, and customers in parallel...");
-        const [sales, orders, customers] = await Promise.all([
-            fetchAll('sales', 'data'),
-            fetchAll('orders', 'data'),
-            fetchAll('customers', 'name').catch(e => {
-                console.warn("[Persistence] Customers table not found or error fetching. Skipping customer demographic preset.", e.message);
-                return [];
-            })
-        ]);
+        console.log("[Persistence] Fetching sales, orders, and customers in parallel (10s limit)...");
+        const [sales, orders, customers] = await withTimeout(
+            Promise.all([
+                fetchAll('sales', 'data'),
+                fetchAll('orders', 'data'),
+                fetchAll('customers', 'name').catch(e => {
+                    console.warn("[Persistence] Customers table error. Skipping.", e.message);
+                    return [];
+                })
+            ]),
+            10000
+        ).catch(err => {
+            console.error("[Persistence] Parallel fetch timed out! Returning empty datasets.", err.message);
+            return [[], [], []];
+        });
 
         // Transform back to Record types
         // Optimization: Pre-group orders by sale_id to avoid O(N*M) search
         const ordersBySaleId = new Map<string, any[]>();
-        orders.forEach(o => {
+        (orders as any[]).forEach((o: any) => {
             if (!ordersBySaleId.has(o.sale_id)) {
                 ordersBySaleId.set(o.sale_id, []);
             }
@@ -154,7 +182,7 @@ export async function fetchSalesHistory() {
             });
         });
 
-        const transformedSales: SaleRecord[] = sales.map(s => ({
+        const transformedSales: SaleRecord[] = (sales as any[]).map((s: any) => ({
             id: s.id,
             data: new Date(s.data),
             loja: getCanonicalStoreName(s.loja),
@@ -173,7 +201,7 @@ export async function fetchSalesHistory() {
             items: ordersBySaleId.get(s.id) || []
         }));
 
-        const transformedOrders: OrderRecord[] = orders.map(o => ({
+        const transformedOrders: OrderRecord[] = (orders as any[]).map((o: any) => ({
             data: new Date(o.data),
             loja: getCanonicalStoreName(o.loja),
             cliente: o.cliente,
@@ -185,7 +213,7 @@ export async function fetchSalesHistory() {
             originalRow: 0
         }));
 
-        const transformedCustomers: CustomerRecord[] = customers.map(c => ({
+        const transformedCustomers: CustomerRecord[] = (customers as any[]).map((c: any) => ({
             id: c.id,
             cpf: c.cpf,
             name: c.name,

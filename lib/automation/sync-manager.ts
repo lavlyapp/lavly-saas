@@ -1,4 +1,4 @@
-import { getVMPayCredentials, VMPayCredential } from "../vmpay-config";
+import { getVMPayCredentials, VMPayCredential, getCanonicalStoreName } from "../vmpay-config";
 import { syncVMPaySales } from "../vmpay-client";
 import { supabase } from "../supabase";
 import { updateTargetTimeDB, checkAndTurnOffAll } from "./scheduler";
@@ -51,7 +51,7 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
             const { data: latestSale, error: maxSyncErr } = await db
                 .from('sales')
                 .select('data')
-                .eq('loja', cred.name)
+                .eq('loja', getCanonicalStoreName(cred.name))
                 .order('data', { ascending: false })
                 .limit(1)
                 .single();
@@ -119,15 +119,22 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
             }
         }
 
-        // Update last sync time on 'stores'. Se falhar por RLS, nós ignoramos pacificamente
-        // Porque na próxima vez ele puxa o MAX() da tabela Sales, contornando o erro de update.
-        const { error: updateError } = await db
+        // Ensure store exists in DB to track last sync
+        const { error: storeUpsertError } = await db
             .from('stores')
-            .update({ last_sync_sales: now.toISOString() })
-            .eq('cnpj', cred.cnpj);
+            .upsert({
+                cnpj: cred.cnpj,
+                name: getCanonicalStoreName(cred.name),
+                api_key: cred.apiKey,
+                is_active: true,
+                updated_at: now.toISOString()
+            }, { onConflict: 'cnpj' });
 
-        if (updateError) {
-            console.warn(`[Sync Manager] Aviso SQL Pós-Sync (RLS contornado pelo MAX Data): ${updateError.message}`);
+        if (storeUpsertError) {
+            console.warn(`[Sync Manager] Non-blocking Store Upsert Error (RLS?): ${storeUpsertError.message}`);
+        } else {
+            // If upsert worked, update the last sync sales explicitly
+            await db.from('stores').update({ last_sync_sales: now.toISOString() }).eq('cnpj', cred.cnpj);
         }
 
         // --- AUTOMATION TRIGGER ---

@@ -1,4 +1,4 @@
-import { VMPAY_API_BASE_URL, getVMPayCredentials, VMPayCredential } from "./vmpay-config";
+import { VMPAY_API_BASE_URL, getVMPayCredentials, VMPayCredential, getCanonicalStoreName } from "./vmpay-config";
 import { SaleRecord, CustomerRecord } from "./processing/etl";
 
 interface EquipmentMap {
@@ -42,7 +42,7 @@ async function fetchMachines(apiKey: string): Promise<EquipmentMap> {
 }
 
 export async function syncVMPaySales(startDate: Date, endDate: Date, specificCred?: VMPayCredential): Promise<SaleRecord[]> {
-    const salesMap = new Map<number, SaleRecord>(); // Dedup by ID
+    const salesMap = new Map<string, SaleRecord>(); // Dedup by CNPJ + ID
 
     const credentials = specificCred ? [specificCred] : await getVMPayCredentials();
 
@@ -108,7 +108,7 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                         break;
                     }
 
-                    console.log(`[VMPay Client] Page ${page} received ${data.length} records for ${cred.name}.`);
+                    console.log(`[VMPay Client] Page ${page} received ${data.length} records for ${cred.name}. (API Key: ${cred.apiKey.substring(0, 5)}...)`);
 
                     for (const sale of data) {
                         // Normalize
@@ -183,25 +183,27 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                         }
 
                         const record: SaleRecord = {
-                            id: String(sale.idVenda),
+                            id: `${cred.cnpj}-${sale.idVenda}`, // Composite ID to prevent collisions across stores
                             data: safeDate,
-                            loja: cred.name, // Use canonical name from config
+                            loja: getCanonicalStoreName(cred.name),
                             cliente: sale.nomeCliente || "Cliente Não Identificado",
                             customerId: sale.idCliente ? String(sale.idCliente) : undefined,
-                            produto: items.length > 0 ? items[0].service : produto, // Main product label
+                            produto: items.length > 0 ? items[0].service : produto,
                             valor: sale.valor,
                             formaPagamento: sale.tipoPagamento || "Desconhecido",
                             tipoCartao: sale.tipoCartao || "",
                             categoriaVoucher: sale.nomeCategoriaVoucher || "",
                             desconto: (sale.valorSemDesconto || sale.valor) - sale.valor,
                             telefone: sale.telefoneCliente || "",
-                            items: items, // Enriched Items
+                            items: items,
                             originalRow: 0,
                             birthDate,
                             age
                         };
 
-                        salesMap.set(sale.idVenda, record);
+                        if (record.id) {
+                            salesMap.set(record.id, record);
+                        }
                     }
 
                     if (data.length < size) break;

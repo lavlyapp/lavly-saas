@@ -193,12 +193,23 @@ export function SettingsPage() {
 
     const handleSave = async () => {
         if (isSaving) return;
+
+        // Basic Validation
+        const invalidStores = stores.filter(s => !s.name || !s.cnpj);
+        if (invalidStores.length > 0) {
+            alert(`Por favor, preencha o Nome e o CNPJ de todas as lojas. (${invalidStores.length} lojas incompletas)`);
+            return;
+        }
+
         setIsSaving(true);
         setSaved(false);
 
         try {
-            // 1. Save VMPay Account to Profile
-            if (user) {
+            console.log("SettingsPage: Initiating save process...");
+
+            // 1. Save VMPay Account to Profile (Master Account)
+            if (user && (vmpayUser || vmpayPass)) {
+                console.log("SettingsPage: Updating user profile...");
                 const { error: profileError } = await supabase.from('profiles').upsert({
                     id: user.id,
                     email: user.email,
@@ -207,20 +218,23 @@ export function SettingsPage() {
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'id' });
 
-                if (profileError) throw profileError;
+                if (profileError) {
+                    console.error("SettingsPage: Profile save error", profileError);
+                    throw new Error(`Erro ao salvar perfil: ${profileError.message}`);
+                }
             }
 
-            // 2. Save ALL Stores to Supabase in a SINGLE batch
+            // 2. Save ALL Stores to Supabase
             if (stores.length > 0) {
                 const storesPayload = stores.map(store => ({
-                    id: store.id,
-                    cnpj: store.cnpj,
+                    id: store.id || undefined, // Send undefined for new stores
+                    cnpj: store.cnpj.replace(/\D/g, ''), // Sanitize CNPJ
                     name: store.name || "Sem Nome",
                     api_key: store.api_key || "",
                     open_time: store.open_time || "07:00:00",
                     close_time: store.close_time || "23:00:00",
                     is_active: store.is_active,
-                    cep: store.cep || "",
+                    cep: store.cep?.replace(/\D/g, '') || "",
                     address: store.address || "",
                     number: store.number || "",
                     complement: store.complement || "",
@@ -230,31 +244,37 @@ export function SettingsPage() {
                     updated_at: new Date().toISOString()
                 }));
 
-                console.log(`SettingsPage: Batch upserting ${storesPayload.length} stores...`);
-                const { error } = await supabase
+                console.log(`SettingsPage: Upserting ${storesPayload.length} stores...`);
+                // Use a single upsert. If ID exists, it updates; otherwise, it inserts based on CNPJ conflict.
+                const { error: storeError } = await supabase
                     .from('stores')
                     .upsert(storesPayload, { onConflict: 'cnpj' });
 
-                if (error) throw error;
+                if (storeError) {
+                    console.error("SettingsPage: Store upsert error", storeError);
+                    throw new Error(`Erro ao salvar lojas: ${storeError.message}`);
+                }
             }
 
-            // 3. Save Automation Settings
+            // 3. Save Automation Settings (Context/LocalStorage)
             setAutomationSettings(localAutomation);
 
-            // 4. Log Activity
-            try {
-                await logActivity("STORE_UPDATE", user?.id || null, {
-                    vmpayAccount: !!vmpayUser,
-                    storeCount: stores.length
-                });
-            } catch (e) { }
+            // 4. Log Activity (Non-blocking)
+            logActivity("STORE_UPDATE", user?.id || null, {
+                vmpayAccount: !!vmpayUser,
+                storeCount: stores.length
+            }).catch(err => console.warn("SettingsPage: Failed to log activity", err));
 
+            console.log("SettingsPage: All data saved successfully.");
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);
+
+            // Refresh data from DB to ensure local state is in sync with assigned IDs
             await loadData(true);
+
         } catch (e: any) {
             console.error("SettingsPage: Save Error", e);
-            alert(`Erro ao salvar: ${e.message || "Erro desconhecido"}`);
+            alert(`Erro Crítico ao Salvar: ${e.message || "Erro de conexão com o Supabase"}`);
         } finally {
             setIsSaving(false);
         }

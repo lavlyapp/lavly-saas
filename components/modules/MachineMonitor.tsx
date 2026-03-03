@@ -61,6 +61,7 @@ export function MachineMonitor({ allRecords, selectedStore }: MachineMonitorProp
 
     Object.entries(recordsByStore).forEach(([store, storeRecords]) => {
         const machineMap = new Map<string, SaleRecord>();
+        const canonicalStore = getCanonicalStoreName(store);
 
         storeRecords.forEach(record => {
             let machineName = "Desconhecida";
@@ -69,14 +70,27 @@ export function MachineMonitor({ allRecords, selectedStore }: MachineMonitorProp
 
             if (machineName === "Desconhecida" && record.produto) {
                 const prod = record.produto.toUpperCase();
-                const num = prod.match(/\d+/)?.[0];
-                if (num) {
-                    if (prod.includes('LAV') || prod.includes('33') || prod.includes('30')) machineName = `Máquina ${num}`;
-                    else if (prod.includes('SEC') || prod.includes('45')) machineName = `Secadora ${num}`;
+                const numMatch = prod.match(/\d+/);
+                const num = numMatch ? numMatch[0] : null;
+
+                if (num && !['30', '45', '60'].includes(num)) {
+                    if (prod.includes('LAV') || prod.includes('33')) machineName = `Máquina ${num}`;
+                    else if (prod.includes('SEC')) machineName = `Secadora ${num}`;
                 }
             }
 
             if (machineName === "Desconhecida") return;
+
+            // --- FILTERS ---
+            const isPhantom = (
+                (canonicalStore === 'Lavateria SANTOS DUMONT' || canonicalStore === 'Lavateria Cascavel') &&
+                (machineName.includes('30') || machineName.includes('45'))
+            );
+
+            // Limit inactivity: Exclude machines not seen in > 120 days
+            const daysSinceSeen = differenceInMinutes(now, record.data) / (24 * 60);
+
+            if (isPhantom || daysSinceSeen > 120) return;
 
             const existing = machineMap.get(machineName);
             if (!existing || record.data > existing.data) {
@@ -84,19 +98,17 @@ export function MachineMonitor({ allRecords, selectedStore }: MachineMonitorProp
             }
         });
 
-        const storeMachines: MachineStatus[] = Array.from(machineMap.entries()).map(([name, record]) => {
+        const storeMachines: MachineStatus[] = [];
+
+        machineMap.forEach((record, name) => {
             const duration = getCycleDuration(record.produto);
-            let type: 'washer' | 'dryer';
-
-            // Enhanced Type Detection
-            const storeLower = store.toLowerCase();
             const machineNum = parseInt(name.replace(/\D/g, ''), 10);
+            const storeLower = store.toLowerCase();
 
+            let type: 'washer' | 'dryer';
             if (storeLower.includes('lavateria') && !isNaN(machineNum)) {
-                // Lavateria Logic: Even = Washer, Odd = Dryer
                 type = machineNum % 2 === 0 ? 'washer' : 'dryer';
             } else {
-                // Fallback Logic: Duration Based
                 type = duration > 40 ? 'dryer' : 'washer';
             }
 
@@ -124,18 +136,14 @@ export function MachineMonitor({ allRecords, selectedStore }: MachineMonitorProp
             }
 
             let displayName = name;
-            // Simplify display name logic
             if (name.toLowerCase().includes('máquina')) displayName = name.replace(/Máquina\s*/i, 'MQ ');
             else if (name.toLowerCase().includes('secadora')) displayName = name.replace(/Secadora\s*/i, 'SEC ');
 
-            // If we have a number, ensure it spreads nicely
             if (!isNaN(machineNum)) {
-                // displayName = `${type === 'washer' ? 'LAV' : 'SEC'} ${machineNum}`;
-                // Actually keep the original name structure but cleaner
                 displayName = name.replace(/Máquina/i, '').replace(/Secadora/i, '').trim();
             }
 
-            const status = {
+            const status: MachineStatus = {
                 id: `${store}-${name}`,
                 name: displayName || name,
                 type,
@@ -150,11 +158,11 @@ export function MachineMonitor({ allRecords, selectedStore }: MachineMonitorProp
                 runningMachines.push({ store, status });
             }
 
-            return status;
-        }).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+            storeMachines.push(status);
+        });
 
         if (storeMachines.length > 0) {
-            machinesByStore[store] = storeMachines;
+            machinesByStore[store] = storeMachines.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
         }
     });
 

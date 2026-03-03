@@ -108,8 +108,18 @@ function AppContent({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-neutral-950 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-indigo-500"></div>
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 border-4 border-indigo-600/20 border-t-indigo-500 rounded-full animate-spin mb-8" />
+        <h1 className="text-2xl font-bold text-white mb-2">Iniciando Lavly...</h1>
+        <p className="text-neutral-500 text-sm max-w-xs mx-auto">
+          Preparando base de dados e conectando ao VMPay seguro.
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-12 px-6 py-2 bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white rounded-lg text-xs transition-all"
+        >
+          Reiniciar Conexão
+        </button>
       </div>
     );
   }
@@ -282,7 +292,7 @@ function AppContent({
   );
 }
 
-export default function DashboardClient({ initialSession }: { initialSession?: any }) {
+export default function DashboardClient({ initialSession, initialRole }: { initialSession?: any, initialRole?: any }) {
   const [activeTab, setActiveTab] = useState("financial");
   const [status, setStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -305,9 +315,19 @@ export default function DashboardClient({ initialSession }: { initialSession?: a
     return combined;
   }, [allRecords, dbStores]);
 
-  // Hydration Fix
+  // Hydration & Init Fix
   useEffect(() => {
     setMounted(true);
+    console.log("[DashboardClient] ✅ Component mounted and hydrated.");
+    setLogs(prev => [...prev, "[System] Interface carregada e hidratada."]);
+
+    // Safety timeout: If status is still 'uploading' after 15 seconds, show warning in logs
+    const timer = setTimeout(() => {
+      console.log("[DashboardClient] ⚠️ Initialization taking a while. Checking logs...");
+      setLogs(prev => [...prev, "[System] Aviso: O carregamento inicial está demorando. Verificando conectividade..."]);
+    }, 15000);
+
+    return () => clearTimeout(timer);
   }, []);
 
   const data = useMemo(() => {
@@ -761,23 +781,20 @@ export default function DashboardClient({ initialSession }: { initialSession?: a
   }
 
   async function handleSyncVMPay() {
-    setStatus("uploading");
-    setMessage("Sincronizando dados com VMPay... (Isso pode demorar alguns segundos)");
-    setLogs(prev => [...prev, "[VMPay] Iniciando sincronização via API..."]);
-
     try {
-      // Fetch current session for auth token
+      setStatus("uploading");
+      setMessage("Conectando com VMPay...");
+      setLogs(prev => [...prev, "[VMPay] Iniciando sincronização manual..."]);
+
       const { supabase } = await import("@/lib/supabase");
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
 
-      // Force full sync (180 days) if dashboard is completely empty
       const isFirstSync = allRecords.length === 0;
       const url = isFirstSync ? "/api/vmpay/sync?source=manual&force=true" : "/api/vmpay/sync?source=manual";
 
-      // Set an abort controller to prevent infinite freeze if Vercel drops connection without 50x
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 55000); // Vercel times out at 60s max, we abort slightly before
+      const timeoutId = setTimeout(() => controller.abort(), 55000);
 
       const res = await fetch(url, {
         method: "GET",
@@ -788,52 +805,56 @@ export default function DashboardClient({ initialSession }: { initialSession?: a
       });
       clearTimeout(timeoutId);
 
-      // Robust check for Vercel 504 timeouts (HTML instead of JSON)
       const contentType = res.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
         const textStr = await res.text();
-        throw new Error(`A sincronização demorou muito e o servidor (Vercel) encerrou a conexão (Timeout). Tente atualizar a página ou sincronizar uma loja por vez. Resposta bruta: ${textStr.substring(0, 50)}...`);
+        throw new Error(`Servidor ocupado. Tente novamente em instantes. (${textStr.substring(0, 20)})`);
       }
 
       const result = await res.json();
-      if (!res.ok || !result.success) throw new Error(result.error || `HTTP ${res.status}`);
+      if (!res.ok || !result.success) throw new Error(result.error || `Erro ${res.status}`);
 
-      // --- CUSTOMERS SYNC ---
+      // Customers
       if (result.customers && Array.isArray(result.customers)) {
         const customers = result.customers.map((c: any) => ({
           ...c,
           registrationDate: c.registrationDate ? new Date(c.registrationDate) : undefined
         }));
         setAllCustomers(customers);
-        setLogs(prev => [...prev, `[VMPay] ${customers.length} clientes sincronizados.`]);
+      } else {
+        setLogs(prev => [...prev, "[VMPay] Sincronização de clientes ignorada (Performance)."]);
       }
 
-      // Convert date strings back to Date objects
       const rawRecords = result.records || [];
       const totalToProcess = rawRecords.length;
       const CHUNK_SIZE = 500;
 
-      setLogs(prev => [...prev, `[VMPay] Iniciando processamento de ${totalToProcess} registros em blocos...`]);
+      const allProcessedRecords: any[] = [];
+      const allProcessedOrders: OrderRecord[] = [];
+
+      setLogs(prev => [...prev, `[VMPay] Processando ${totalToProcess} registros...`]);
+
+      const storeCounts: Record<string, number> = {};
 
       for (let i = 0; i < totalToProcess; i += CHUNK_SIZE) {
         const chunk = rawRecords.slice(i, i + CHUNK_SIZE);
+        const processedChunk = chunk.map((r: any) => {
+          const storeName = getCanonicalStoreName(r.loja);
+          storeCounts[storeName] = (storeCounts[storeName] || 0) + 1;
 
-        // Update Message
-        const pct = Math.round((i / totalToProcess) * 100);
-        setMessage(`Processando novos dados... ${pct}% (${i}/${totalToProcess})`);
+          return {
+            ...r,
+            data: new Date(r.data),
+            loja: storeName,
+            items: (r.items || []).map((it: any) => ({
+              ...it,
+              startTime: it.startTime ? new Date(it.startTime) : null
+            }))
+          };
+        });
 
-        // Convert dates for this chunk
-        const processedChunk = chunk.map((r: any) => ({
-          ...r,
-          data: new Date(r.data),
-          loja: getCanonicalStoreName(r.loja), // Normalização aqui!
-          items: r.items?.map((i: any) => ({
-            ...i,
-            startTime: i.startTime ? new Date(i.startTime) : null
-          })) || []
-        }));
+        allProcessedRecords.push(...processedChunk);
 
-        // Extract Synthetic Orders
         const chunkOrders: OrderRecord[] = processedChunk.flatMap((sale: any) =>
           (sale.items || []).map((item: any) => ({
             data: item.startTime || sale.data,
@@ -842,32 +863,49 @@ export default function DashboardClient({ initialSession }: { initialSession?: a
             machine: item.machine,
             service: item.service,
             status: item.status,
-            valor: item.value
+            valor: item.value || 0
           }))
         );
 
-        // Update Global States in batches
-        setAllOrders(prev => mergeOrders(prev, chunkOrders));
-        setAllRecords(prev => {
-          const existingIds = new Set(prev.map(r => r.id));
-          const uniqueNew = processedChunk.filter((r: any) => !existingIds.has(r.id));
-          return [...prev, ...uniqueNew];
-        });
+        allProcessedOrders.push(...chunkOrders);
 
-        // Yield to browser
+        const pct = Math.round((i / totalToProcess) * 100);
+        setMessage(`Processando... ${pct}%`);
         await new Promise(resolve => setTimeout(resolve, 0));
       }
 
-      const custCount = result.customers?.length || 0;
-      setLogs(prev => [...prev, `[VMPay] Sincronização concluída. ${totalToProcess} vendas, ${custCount} clientes.`]);
-      setMessage(`Sincronização VMPay concluída! ${totalToProcess} vendas, ${custCount} clientes.`);
-      setStatus("success");
+      // Single state update for everything
+      setAllRecords(prev => {
+        const existingIds = new Set(prev.map(r => r.id));
+        const uniqueNew = allProcessedRecords.filter(r => !existingIds.has(r.id));
+        return [...prev, ...uniqueNew];
+      });
 
+      setAllOrders(prev => {
+        // Improved Key includes Loja and Machine to avoid collisions across stores
+        const getOrderKey = (o: OrderRecord) => {
+          const time = o.data instanceof Date ? o.data.getTime() : new Date(o.data).getTime();
+          return `${o.loja}-${o.machine}-${time}-${o.valor}`;
+        };
+
+        const existingKeys = new Set(prev.map(getOrderKey));
+        const unique = allProcessedOrders.filter(o => !existingKeys.has(getOrderKey(o)));
+        return [...prev, ...unique];
+      });
+
+      // Log per-store summary
+      Object.entries(storeCounts).forEach(([store, count]) => {
+        setLogs(prev => [...prev, `[Sync] ${store}: ${count} vendas encontradas.`]);
+      });
+
+      setLogs(prev => [...prev, `[VMPay] Sincronização concluída: ${totalToProcess} registros.`]);
+      setStatus("success");
+      setMessage("Sincronização concluída!");
     } catch (e: any) {
       console.error(e);
       setStatus("error");
-      setMessage(`Erro na sincronização: ${e.message}`);
-      setLogs(prev => [...prev, `[VMPay Error] ${e.message}`]);
+      setMessage(`Erro: ${e.message}`);
+      setLogs(prev => [...prev, `[Erro] ${e.message}`]);
     }
   }
 
@@ -878,6 +916,30 @@ export default function DashboardClient({ initialSession }: { initialSession?: a
 
     if (activeTab === 'logs') {
       return <ActivityLogs />;
+    }
+
+    // 2. Initial Loading State (Fix for blank screen "not loading normally")
+    if (status === 'uploading' && allRecords.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center h-[60vh] w-full bg-neutral-900/50 rounded-3xl border border-neutral-800 animate-pulse">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+            <div className="text-center">
+              <h3 className="text-xl font-bold text-white mb-1">Carregando Sistema Lavly...</h3>
+              <p className="text-sm text-neutral-500">{message || "Sincronizando dados com o banco de dados"}</p>
+            </div>
+          </div>
+          <div className="mt-8 max-w-md w-full px-4">
+            <div className="bg-black/40 rounded-xl p-4 border border-white/5 font-mono text-[10px] text-neutral-500 h-24 overflow-y-auto">
+              {logs.slice(-3).map((log, i) => (
+                <div key={i} className="mb-1 truncate opacity-70">
+                  <span className="text-blue-500 mr-2">&gt;</span>{log}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
     }
 
     // Default or No Data State
@@ -1005,7 +1067,7 @@ export default function DashboardClient({ initialSession }: { initialSession?: a
 
   return (
     <SettingsProvider>
-      <AuthProvider initialSession={initialSession}>
+      <AuthProvider initialSession={initialSession} initialRole={initialRole}>
         <SubscriptionProvider>
           <CustomerProvider>
             <AppContent

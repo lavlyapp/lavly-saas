@@ -1,50 +1,41 @@
-import { VMPAY_API_BASE_URL, getVMPayCredentials } from "../lib/vmpay-config";
 
-async function probeRawSales() {
-    const credentials = await getVMPayCredentials();
-    const cred = credentials[0];
-    if (!cred) {
-        console.error("No credentials found");
+import { supabase } from "./lib/supabase";
+
+async function probe() {
+    const today = new Date().toISOString().split('T')[0];
+    console.log(`[Probe] Checking database for records on ${today}...`);
+
+    const { data, error } = await supabase
+        .from('sales')
+        .select('id, data, loja, valor')
+        .gte('data', `${today}T00:00:00Z`)
+        .lte('data', `${today}T23:59:59Z`);
+
+    if (error) {
+        console.error("[Probe] Error:", error.message);
         return;
     }
-    console.log(`Fetching RAW sales for ${cred.name}...`);
 
-    // Fetch recent sales (last 48h to ensure data)
-    const end = new Date();
-    const start = new Date();
-    start.setDate(end.getDate() - 2);
-
-    // API Date format: ISO 8601
-    const url = `${VMPAY_API_BASE_URL}/vendas?dataInicio=${start.toISOString()}&dataTermino=${end.toISOString()}&somenteSucesso=true&pagina=0&quantidade=5`;
-
-    try {
-        const res = await fetch(url, {
-            headers: { 'x-api-key': cred.apiKey }
+    console.log(`[Probe] Found ${data.length} records in database for today.`);
+    if (data.length > 0) {
+        const counts: Record<string, number> = {};
+        data.forEach(r => {
+            counts[r.loja] = (counts[r.loja] || 0) + 1;
         });
+        console.log("[Probe] Counts by store:", JSON.stringify(counts, null, 2));
+        console.log("[Probe] Sample:", JSON.stringify(data[0], null, 2));
+    } else {
+        console.log("[Probe] NO RECORDS FOUND IN DATABASE FOR TODAY.");
 
-        if (res.ok) {
-            const data = await res.json();
-            if (Array.isArray(data) && data.length > 0) {
-                console.log("RAW SALE OBJECT KEYS:", Object.keys(data[0]));
-                console.log("RAW SALE OBJECT SAMPLE:", JSON.stringify(data[0], null, 2));
+        // Let's check the last 10 records overall
+        const { data: lastRecs } = await supabase
+            .from('sales')
+            .select('id, data, loja, valor')
+            .order('data', { ascending: false })
+            .limit(10);
 
-                // Check specifically for customer ID or gender
-                console.log("\n--- CUSTOMER FIELDS CHECK ---");
-                data.slice(0, 3).forEach((s, i) => {
-                    const id = s.idCliente || s.clienteId || 'N/A';
-                    const sName = s.cliente || s.nomeCliente || 'N/A';
-                    const gender = s.genero || s.sexo || s.gender || 'N/A';
-                    console.log(`[${i}] ID: ${id} | NAME: ${sName} | GENDER: ${gender}`);
-                });
-            } else {
-                console.log("No sales found or empty array.");
-            }
-        } else {
-            console.log("Error:", res.status, await res.text());
-        }
-    } catch (e) {
-        console.error(e);
+        console.log("[Probe] Last 10 records in DB:", JSON.stringify(lastRecs, null, 2));
     }
 }
 
-probeRawSales();
+probe();

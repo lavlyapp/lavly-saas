@@ -148,37 +148,34 @@ export async function getVMPayMasterAccount(userId: string): Promise<VMPayMaster
  * Falls back to static credentials if the database is not configured or empty.
  */
 export async function getVMPayCredentials(): Promise<VMPayCredential[]> {
+    const withTimeout = async (promise: Promise<any>, timeoutMs: number) => {
+        let timeoutId: any;
+        const timeoutPromise = new Promise((_, reject) => {
+            timeoutId = setTimeout(() => reject(new Error("Timeout")), timeoutMs);
+        });
+        return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
+    };
+
     try {
-        const { data, error } = await supabase
-            .from('stores')
-            .select(`
-                id,
-                name, 
-                cnpj, 
-                api_key, 
-                open_time, 
-                close_time, 
-                is_active,
-                has_ac_subscription,
-                tuya_device_id,
-                tuya_client_id,
-                tuya_client_secret,
-                tuya_scene_on_id,
-                tuya_scene_off_id,
-                cep,
-                address,
-                number,
-                complement,
-                neighborhood,
-                city,
-                state
-            `)
-            .eq('is_active', true);
+        console.log("[VMPay Config] Fetching stores with 5s timeout...");
+        const { data, error } = await withTimeout(
+            supabase
+                .from('stores')
+                .select(`
+                    id, name, cnpj, api_key, open_time, close_time, 
+                    is_active, has_ac_subscription, tuya_device_id,
+                    tuya_client_id, tuya_client_secret, tuya_scene_on_id,
+                    tuya_scene_off_id, cep, address, number,
+                    complement, neighborhood, city, state
+                `)
+                .eq('is_active', true) as any,
+            5000
+        );
 
         if (error) throw error;
 
         if (data && data.length > 0) {
-            return data.map(d => ({
+            return data.map((d: any) => ({
                 id: d.id,
                 name: getCanonicalStoreName(d.name),
                 cnpj: d.cnpj,
@@ -201,8 +198,8 @@ export async function getVMPayCredentials(): Promise<VMPayCredential[]> {
                 state: d.state
             }));
         }
-    } catch (e) {
-        console.warn("[VMPay Config] Falling back to static credentials due to error or empty DB:", e);
+    } catch (e: any) {
+        console.warn(`[VMPay Config] Fallback to STATIC due to: ${e.message}`);
     }
 
     return STATIC_VMPAY_CREDENTIALS;

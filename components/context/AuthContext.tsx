@@ -17,10 +17,10 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children, initialSession }: { children: ReactNode, initialSession?: any }) {
+export function AuthProvider({ children, initialSession, initialRole }: { children: ReactNode, initialSession?: any, initialRole?: Role | null }) {
     const [user, setUser] = useState<User | null>(initialSession?.user ?? null);
-    const [role, setRole] = useState<Role | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const [role, setRole] = useState<Role | null>(initialRole ?? null);
+    const [isLoading, setIsLoading] = useState(!initialSession || (initialSession.user && !initialRole));
 
     useEffect(() => {
         const fetchProfile = async (userId: string) => {
@@ -43,6 +43,7 @@ export function AuthProvider({ children, initialSession }: { children: ReactNode
         };
 
         if (!initialSession) {
+            console.log("[Auth] No initial session, fetching...");
             supabase.auth.getSession().then(({ data: { session } }) => {
                 setUser(session?.user ?? null);
                 if (session?.user) {
@@ -52,8 +53,10 @@ export function AuthProvider({ children, initialSession }: { children: ReactNode
                 }
             });
         } else if (initialSession?.user && !role) {
+            console.log("[Auth] have session but no role, fetching profile...");
             fetchProfile(initialSession.user.id);
         } else {
+            // Already have session and role (from server or previous state)
             setIsLoading(false);
         }
 
@@ -70,6 +73,18 @@ export function AuthProvider({ children, initialSession }: { children: ReactNode
 
         return () => subscription.unsubscribe();
     }, [initialSession, role]);
+
+    // --- Failsafe Cleanup ---
+    useEffect(() => {
+        if (!isLoading) return;
+        const timer = setTimeout(() => {
+            if (isLoading) {
+                console.warn("[Auth] ⚠️ Failsafe timeout reached. Forcing loading to false.");
+                setIsLoading(false);
+            }
+        }, 10000); // 10 seconds max
+        return () => clearTimeout(timer);
+    }, [isLoading]);
 
     const login = async (email: string, password: string) => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });

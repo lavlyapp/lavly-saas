@@ -134,8 +134,11 @@ export function FinancialDashboard({ data, allRecords, selectedStore = 'Todas' }
 
         return data.records.filter((r: any) => {
             if (!r.data) return false;
-            // OPTIMIZATION: Assume r.data is already a Date or handle it safely
             const recordDate = r.data instanceof Date ? r.data : new Date(r.data);
+
+            // If the record is from today/yesterday, we need to be careful with UTC
+            // Brazil is UTC-3. We consider "Today" to include late UTC sales from yesterday
+            // and exclude early UTC sales from tomorrow.
             return recordDate >= interval!.start && recordDate <= interval!.end;
         });
     }, [data?.records, period, customRange]);
