@@ -442,10 +442,12 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
 
           while (hasMore) {
             setLogs(prev => [...prev, `[System] Baixando ${tableName}: Lote ${i + 1} (até ${pageSize} registros)...`]);
-            const { data, error } = await supabase.from(tableName).select(columns).range(i * pageSize, (i + 1) * pageSize - 1).order('data', { ascending: false });
+            const { data, error } = await supabase.from(tableName).select(columns).range(i * pageSize, (i + 1) * pageSize - 1).order('id', { ascending: true });
 
             if (error) {
               console.error(`[${tableName}] Error fetching page ${i}:`, error);
+              // Handle silent aborts by stopping gracefully without taking down the promise chain
+              setLogs(prev => [...prev, `[System] Erro de rede no Lote ${i + 1}. Tentando continuar com os dados obtidos...`]);
               break;
             }
 
@@ -524,12 +526,23 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
 
         // Hydrate & Normalize for UI
         const hydratedSales = finalRawSales.map((s: any) => ({
-          ...s, data: new Date(s.data), loja: getCanonicalStoreName(s.loja),
+          ...s,
+          data: s.data ? new Date(s.data) : new Date(),
+          loja: getCanonicalStoreName(s.loja),
           birthDate: s.birthDate ? new Date(s.birthDate) : undefined,
-          items: s.items ? s.items.map((i: any) => ({ ...i, startTime: new Date(i.startTime) })) : []
+          items: s.items ? s.items.map((i: any) => ({ ...i, startTime: i.startTime ? new Date(i.startTime) : new Date() })) : []
         }));
-        const hydratedOrders = finalRawOrders.map((o: any) => ({ ...o, data: new Date(o.data), loja: getCanonicalStoreName(o.loja) }));
-        const hydratedCustomers = finalRawCustomers.map((c: any) => ({ ...c, registrationDate: c.registrationDate ? new Date(c.registrationDate) : undefined }));
+
+        const hydratedOrders = finalRawOrders.map((o: any) => ({
+          ...o,
+          data: o.data ? new Date(o.data) : new Date(),
+          loja: getCanonicalStoreName(o.loja)
+        }));
+
+        const hydratedCustomers = finalRawCustomers.map((c: any) => ({
+          ...c,
+          registrationDate: c.registrationDate ? new Date(c.registrationDate) : undefined
+        }));
 
         // Update State definitively
         setAllRecords(hydratedSales);
