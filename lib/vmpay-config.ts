@@ -157,7 +157,7 @@ export async function getVMPayCredentials(): Promise<VMPayCredential[]> {
     };
 
     try {
-        console.log("[VMPay Config] Fetching stores with 5s timeout...");
+        console.log("[VMPay Config] Fetching stores with 15s timeout...");
         const { data, error } = await withTimeout(
             supabase
                 .from('stores')
@@ -169,7 +169,7 @@ export async function getVMPayCredentials(): Promise<VMPayCredential[]> {
                     complement, neighborhood, city, state
                 `)
                 .eq('is_active', true) as any,
-            5000
+            15000
         );
 
         if (error) throw error;

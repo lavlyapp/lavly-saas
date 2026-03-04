@@ -433,6 +433,14 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         // FULL LOAD (Paginated & Robust for first run)
         setLogs(prev => [...prev, `[System] Baixando banco de dados completo (primeiro acesso neste dispositivo)...`]);
 
+        const withDbTimeout = async (promise: Promise<any>, timeoutMs: number) => {
+          let timeoutId: any;
+          const timeoutPromise = new Promise((_, reject) => {
+            timeoutId = setTimeout(() => reject(new Error("Timeout de Rede (Supabase)")), timeoutMs);
+          });
+          return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
+        };
+
         const fetchTable = async (tableName: string, columns: string) => {
           const pageSize = 2000;
           const allResults: any[] = [];
@@ -442,24 +450,32 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
 
           while (hasMore) {
             setLogs(prev => [...prev, `[System] Baixando ${tableName}: Lote ${i + 1} (até ${pageSize} registros)...`]);
-            const { data, error } = await supabase.from(tableName).select(columns).range(i * pageSize, (i + 1) * pageSize - 1).order('id', { ascending: true });
+            try {
+              const { data, error } = await withDbTimeout(
+                supabase.from(tableName).select(columns).range(i * pageSize, (i + 1) * pageSize - 1) as any,
+                20000 // 20s rigid timeout per chunk
+              );
 
-            if (error) {
-              console.error(`[${tableName}] Error fetching page ${i}:`, error);
-              // Handle silent aborts by stopping gracefully without taking down the promise chain
-              setLogs(prev => [...prev, `[System] Erro de rede no Lote ${i + 1}. Tentando continuar com os dados obtidos...`]);
-              break;
-            }
-
-            if (data && data.length > 0) {
-              allResults.push(...data);
-              if (data.length < pageSize) {
-                hasMore = false; // Last page reached
-              } else {
-                i++;
+              if (error) {
+                console.error(`[${tableName}] Error fetching page ${i}:`, error);
+                setLogs(prev => [...prev, `[System] Erro no Banco no Lote ${i + 1}. Tentando continuar com os dados obtidos...`]);
+                break;
               }
-            } else {
-              hasMore = false; // Empty page
+
+              if (data && data.length > 0) {
+                allResults.push(...data);
+                if (data.length < pageSize) {
+                  hasMore = false; // Last page reached
+                } else {
+                  i++;
+                }
+              } else {
+                hasMore = false; // Empty page
+              }
+            } catch (timeoutErr) {
+              console.error(`[${tableName}] Timeout fetching page ${i}:`, timeoutErr);
+              setLogs(prev => [...prev, `[System] A conexão com o banco de dados expirou (Timeout) no Lote ${i + 1}. A nuvem pode estar bloqueada nesta rede.`]);
+              throw timeoutErr; // Bubble up to abort the whole initialization
             }
           }
 
@@ -491,9 +507,9 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         }
 
         const [newSalesRes, newOrdersRes, newCustomersRes] = await Promise.all([
-          salesQuery,
-          ordersQuery,
-          supabase.from('customers').select('id, cpf, name, phone, email, gender, registration_date').limit(10000)
+          salesQuery as any,
+          ordersQuery as any,
+          supabase.from('customers').select('id, cpf, name, phone, email, gender, registration_date').limit(10000) as any
         ]);
 
         newSales = newSalesRes.data || [];
