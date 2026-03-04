@@ -112,35 +112,25 @@ export async function fetchSalesHistory(supabaseClient?: any) {
                 }
                 if (!count) return [];
 
-                const pageSize = 1000;
+                const pageSize = 10000; // 10x mais rápido por página
                 const pages = Math.ceil(count / pageSize);
-                const queryFns = [];
+                const queryPromises = [];
 
                 for (let i = 0; i < pages; i++) {
-                    queryFns.push(async () => {
-                        const start = i * pageSize;
-                        const end = start + pageSize - 1;
-                        let query: any = db.from(tableName).select(columns).range(start, end);
-                        if (orderColumn) {
-                            query = query.order(orderColumn, { ascending: false });
-                        }
-                        return withTimeout(query as any, 15000); // Aumentado para 15s
-                    });
+                    const start = i * pageSize;
+                    const end = start + pageSize - 1;
+                    let query: any = db.from(tableName).select(columns).range(start, end);
+                    if (orderColumn) {
+                        query = query.order(orderColumn, { ascending: false });
+                    }
+                    queryPromises.push(withTimeout(query as any, 50000)); // Limite de 50s para o banco responder
                 }
 
+                const chunkResults = await Promise.all(queryPromises);
                 let allData: any[] = [];
-                // Run 5 requests concurrently para não afogar o banco
-                for (let i = 0; i < queryFns.length; i += 5) {
-                    const chunk = queryFns.slice(i, i + 5);
-                    const chunkResults = await Promise.all(chunk.map(fn => fn()));
-                    for (const res of chunkResults) {
-                        if (res.error) throw res.error;
-                        if (res.data) {
-                            for (let j = 0; j < res.data.length; j++) {
-                                allData.push(res.data[j]);
-                            }
-                        }
-                    }
+                for (const res of chunkResults) {
+                    if (res.error) throw res.error;
+                    if (res.data) allData.push(...res.data);
                 }
 
                 console.log(`[Persistence] fetchAll completed for ${tableName}. Total rows: ${allData.length}`);

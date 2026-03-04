@@ -374,108 +374,85 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
 
   const isInitializing = useRef(false);
 
-  useEffect(() => {
-    async function loadHistory() {
-      if (!mounted || isInitializing.current) return;
-      isInitializing.current = true;
+  const reloadAllData = async (reason: string = "Inicial") => {
+    if (isInitializing.current) return;
+    isInitializing.current = true;
 
-      console.log("[Home] Initializing app data...");
-      setLogs(prev => [...prev, "[System] Iniciando carregamento de dados..."]);
-      setStatus("uploading");
-      setMessage("Carregando histórico do banco de dados...");
+    console.log(`[Home] Reloading all data (Reason: ${reason})...`);
+    setLogs(prev => [...prev, `[System] Iniciando carregamento de dados (${reason})...`]);
+    setStatus("uploading");
+    setMessage("Carregando histórico do banco de dados...");
 
-      try {
-        // 1. Load active stores first
-        setLogs(prev => [...prev, "[System-Debug] 1/4 Importando vmpay-config..."]);
-        const { getVMPayCredentials, getCanonicalStoreName } = await import("@/lib/vmpay-config");
-        setLogs(prev => [...prev, "[System-Debug] 2/4 Buscando credenciais VMPay..."]);
-        const activeStores = await getVMPayCredentials();
-        const configuredNames = activeStores.map(s => getCanonicalStoreName(s.name));
+    try {
+      // 1. Load active stores and config
+      const { getVMPayCredentials, getCanonicalStoreName } = await import("@/lib/vmpay-config");
+      const activeStores = await getVMPayCredentials();
+      const configuredNames = activeStores.map(s => getCanonicalStoreName(s.name));
 
-        let initialStore = selectedStore;
-        if (!selectedStore) {
-          initialStore = 'Todas';
-          setSelectedStore(initialStore);
+      // 2. Direct parallel fetch from Supabase
+      const fetchTable = async (tableName: string, columns: string) => {
+        const { count, error: countErr } = await supabase.from(tableName).select('*', { count: 'exact', head: true });
+        if (countErr) throw countErr;
+        if (!count) return [];
+
+        const pageSize = 10000;
+        const pages = Math.ceil(count / pageSize);
+        const promises = [];
+        for (let i = 0; i < pages; i++) {
+          promises.push(supabase.from(tableName).select(columns).range(i * pageSize, (i + 1) * pageSize - 1).order('data', { ascending: false }));
         }
+        setLogs(prev => [...prev, `[System] Carregando ${tableName}: ${count} registros...`]);
+        const results = await Promise.all(promises);
+        return results.flatMap(r => r.data || []);
+      };
 
-        // 2. Load history from Next.js Server API
-        setLogs(prev => [...prev, "[System-Debug] 3/4 Acessando API Servidor VMPay..."]);
+      const [sales, orders, customers] = await Promise.all([
+        fetchTable('sales', 'id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age'),
+        fetchTable('orders', 'data, loja, cliente, machine, service, status, valor, customer_id, sale_id'),
+        supabase.from('customers').select('id, cpf, name, phone, email, gender, registration_date').limit(10000).then(r => r.data || [])
+      ]);
 
-        // Get current session token for RLS
-        const { data: { session } } = await supabase.auth.getSession();
-        const headers: Record<string, string> = { 'cache': 'no-store' };
-        if (session?.access_token) {
-          headers['Authorization'] = `Bearer ${session.access_token}`;
-        }
+      // Hydrate & Normalize
+      const hydratedSales = (sales || []).map((s: any) => ({
+        ...s,
+        data: new Date(s.data),
+        loja: getCanonicalStoreName(s.loja),
+        birthDate: s.birthDate ? new Date(s.birthDate) : undefined,
+        items: s.items ? s.items.map((i: any) => ({ ...i, startTime: new Date(i.startTime) })) : []
+      }));
 
-        const historyRes = await fetch("/api/vmpay/history", {
-          cache: 'no-store',
-          headers: headers as any
-        });
+      const hydratedOrders = (orders || []).map((o: any) => ({
+        ...o,
+        data: new Date(o.data),
+        loja: getCanonicalStoreName(o.loja)
+      }));
 
-        if (!historyRes.ok) {
-          throw new Error("Falha no Endpoint de Histórico");
-        }
+      const hydratedCustomers = (customers || []).map((c: any) => ({
+        ...c,
+        registrationDate: c.registrationDate ? new Date(c.registrationDate) : undefined
+      }));
 
-        setLogs(prev => [...prev, "[System-Debug] 4/4 Histórico recebido com sucesso."]);
-        const result = await historyRes.json();
-        const { sales, orders, customers, debug, activeStores: apiActiveStores } = result;
-        if (debug) console.log("[API-Debug] History payload:", debug);
-        if (apiActiveStores) {
-          console.log("[API-Debug] Active stores from server:", apiActiveStores);
-          setLogs(prev => [...prev, `[System] Servidor reportou ${apiActiveStores.length} lojas ativas.`]);
-        }
+      // Update State
+      setDbStores(configuredNames);
+      setAllRecords(hydratedSales);
+      setAllOrders(hydratedOrders);
+      if (hydratedCustomers.length > 0) setAllCustomers(hydratedCustomers);
 
-        // Re-hydrate Date objects since JSON stringifies them
-        const hydratedSales = (sales || []).map((s: any) => ({
-          ...s,
-          data: new Date(s.data),
-          birthDate: s.birthDate ? new Date(s.birthDate) : undefined,
-          items: s.items ? s.items.map((i: any) => ({ ...i, startTime: new Date(i.startTime) })) : []
-        }));
-
-        const hydratedOrders = (orders || []).map((o: any) => ({
-          ...o,
-          data: new Date(o.data)
-        }));
-
-        const hydratedCustomers = (customers || []).map((c: any) => ({
-          ...c,
-          registrationDate: c.registrationDate ? new Date(c.registrationDate) : undefined
-        }));
-
-        if (hydratedCustomers.length > 0) {
-          setAllCustomers(hydratedCustomers);
-        }
-
-        // Normalize names from DB just in case SQL migration wasn't 100% or cache exists
-        const normalizedSales = hydratedSales.map((s: any) => ({ ...s, loja: getCanonicalStoreName(s.loja) }));
-        const normalizedOrders = hydratedOrders.map((o: any) => ({ ...o, loja: getCanonicalStoreName(o.loja) }));
-
-        console.log(`[Home] History loaded: ${hydratedSales.length} sales, ${hydratedOrders.length} orders`);
-
-        // 3. Process and Update State
-        setDbStores(configuredNames);
-
-        if (hydratedSales.length > 0) {
-          setAllRecords(normalizedSales);
-          setAllOrders(normalizedOrders);
-          setLogs(prev => [...prev, `[System] ${hydratedSales.length} registros carregados conforme histórico.`]);
-        } else {
-          setLogs(prev => [...prev, "[System] Nenhum histórico encontrado. Aguardando novos dados."]);
-        }
-        setStatus("idle");
-        setMessage("");
-      } catch (err) {
-        console.error("[Home] Error during initialization:", err);
-        setLogs(prev => [...prev, `[Erro] Falha crítica ao carregar dados: ${(err as any).message}`]);
-        setStatus("error");
-        setMessage("Erro ao carregar dados do Supabase. Verifique sua conexão.");
-      } finally {
-        isInitializing.current = false;
-      }
+      setLogs(prev => [...prev, `[System] ${hydratedSales.length} registros prontos.`]);
+      setStatus("idle");
+      setMessage("");
+    } catch (err) {
+      console.error("[Home] Error loading data:", err);
+      setLogs(prev => [...prev, `[Erro] Falha ao carregar dados: ${(err as any).message}`]);
+      setStatus("error");
+      setMessage("Erro na conexão com o Banco de Dados.");
+    } finally {
+      isInitializing.current = false;
     }
-    loadHistory();
+  };
+
+  useEffect(() => {
+    if (mounted) reloadAllData("Inicial");
   }, [mounted]);
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -892,58 +869,10 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
       const totalToProcess = rawRecords.length;
 
       setLogs(prev => [...prev, `[VMPay] Ciclo completo: ${totalToProcess} novos registros integrados no banco de dados.`]);
-      setLogs(prev => [...prev, `[Sistema] Atualizando painel... (Isto pode levar alguns segundos)`]);
+      setLogs(prev => [...prev, `[Sistema] Atualizando painel...`]);
 
-      // FIX: Instead of merging thousands of records in memory and freezing the browser thread,
-      // we simply reload the history from the server-side proxy which handles deduplication efficiently.
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const headers: Record<string, string> = { 'cache': 'no-store' };
-        if (session?.access_token) {
-          headers['Authorization'] = `Bearer ${session.access_token}`;
-        }
-
-        const historyRes = await fetch("/api/vmpay/history", {
-          cache: 'no-store',
-          headers: headers as any
-        });
-        if (!historyRes.ok) throw new Error("Erro recarregando a API após Sincronismo.");
-        const result = await historyRes.json();
-        const freshRecords = result;
-        if (result.debug) console.log("[API-Debug] Sync refresh payload:", result.debug);
-
-        if (freshRecords && freshRecords.sales && freshRecords.sales.length > 0) {
-          const { getCanonicalStoreName } = await import("@/lib/vmpay-config");
-
-          // Hydrate Dates
-          const hydratedSales = freshRecords.sales.map((s: any) => ({
-            ...s,
-            data: new Date(s.data),
-            birthDate: s.birthDate ? new Date(s.birthDate) : undefined,
-            loja: getCanonicalStoreName(s.loja),
-            items: s.items ? s.items.map((i: any) => ({ ...i, startTime: new Date(i.startTime) })) : []
-          }));
-
-          const hydratedOrders = freshRecords.orders.map((o: any) => ({
-            ...o,
-            data: new Date(o.data),
-            loja: getCanonicalStoreName(o.loja)
-          }));
-
-          const hydratedCustomers = (freshRecords.customers || []).map((c: any) => ({
-            ...c,
-            registrationDate: c.registrationDate ? new Date(c.registrationDate) : undefined
-          }));
-
-          setAllRecords(hydratedSales);
-          setAllOrders(hydratedOrders);
-
-          if (hydratedCustomers && hydratedCustomers.length > 0) {
-            setAllCustomers(hydratedCustomers);
-          }
-        } else {
-          setLogs(prev => [...prev, "[Aviso] Servidor não retornou dados a tempo (Possível limite superado). Recarregue a página (F5) para visualizar as vendas novas."]);
-        }
+        await reloadAllData("Sincronismo");
       } catch (dbErr: any) {
         setLogs(prev => [...prev, `[Aviso] Falha ao recarregar a tela automaticamente: ${dbErr.message}`]);
       }
