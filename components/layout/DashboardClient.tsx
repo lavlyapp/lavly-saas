@@ -397,28 +397,52 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
           setSelectedStore(initialStore);
         }
 
-        // 2. Load history from Supabase
-        setLogs(prev => [...prev, "[System-Debug] 3/4 Importando persistence.ts..."]);
-        const { fetchSalesHistory } = await import("@/lib/persistence");
-        setLogs(prev => [...prev, "[System-Debug] 4/4 Aguardando fetchSalesHistory() (Banco de Dados)..."]);
-        const { sales, orders, customers } = await fetchSalesHistory();
-        if (customers) {
-          setAllCustomers(customers);
+        // 2. Load history from Next.js Server API
+        setLogs(prev => [...prev, "[System-Debug] 3/4 Acessando API Servidor VMPay..."]);
+        const historyRes = await fetch("/api/vmpay/history", { cache: 'no-store' });
+
+        if (!historyRes.ok) {
+          throw new Error("Falha no Endpoint de Histórico");
+        }
+
+        setLogs(prev => [...prev, "[System-Debug] 4/4 Histórico recebido com sucesso."]);
+        const { sales, orders, customers } = await historyRes.json();
+
+        // Re-hydrate Date objects since JSON stringifies them
+        const hydratedSales = (sales || []).map((s: any) => ({
+          ...s,
+          data: new Date(s.data),
+          birthDate: s.birthDate ? new Date(s.birthDate) : undefined,
+          items: s.items ? s.items.map((i: any) => ({ ...i, startTime: new Date(i.startTime) })) : []
+        }));
+
+        const hydratedOrders = (orders || []).map((o: any) => ({
+          ...o,
+          data: new Date(o.data)
+        }));
+
+        const hydratedCustomers = (customers || []).map((c: any) => ({
+          ...c,
+          registrationDate: c.registrationDate ? new Date(c.registrationDate) : undefined
+        }));
+
+        if (hydratedCustomers.length > 0) {
+          setAllCustomers(hydratedCustomers);
         }
 
         // Normalize names from DB just in case SQL migration wasn't 100% or cache exists
-        const normalizedSales = sales.map(s => ({ ...s, loja: getCanonicalStoreName(s.loja) }));
-        const normalizedOrders = orders.map(o => ({ ...o, loja: getCanonicalStoreName(o.loja) }));
+        const normalizedSales = hydratedSales.map((s: any) => ({ ...s, loja: getCanonicalStoreName(s.loja) }));
+        const normalizedOrders = hydratedOrders.map((o: any) => ({ ...o, loja: getCanonicalStoreName(o.loja) }));
 
-        console.log(`[Home] History loaded: ${sales.length} sales, ${orders.length} orders`);
+        console.log(`[Home] History loaded: ${hydratedSales.length} sales, ${hydratedOrders.length} orders`);
 
         // 3. Process and Update State
         setDbStores(configuredNames);
 
-        if (sales.length > 0) {
+        if (hydratedSales.length > 0) {
           setAllRecords(normalizedSales);
           setAllOrders(normalizedOrders);
-          setLogs(prev => [...prev, `[System] ${sales.length} registros carregados conforme histórico.`]);
+          setLogs(prev => [...prev, `[System] ${hydratedSales.length} registros carregados conforme histórico.`]);
         } else {
           setLogs(prev => [...prev, "[System] Nenhum histórico encontrado. Aguardando novos dados."]);
         }
@@ -853,25 +877,43 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
       setLogs(prev => [...prev, `[Sistema] Atualizando painel... (Isto pode levar alguns segundos)`]);
 
       // FIX: Instead of merging thousands of records in memory and freezing the browser thread,
-      // we simply reload the history from Supabase which handles deduplication efficiently.
+      // we simply reload the history from the server-side proxy which handles deduplication efficiently.
       try {
-        const { fetchSalesHistory } = await import("@/lib/persistence");
-        const freshRecords = await fetchSalesHistory();
+        const historyRes = await fetch("/api/vmpay/history", { cache: 'no-store' });
+        if (!historyRes.ok) throw new Error("Erro recarregando a API após Sincronismo.");
+        const freshRecords = await historyRes.json();
 
         if (freshRecords && freshRecords.sales && freshRecords.sales.length > 0) {
           const { getCanonicalStoreName } = await import("@/lib/vmpay-config");
 
-          const normalizedSales = freshRecords.sales.map((s: any) => ({ ...s, loja: getCanonicalStoreName(s.loja) }));
-          const normalizedOrders = freshRecords.orders.map((o: any) => ({ ...o, loja: getCanonicalStoreName(o.loja) }));
+          // Hydrate Dates
+          const hydratedSales = freshRecords.sales.map((s: any) => ({
+            ...s,
+            data: new Date(s.data),
+            birthDate: s.birthDate ? new Date(s.birthDate) : undefined,
+            loja: getCanonicalStoreName(s.loja),
+            items: s.items ? s.items.map((i: any) => ({ ...i, startTime: new Date(i.startTime) })) : []
+          }));
 
-          setAllRecords(normalizedSales);
-          setAllOrders(normalizedOrders);
+          const hydratedOrders = freshRecords.orders.map((o: any) => ({
+            ...o,
+            data: new Date(o.data),
+            loja: getCanonicalStoreName(o.loja)
+          }));
 
-          if (freshRecords.customers && freshRecords.customers.length > 0) {
-            setAllCustomers(freshRecords.customers);
+          const hydratedCustomers = (freshRecords.customers || []).map((c: any) => ({
+            ...c,
+            registrationDate: c.registrationDate ? new Date(c.registrationDate) : undefined
+          }));
+
+          setAllRecords(hydratedSales);
+          setAllOrders(hydratedOrders);
+
+          if (hydratedCustomers && hydratedCustomers.length > 0) {
+            setAllCustomers(hydratedCustomers);
           }
         } else {
-          setLogs(prev => [...prev, "[Aviso] Servidor não retornou dados a tempo (Possível limite de 40s atingido). Recarregue a página (F5) para visualizar as vendas novas."]);
+          setLogs(prev => [...prev, "[Aviso] Servidor não retornou dados a tempo (Possível limite superado). Recarregue a página (F5) para visualizar as vendas novas."]);
         }
       } catch (dbErr: any) {
         setLogs(prev => [...prev, `[Aviso] Falha ao recarregar a tela automaticamente: ${dbErr.message}`]);
