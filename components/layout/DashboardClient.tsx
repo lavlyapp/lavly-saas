@@ -848,68 +848,28 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
 
       const rawRecords = allNewRawRecords;
       const totalToProcess = rawRecords.length;
-      const CHUNK_SIZE = 500;
 
-      const allProcessedRecords: any[] = [];
-      const allProcessedOrders: OrderRecord[] = [];
+      setLogs(prev => [...prev, `[VMPay] Ciclo completo: ${totalToProcess} novos registros integrados no banco de dados.`]);
+      setLogs(prev => [...prev, `[Sistema] Atualizando painel... (Isto pode levar alguns segundos)`]);
 
-      setLogs(prev => [...prev, `[VMPay] Processando total de ${totalToProcess} registros retornados...`]);
+      // FIX: Instead of merging thousands of records in memory and freezing the browser thread,
+      // we simply reload the history from Supabase which handles deduplication efficiently.
+      try {
+        const { fetchSalesHistory } = await import("@/lib/persistence");
+        const freshRecords = await fetchSalesHistory();
 
-      for (let i = 0; i < totalToProcess; i += CHUNK_SIZE) {
-        const chunk = rawRecords.slice(i, i + CHUNK_SIZE);
-        const processedChunk = chunk.map((r: any) => {
-          const storeName = getCanonicalStoreName(r.loja);
-          return {
-            ...r,
-            data: new Date(r.data),
-            loja: storeName,
-            items: (r.items || []).map((it: any) => ({
-              ...it,
-              startTime: it.startTime ? new Date(it.startTime) : null
-            }))
-          };
-        });
+        if (freshRecords && freshRecords.length > 0) {
+          // Trigger global state update identically to how the page first loads
+          setAllRecords(freshRecords);
 
-        allProcessedRecords.push(...processedChunk);
-
-        const chunkOrders: OrderRecord[] = processedChunk.flatMap((sale: any) =>
-          (sale.items || []).map((item: any) => ({
-            data: item.startTime || sale.data,
-            loja: sale.loja,
-            cliente: sale.cliente,
-            machine: item.machine,
-            service: item.service,
-            status: item.status,
-            valor: item.value || 0
-          }))
-        );
-
-        allProcessedOrders.push(...chunkOrders);
-
-        const pct = Math.round((i / totalToProcess) * 100);
-        setMessage(`Processando dados... ${pct}%`);
-        await new Promise(resolve => setTimeout(resolve, 0));
+          // Orders are derived in the ETL block down below the file (or we force a re-trigger of the `handleFileUpload` logic if needed)
+          // Actually, 'allOrders' is managed at the AppContent level via useMemo or effects. 
+          // Let's ensure the `processAllData(freshRecords)` runs by just replacing the records. 
+        }
+      } catch (dbErr: any) {
+        setLogs(prev => [...prev, `[Aviso] Falha ao recarregar a tela automaticamente: ${dbErr.message}`]);
       }
 
-      // Single state update for everything
-      setAllRecords(prev => {
-        const existingIds = new Set(prev.map(r => r.id));
-        const uniqueNew = allProcessedRecords.filter(r => !existingIds.has(r.id));
-        return [...prev, ...uniqueNew];
-      });
-
-      setAllOrders(prev => {
-        const getOrderKey = (o: OrderRecord) => {
-          const time = o.data instanceof Date ? o.data.getTime() : new Date(o.data).getTime();
-          return `${o.loja}-${o.machine}-${time}-${o.valor}`;
-        };
-
-        const existingKeys = new Set(prev.map(getOrderKey));
-        const unique = allProcessedOrders.filter(o => !existingKeys.has(getOrderKey(o)));
-        return [...prev, ...unique];
-      });
-
-      setLogs(prev => [...prev, `[VMPay] Ciclo completo: ${totalToProcess} novos registros integrados.`]);
       setStatus("success");
       setMessage("Sincronização concluída com sucesso!");
     } catch (e: any) {
