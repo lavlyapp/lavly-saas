@@ -439,20 +439,28 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
 
           const pageSize = 10000;
           const pages = Math.ceil(count / pageSize);
-          const promises = [];
+          const allResults: any[] = [];
+
           for (let i = 0; i < pages; i++) {
-            promises.push(supabase.from(tableName).select(columns).range(i * pageSize, (i + 1) * pageSize - 1).order('data', { ascending: false }));
+            setLogs(prev => [...prev, `[System] Baixando ${tableName}: Lote ${i + 1} de ${pages}...`]);
+            const { data, error } = await supabase.from(tableName).select(columns).range(i * pageSize, (i + 1) * pageSize - 1).order('data', { ascending: false });
+            if (error) console.error(`[${tableName}] Error fetching page ${i}:`, error);
+            if (data) allResults.push(...data);
           }
 
-          const results = await Promise.all(promises);
-          return results.flatMap(r => r.data || []);
+          return allResults;
         };
 
-        [newSales, newOrders, newCustomers] = await Promise.all([
-          fetchTable('sales', 'id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age'),
-          fetchTable('orders', 'data, loja, cliente, machine, service, status, valor, customer_id, sale_id'),
-          supabase.from('customers').select('id, cpf, name, phone, email, gender, registration_date').limit(15000).then(r => r.data || [])
-        ]);
+        // Fetch tables sequentially to avoid overloading the browser network thread
+        setLogs(prev => [...prev, `[System] Iniciando download das Vendas...`]);
+        newSales = await fetchTable('sales', 'id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age');
+
+        setLogs(prev => [...prev, `[System] Iniciando download dos Pedidos...`]);
+        newOrders = await fetchTable('orders', 'data, loja, cliente, machine, service, status, valor, customer_id, sale_id');
+
+        setLogs(prev => [...prev, `[System] Iniciando download dos Clientes...`]);
+        const custRes = await supabase.from('customers').select('id, cpf, name, phone, email, gender, registration_date').limit(15000);
+        newCustomers = custRes.data || [];
 
       } else {
         // DELTA SYNC (Only fetch newer records)
