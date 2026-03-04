@@ -418,7 +418,9 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         }
 
         setLogs(prev => [...prev, "[System-Debug] 4/4 Histórico recebido com sucesso."]);
-        const { sales, orders, customers } = await historyRes.json();
+        const result = await historyRes.json();
+        const { sales, orders, customers, debug } = result;
+        if (debug) console.log("[API-Debug] History payload:", debug);
 
         // Re-hydrate Date objects since JSON stringifies them
         const hydratedSales = (sales || []).map((s: any) => ({
@@ -902,7 +904,9 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
           headers: headers as any
         });
         if (!historyRes.ok) throw new Error("Erro recarregando a API após Sincronismo.");
-        const freshRecords = await historyRes.json();
+        const result = await historyRes.json();
+        const freshRecords = result;
+        if (result.debug) console.log("[API-Debug] Sync refresh payload:", result.debug);
 
         if (freshRecords && freshRecords.sales && freshRecords.sales.length > 0) {
           const { getCanonicalStoreName } = await import("@/lib/vmpay-config");
