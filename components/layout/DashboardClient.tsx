@@ -370,7 +370,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
     console.log(`[v3-Filter] View recalculated. Selected: "${selectedStore}". Records: ${allRecords.length}. Filtered: ${filteredRecords.length}`);
     console.timeEnd("[Page] calculate ViewData");
     return viewData;
-  }, [allRecords, allOrders, selectedStore, mounted, logs]);
+  }, [allRecords, allOrders, selectedStore, mounted]); // Removido logs daqui para evitar travamento ao logar
 
   const isInitializing = useRef(false);
 

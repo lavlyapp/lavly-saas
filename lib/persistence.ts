@@ -97,12 +97,12 @@ export async function fetchSalesHistory(supabaseClient?: any) {
             return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
         };
 
-        const fetchAll = async (tableName: string, orderColumn?: string) => {
+        const fetchAll = async (tableName: string, columns: string, orderColumn?: string) => {
             try {
                 const { count, error: countErr } = await withTimeout(
                     db
                         .from(tableName)
-                        .select('*', { count: 'exact', head: true }) as any,
+                        .select(columns, { count: 'exact', head: true }) as any,
                     15000 // Aumentado para 15s
                 );
 
@@ -120,7 +120,7 @@ export async function fetchSalesHistory(supabaseClient?: any) {
                     queryFns.push(async () => {
                         const start = i * pageSize;
                         const end = start + pageSize - 1;
-                        let query: any = db.from(tableName).select('*').range(start, end);
+                        let query: any = db.from(tableName).select(columns).range(start, end);
                         if (orderColumn) {
                             query = query.order(orderColumn, { ascending: false });
                         }
@@ -154,9 +154,9 @@ export async function fetchSalesHistory(supabaseClient?: any) {
         console.log("[Persistence] Fetching sales, orders, and customers in parallel (40s limit)...");
         const [sales, orders, customers] = await withTimeout(
             Promise.all([
-                fetchAll('sales', 'data'),
-                fetchAll('orders', 'data'),
-                fetchAll('customers', 'name').catch(e => {
+                fetchAll('sales', 'id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age', 'data'),
+                fetchAll('orders', 'data, loja, cliente, machine, service, status, valor, customer_id, sale_id', 'data'),
+                fetchAll('customers', 'id, cpf, name, phone, email, gender, registration_date', 'name').catch(e => {
                     console.warn("[Persistence] Customers table error. Skipping.", e.message);
                     return [];
                 })

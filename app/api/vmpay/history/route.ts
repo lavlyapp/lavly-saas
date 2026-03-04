@@ -35,19 +35,19 @@ export async function GET(request: Request) {
         // Pass the authenticated client so fetchSalesHistory handles RLS correctly
         const history = await fetchSalesHistory(supabaseClient);
 
-        if (!history || !history.sales || history.sales.length === 0) {
-            console.log("[API/History] No history found or timeout reached.");
-            return NextResponse.json({ success: true, count: 0, sales: [], orders: [], customers: [] });
-        }
-
-        console.log(`[API/History] Successfully retrieved ${history.sales.length} sales. Sending payload...`);
-
         return NextResponse.json({
             success: true,
             count: history.sales.length,
             sales: history.sales,
             orders: history.orders,
-            customers: history.customers || []
+            customers: history.customers || [],
+            debug: {
+                hasToken: !!token,
+                salesCount: (history.sales || []).length,
+                ordersCount: (history.orders || []).length,
+                customersCount: (history.customers || []).length,
+                timestamp: new Date().toISOString()
+            }
         });
 
     } catch (error: any) {
