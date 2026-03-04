@@ -122,11 +122,12 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                             produto = "SECAGEM";
                         }
 
-                        // Fix Timezone: API returns UTC but might miss 'Z' suffix
+                        // Fix Timezone: VMPay returns time in local BRT (America/Sao_Paulo). 
+                        // Do NOT append 'Z' as it forces the parser to treat it as UTC+0, skewing the time forward by 3h.
                         let dateStr = sale.data;
-                        if (dateStr && typeof dateStr === 'string' && !dateStr.endsWith('Z')) {
-                            dateStr += 'Z';
-                        }
+
+                        // Parse as local time. VMPay format is usually "YYYY-MM-DDTHH:mm:ss"
+                        // This ensures that when compared against 'new Date()' in MachineMonitor, both represent the same wall-clock time.
                         const safeDate = new Date(dateStr);
 
                         // Parse ALL items

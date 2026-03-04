@@ -781,6 +781,11 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
   }
 
   async function handleSyncVMPay() {
+    if (status === "uploading") {
+      console.warn("[DashboardClient] Sync already in progress. Ignoring request.");
+      return;
+    }
+
     try {
       setStatus("uploading");
       setMessage("Preparando sincronização...");
