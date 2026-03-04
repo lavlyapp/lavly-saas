@@ -858,9 +858,9 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         const { fetchSalesHistory } = await import("@/lib/persistence");
         const freshRecords = await fetchSalesHistory();
 
-        if (freshRecords && freshRecords.length > 0) {
+        if (freshRecords && freshRecords.sales && freshRecords.sales.length > 0) {
           // Trigger global state update identically to how the page first loads
-          setAllRecords(freshRecords);
+          setAllRecords(freshRecords.sales);
 
           // Orders are derived in the ETL block down below the file (or we force a re-trigger of the `handleFileUpload` logic if needed)
           // Actually, 'allOrders' is managed at the AppContent level via useMemo or effects. 
