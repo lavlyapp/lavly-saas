@@ -434,18 +434,31 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         setLogs(prev => [...prev, `[System] Baixando banco de dados completo (primeiro acesso neste dispositivo)...`]);
 
         const fetchTable = async (tableName: string, columns: string) => {
-          const { count } = await supabase.from(tableName).select('*', { count: 'exact', head: true });
-          if (!count) return [];
-
           const pageSize = 10000;
-          const pages = Math.ceil(count / pageSize);
           const allResults: any[] = [];
 
-          for (let i = 0; i < pages; i++) {
-            setLogs(prev => [...prev, `[System] Baixando ${tableName}: Lote ${i + 1} de ${pages}...`]);
+          let hasMore = true;
+          let i = 0;
+
+          while (hasMore) {
+            setLogs(prev => [...prev, `[System] Baixando ${tableName}: Lote ${i + 1} (até ${pageSize} registros)...`]);
             const { data, error } = await supabase.from(tableName).select(columns).range(i * pageSize, (i + 1) * pageSize - 1).order('data', { ascending: false });
-            if (error) console.error(`[${tableName}] Error fetching page ${i}:`, error);
-            if (data) allResults.push(...data);
+
+            if (error) {
+              console.error(`[${tableName}] Error fetching page ${i}:`, error);
+              break;
+            }
+
+            if (data && data.length > 0) {
+              allResults.push(...data);
+              if (data.length < pageSize) {
+                hasMore = false; // Last page reached
+              } else {
+                i++;
+              }
+            } else {
+              hasMore = false; // Empty page
+            }
           }
 
           return allResults;
