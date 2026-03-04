@@ -379,66 +379,123 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
     isInitializing.current = true;
 
     console.log(`[Home] Reloading all data (Reason: ${reason})...`);
-    setLogs(prev => [...prev, `[System] Iniciando carregamento de dados (${reason})...`]);
     setStatus("uploading");
-    setMessage("Carregando histórico do banco de dados...");
 
     try {
       // 1. Load active stores and config
       const { getVMPayCredentials, getCanonicalStoreName } = await import("@/lib/vmpay-config");
       const activeStores = await getVMPayCredentials();
       const configuredNames = activeStores.map(s => getCanonicalStoreName(s.name));
+      setDbStores(configuredNames);
 
-      // 2. Direct parallel fetch from Supabase
-      const fetchTable = async (tableName: string, columns: string) => {
-        const { count, error: countErr } = await supabase.from(tableName).select('*', { count: 'exact', head: true });
-        if (countErr) throw countErr;
-        if (!count) return [];
+      // 2. Load from Local Cache (IndexedDB)
+      const { get, set } = await import('idb-keyval');
+      setLogs(prev => [...prev, "[System] Verificando cache offline ultrarrápido..."]);
 
-        const pageSize = 10000;
-        const pages = Math.ceil(count / pageSize);
-        const promises = [];
-        for (let i = 0; i < pages; i++) {
-          promises.push(supabase.from(tableName).select(columns).range(i * pageSize, (i + 1) * pageSize - 1).order('data', { ascending: false }));
-        }
-        setLogs(prev => [...prev, `[System] Carregando ${tableName}: ${count} registros...`]);
-        const results = await Promise.all(promises);
-        return results.flatMap(r => r.data || []);
-      };
+      let cachedSales = await get('lavly_sales') || [];
+      let cachedOrders = await get('lavly_orders') || [];
+      let cachedCustomers = await get('lavly_customers') || [];
 
-      const [sales, orders, customers] = await Promise.all([
-        fetchTable('sales', 'id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age'),
-        fetchTable('orders', 'data, loja, cliente, machine, service, status, valor, customer_id, sale_id'),
-        supabase.from('customers').select('id, cpf, name, phone, email, gender, registration_date').limit(10000).then(r => r.data || [])
+      let lastCachedDate = null;
+      let lastCachedOrderDate = null;
+
+      if (cachedSales.length > 0) {
+        // Hydrate right away to show data instantly
+        const hydratedCachedSales = cachedSales.map((s: any) => ({
+          ...s, data: new Date(s.data), birthDate: s.birthDate ? new Date(s.birthDate) : undefined,
+          items: s.items ? s.items.map((i: any) => ({ ...i, startTime: new Date(i.startTime) })) : []
+        }));
+        const hydratedCachedOrders = cachedOrders.map((o: any) => ({ ...o, data: new Date(o.data) }));
+        const hydratedCachedCustomers = cachedCustomers.map((c: any) => ({ ...c, registrationDate: c.registrationDate ? new Date(c.registrationDate) : undefined }));
+
+        setAllRecords(hydratedCachedSales);
+        setAllOrders(hydratedCachedOrders);
+        if (hydratedCachedCustomers.length > 0) setAllCustomers(hydratedCachedCustomers);
+
+        setLogs(prev => [...prev, `[System] Flash Load: ${cachedSales.length} registros restaurados do dispositivo local.`]);
+
+        // Find max dates for Delta Sync
+        const dates = hydratedCachedSales.map((s: any) => s.data.getTime());
+        lastCachedDate = new Date(Math.max(...dates));
+
+        const orderDates = hydratedCachedOrders.map((o: any) => o.data.getTime());
+        if (orderDates.length > 0) lastCachedOrderDate = new Date(Math.max(...orderDates));
+      } else {
+        setMessage("Carregando 100% do histórico inicial (Pode demorar na primeira vez)...");
+      }
+
+      // 3. Delta Sync (Fetch only what's new from Supabase)
+      setLogs(prev => [...prev, `[System] Buscando apenas mudanças recentes no servidor...`]);
+
+      let salesQuery = supabase.from('sales').select('id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age');
+      if (lastCachedDate) {
+        // Add 1ms so we don't fetch the exact same record again
+        const offsetDate = new Date(lastCachedDate.getTime() + 1000);
+        salesQuery = salesQuery.gte('data', offsetDate.toISOString());
+      }
+
+      let ordersQuery: any = supabase.from('orders').select('data, loja, cliente, machine, service, status, valor, customer_id, sale_id');
+      if (lastCachedOrderDate) {
+        const offsetDate = new Date(lastCachedOrderDate.getTime() + 1000);
+        ordersQuery = ordersQuery.gte('data', offsetDate.toISOString());
+      }
+
+      // Execute tiny Delta Sync
+      const [newSalesRes, newOrdersRes, newCustomersRes] = await Promise.all([
+        salesQuery.order('data', { ascending: false }),
+        ordersQuery.order('data', { ascending: false }).limit(2000), // Limits for safety
+        supabase.from('customers').select('id, cpf, name, phone, email, gender, registration_date').limit(10000)
       ]);
 
-      // Hydrate & Normalize
-      const hydratedSales = (sales || []).map((s: any) => ({
-        ...s,
-        data: new Date(s.data),
-        loja: getCanonicalStoreName(s.loja),
-        birthDate: s.birthDate ? new Date(s.birthDate) : undefined,
-        items: s.items ? s.items.map((i: any) => ({ ...i, startTime: new Date(i.startTime) })) : []
-      }));
+      const newSales = newSalesRes.data || [];
+      const newOrders = newOrdersRes.data || [];
+      const newCustomers = newCustomersRes.data || [];
 
-      const hydratedOrders = (orders || []).map((o: any) => ({
-        ...o,
-        data: new Date(o.data),
-        loja: getCanonicalStoreName(o.loja)
-      }));
+      if (newSales.length > 0 || cachedSales.length === 0) {
+        if (newSales.length > 0) setLogs(prev => [...prev, `[System] Delta Sync: ${newSales.length} novas vendas integradas.`]);
 
-      const hydratedCustomers = (customers || []).map((c: any) => ({
-        ...c,
-        registrationDate: c.registrationDate ? new Date(c.registrationDate) : undefined
-      }));
+        // Merge old + new
+        const combinedSales = [...newSales, ...cachedSales];
+        // Simple deduplication by ID just in case
+        const uniqueSalesMap = new Map();
+        combinedSales.forEach(s => uniqueSalesMap.set(s.id, s));
+        const finalRawSales = Array.from(uniqueSalesMap.values()).sort((a: any, b: any) => new Date(b.data).getTime() - new Date(a.data).getTime());
 
-      // Update State
-      setDbStores(configuredNames);
-      setAllRecords(hydratedSales);
-      setAllOrders(hydratedOrders);
-      if (hydratedCustomers.length > 0) setAllCustomers(hydratedCustomers);
+        // Orders merge (no unique ID typically, so simple concat)
+        const finalRawOrders = [...newOrders, ...cachedOrders];
 
-      setLogs(prev => [...prev, `[System] ${hydratedSales.length} registros prontos.`]);
+        // Customers (replace entirely as it's small)
+        const finalRawCustomers = newCustomers;
+
+        // Save to super-fast IndexedDB in background
+        Promise.all([
+          set('lavly_sales', finalRawSales),
+          set('lavly_orders', finalRawOrders),
+          set('lavly_customers', finalRawCustomers)
+        ]).catch(e => console.warn("Failed to cache to IndexedDB", e));
+
+        // Hydrate & Normalize for UI
+        const hydratedSales = finalRawSales.map((s: any) => ({
+          ...s, data: new Date(s.data), loja: getCanonicalStoreName(s.loja),
+          birthDate: s.birthDate ? new Date(s.birthDate) : undefined,
+          items: s.items ? s.items.map((i: any) => ({ ...i, startTime: new Date(i.startTime) })) : []
+        }));
+        const hydratedOrders = finalRawOrders.map((o: any) => ({ ...o, data: new Date(o.data), loja: getCanonicalStoreName(o.loja) }));
+        const hydratedCustomers = finalRawCustomers.map((c: any) => ({ ...c, registrationDate: c.registrationDate ? new Date(c.registrationDate) : undefined }));
+
+        // Update State definitively
+        setAllRecords(hydratedSales);
+        setAllOrders(hydratedOrders);
+        if (hydratedCustomers.length > 0) setAllCustomers(hydratedCustomers);
+      } else {
+        setLogs(prev => [...prev, "[System] Histórico validado. Sem novas vendas externas."]);
+      }
+
+      const finalCount = (newSales.length > 0 || cachedSales.length === 0)
+        ? (cachedSales.length + newSales.length)
+        : cachedSales.length;
+
+      setLogs(prev => [...prev, `[System] ${finalCount} registros prontos.`]);
       setStatus("idle");
       setMessage("");
     } catch (err) {
