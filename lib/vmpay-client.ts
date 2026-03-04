@@ -123,11 +123,14 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                         }
 
                         // Fix Timezone: VMPay returns time in local BRT (America/Sao_Paulo). 
-                        // Do NOT append 'Z' as it forces the parser to treat it as UTC+0, skewing the time forward by 3h.
+                        // We must append the offset -03:00 so the Date parser treats it correctly as local time
+                        // and not as UTC (which happens on Vercel servers).
                         let dateStr = sale.data;
+                        if (dateStr && !dateStr.includes('-') && !dateStr.endsWith('Z') && (dateStr.match(/:/g) || []).length >= 2) {
+                            // Only append if it looks like a datetime string without offset
+                            dateStr += "-03:00";
+                        }
 
-                        // Parse as local time. VMPay format is usually "YYYY-MM-DDTHH:mm:ss"
-                        // This ensures that when compared against 'new Date()' in MachineMonitor, both represent the same wall-clock time.
                         const safeDate = new Date(dateStr);
 
                         // Parse ALL items

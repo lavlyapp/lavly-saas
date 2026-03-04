@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { fetchSalesHistory } from '@/lib/persistence';
+import { getVMPayCredentials } from '@/lib/vmpay-config';
 
 export const dynamic = 'force-dynamic';
 // Vercel Pro/Hobby limits: Usually 60s for Hobby, 300s for Pro. We request the max possible standard limit.
@@ -35,12 +36,16 @@ export async function GET(request: Request) {
         // Pass the authenticated client so fetchSalesHistory handles RLS correctly
         const history = await fetchSalesHistory(supabaseClient);
 
+        // Fetch active stores from DB (or fallback) to debug in UI
+        const activeStores = await getVMPayCredentials();
+
         return NextResponse.json({
             success: true,
             count: history.sales.length,
             sales: history.sales,
             orders: history.orders,
             customers: history.customers || [],
+            activeStores: activeStores.map(s => ({ name: s.name, cnpj: s.cnpj, is_active: s.is_active })),
             debug: {
                 hasToken: !!token,
                 salesCount: (history.sales || []).length,

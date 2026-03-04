@@ -419,8 +419,12 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
 
         setLogs(prev => [...prev, "[System-Debug] 4/4 Histórico recebido com sucesso."]);
         const result = await historyRes.json();
-        const { sales, orders, customers, debug } = result;
+        const { sales, orders, customers, debug, activeStores: apiActiveStores } = result;
         if (debug) console.log("[API-Debug] History payload:", debug);
+        if (apiActiveStores) {
+          console.log("[API-Debug] Active stores from server:", apiActiveStores);
+          setLogs(prev => [...prev, `[System] Servidor reportou ${apiActiveStores.length} lojas ativas.`]);
+        }
 
         // Re-hydrate Date objects since JSON stringifies them
         const hydratedSales = (sales || []).map((s: any) => ({
