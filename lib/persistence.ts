@@ -102,7 +102,7 @@ export async function fetchSalesHistory() {
                     supabase
                         .from(tableName)
                         .select('*', { count: 'exact', head: true }) as any,
-                    5000
+                    15000 // Aumentado para 15s
                 );
 
                 if (countErr) {
@@ -123,14 +123,14 @@ export async function fetchSalesHistory() {
                         if (orderColumn) {
                             query = query.order(orderColumn, { ascending: false });
                         }
-                        return withTimeout(query as any, 5000);
+                        return withTimeout(query as any, 15000); // Aumentado para 15s
                     });
                 }
 
                 let allData: any[] = [];
-                // Run 10 requests concurrently
-                for (let i = 0; i < queryFns.length; i += 10) {
-                    const chunk = queryFns.slice(i, i + 10);
+                // Run 5 requests concurrently para não afogar o banco
+                for (let i = 0; i < queryFns.length; i += 5) {
+                    const chunk = queryFns.slice(i, i + 5);
                     const chunkResults = await Promise.all(chunk.map(fn => fn()));
                     for (const res of chunkResults) {
                         if (res.error) throw res.error;
@@ -150,7 +150,7 @@ export async function fetchSalesHistory() {
             }
         };
 
-        console.log("[Persistence] Fetching sales, orders, and customers in parallel (10s limit)...");
+        console.log("[Persistence] Fetching sales, orders, and customers in parallel (40s limit)...");
         const [sales, orders, customers] = await withTimeout(
             Promise.all([
                 fetchAll('sales', 'data'),
@@ -160,7 +160,7 @@ export async function fetchSalesHistory() {
                     return [];
                 })
             ]),
-            10000
+            40000 // 40 Segundos
         ).catch(err => {
             console.error("[Persistence] Parallel fetch timed out! Returning empty datasets.", err.message);
             return [[], [], []];

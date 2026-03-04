@@ -859,12 +859,19 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         const freshRecords = await fetchSalesHistory();
 
         if (freshRecords && freshRecords.sales && freshRecords.sales.length > 0) {
-          // Trigger global state update identically to how the page first loads
-          setAllRecords(freshRecords.sales);
+          const { getCanonicalStoreName } = await import("@/lib/vmpay-config");
 
-          // Orders are derived in the ETL block down below the file (or we force a re-trigger of the `handleFileUpload` logic if needed)
-          // Actually, 'allOrders' is managed at the AppContent level via useMemo or effects. 
-          // Let's ensure the `processAllData(freshRecords)` runs by just replacing the records. 
+          const normalizedSales = freshRecords.sales.map((s: any) => ({ ...s, loja: getCanonicalStoreName(s.loja) }));
+          const normalizedOrders = freshRecords.orders.map((o: any) => ({ ...o, loja: getCanonicalStoreName(o.loja) }));
+
+          setAllRecords(normalizedSales);
+          setAllOrders(normalizedOrders);
+
+          if (freshRecords.customers && freshRecords.customers.length > 0) {
+            setAllCustomers(freshRecords.customers);
+          }
+        } else {
+          setLogs(prev => [...prev, "[Aviso] Servidor não retornou dados a tempo (Possível limite de 40s atingido). Recarregue a página (F5) para visualizar as vendas novas."]);
         }
       } catch (dbErr: any) {
         setLogs(prev => [...prev, `[Aviso] Falha ao recarregar a tela automaticamente: ${dbErr.message}`]);
