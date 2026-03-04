@@ -19,6 +19,7 @@ import { AuthProvider, useAuth } from "@/components/context/AuthContext";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { TermsOfUse } from "@/components/modules/TermsOfUse";
 import { getCanonicalStoreName } from "@/lib/vmpay-config";
+import { supabase } from "@/lib/supabase";
 
 // Dynamically import CrmDashboard with SSR disabled to prevent hydration errors
 const CrmDashboard = dynamic(
@@ -399,7 +400,18 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
 
         // 2. Load history from Next.js Server API
         setLogs(prev => [...prev, "[System-Debug] 3/4 Acessando API Servidor VMPay..."]);
-        const historyRes = await fetch("/api/vmpay/history", { cache: 'no-store' });
+
+        // Get current session token for RLS
+        const { data: { session } } = await supabase.auth.getSession();
+        const headers: Record<string, string> = { 'cache': 'no-store' };
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+
+        const historyRes = await fetch("/api/vmpay/history", {
+          cache: 'no-store',
+          headers: headers as any
+        });
 
         if (!historyRes.ok) {
           throw new Error("Falha no Endpoint de Histórico");
@@ -879,7 +891,16 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
       // FIX: Instead of merging thousands of records in memory and freezing the browser thread,
       // we simply reload the history from the server-side proxy which handles deduplication efficiently.
       try {
-        const historyRes = await fetch("/api/vmpay/history", { cache: 'no-store' });
+        const { data: { session } } = await supabase.auth.getSession();
+        const headers: Record<string, string> = { 'cache': 'no-store' };
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+
+        const historyRes = await fetch("/api/vmpay/history", {
+          cache: 'no-store',
+          headers: headers as any
+        });
         if (!historyRes.ok) throw new Error("Erro recarregando a API após Sincronismo.");
         const freshRecords = await historyRes.json();
 

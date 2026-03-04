@@ -83,7 +83,8 @@ export async function upsertSales(records: SaleRecord[], supabaseClient?: any) {
 /**
  * Fetches all sales history from the database.
  */
-export async function fetchSalesHistory() {
+export async function fetchSalesHistory(supabaseClient?: any) {
+    const db = supabaseClient || supabase;
     try {
         console.log("[Persistence] Fetching sales history from Supabase with pagination...");
 
@@ -99,7 +100,7 @@ export async function fetchSalesHistory() {
         const fetchAll = async (tableName: string, orderColumn?: string) => {
             try {
                 const { count, error: countErr } = await withTimeout(
-                    supabase
+                    db
                         .from(tableName)
                         .select('*', { count: 'exact', head: true }) as any,
                     15000 // Aumentado para 15s
@@ -119,7 +120,7 @@ export async function fetchSalesHistory() {
                     queryFns.push(async () => {
                         const start = i * pageSize;
                         const end = start + pageSize - 1;
-                        let query: any = supabase.from(tableName).select('*').range(start, end);
+                        let query: any = db.from(tableName).select('*').range(start, end);
                         if (orderColumn) {
                             query = query.order(orderColumn, { ascending: false });
                         }
