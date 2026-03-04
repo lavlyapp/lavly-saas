@@ -168,10 +168,18 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
     }
 
     const settingsContext = useSettings();
-    let storeAddress = settingsContext.getStoreAddress(activeStore);
+    const currentStoreSetting = settingsContext.storeSettings[activeStore.toUpperCase()];
+    let storeAddress = currentStoreSetting?.address || '';
+    let storeLat = currentStoreSetting?.latitude;
+    let storeLon = currentStoreSetting?.longitude;
+
     if (!storeAddress && activeStore === 'DEFAULT') {
         const firstConfigured = Object.values(settingsContext.storeSettings).find((s: any) => s.address);
-        if (firstConfigured) storeAddress = firstConfigured.address;
+        if (firstConfigured) {
+            storeAddress = firstConfigured.address;
+            storeLat = firstConfigured.latitude;
+            storeLon = firstConfigured.longitude;
+        }
     }
 
     // --- Dynamic Peak Days ---
@@ -191,7 +199,7 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
     }, [visitsHeatmapData]);
 
     // Weather Alerts Hook
-    const weatherAlerts = useWeatherAlerts(filteredMetrics.profiles, storeAddress || '', topDays);
+    const weatherAlerts = useWeatherAlerts(filteredMetrics.profiles, storeAddress || '', topDays, storeLat, storeLon);
 
 
     // --- Simulator C: Wash/Dry Optimization Logic (using Period Data) ---

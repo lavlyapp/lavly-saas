@@ -1,24 +1,41 @@
 
 // Helper function to get coordinates from an address using a free geocoding API (e.g., Nominatim)
-export async function getCoordinatesFromAddress(address: string): Promise<{ lat: number, lon: number } | null> {
+export async function getCoordinatesFromAddress(address: string, city?: string, state?: string): Promise<{ lat: number, lon: number } | null> {
     try {
-        const query = encodeURIComponent(address);
+        // Build a more precise query if city and state are provided
+        let queryText = address;
+        if (city) queryText += `, ${city}`;
+        if (state) queryText += `, ${state}`;
+        queryText += `, Brasil`;
+
+        const query = encodeURIComponent(queryText);
+
         // Using Nominatim (OpenStreetMap) - requires User-Agent
         const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`, {
             headers: {
-                'User-Agent': 'VMPay-SaaS-App/1.0'
+                'User-Agent': 'Lavly-App/1.0 (brasil)'
             }
         });
 
-        if (!res.ok) return null;
+        if (!res.ok) {
+            console.error(`Geocoding failed for ${queryText}: ${res.status}`);
+            return null;
+        }
 
         const data = await res.json();
         if (data && data.length > 0) {
+            console.log(`Geocoding success for ${queryText}:`, data[0].lat, data[0].lon);
             return {
                 lat: parseFloat(data[0].lat),
                 lon: parseFloat(data[0].lon)
             };
         }
+
+        // Fallback: try just address and city if full query failed
+        if (city && queryText.includes(state || '')) {
+            return getCoordinatesFromAddress(address, city);
+        }
+
         return null;
     } catch (e) {
         console.error("Failed to geocode address:", e);
@@ -38,8 +55,9 @@ export async function checkRainForecast(lat: number, lon: number): Promise<{ wil
         const probability = data.daily?.precipitation_probability_max?.[0] || 0;
         const amount = data.daily?.precipitation_sum?.[0] || 0;
 
-        // Consider it a 'rainy day' if probability > 40% and amount > 1.0mm
-        const willRain = probability >= 40 && amount >= 1.0;
+        // Consider it a 'rainy day' if probability >= 40% and amount >= 0.5mm
+        // Lowered amount slightly to be more sensitive to light rain that still affects laundry
+        const willRain = probability >= 40 && amount >= 0.5;
 
         return {
             willRain,

@@ -17,7 +17,7 @@ interface WeatherAlertState {
     error: string | null;
 }
 
-export function useWeatherAlerts(profiles: CustomerProfile[], storeAddress: string, topDays: string[]) {
+export function useWeatherAlerts(profiles: CustomerProfile[], storeAddress: string, topDays: string[], latitude?: number, longitude?: number) {
     const [state, setState] = useState<WeatherAlertState>({
         loading: true,
         isRainy: false,
@@ -36,10 +36,20 @@ export function useWeatherAlerts(profiles: CustomerProfile[], storeAddress: stri
             }
 
             try {
-                // 1. Get Coordinates
-                const coords = await getCoordinatesFromAddress(storeAddress);
-                if (!coords) {
-                    setState(prev => ({ ...prev, loading: false, error: 'Não foi possível encontrar as coordenadas para este endereço.' }));
+                let coords = { lat: latitude, lon: longitude };
+
+                // 1. Get Coordinates if not provided
+                if (coords.lat === undefined || coords.lon === undefined) {
+                    const fetchedCoords = await getCoordinatesFromAddress(storeAddress);
+                    if (!fetchedCoords) {
+                        setState(prev => ({ ...prev, loading: false, error: 'Não foi possível encontrar as coordenadas para este endereço.' }));
+                        return;
+                    }
+                    coords = { lat: fetchedCoords.lat, lon: fetchedCoords.lon };
+                }
+
+                if (coords.lat === undefined || coords.lon === undefined) {
+                    setState(prev => ({ ...prev, loading: false, error: 'Coordenadas inválidas.' }));
                     return;
                 }
 
@@ -129,7 +139,7 @@ export function useWeatherAlerts(profiles: CustomerProfile[], storeAddress: stri
             fetchAlerts();
         }
 
-    }, [profiles, storeAddress, topDays]);
+    }, [profiles, storeAddress, topDays, latitude, longitude]);
 
     return state;
 }

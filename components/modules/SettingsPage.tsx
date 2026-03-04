@@ -22,6 +22,8 @@ export interface StoreCredential {
     neighborhood?: string;
     city?: string;
     state?: string;
+    latitude?: number;
+    longitude?: number;
 }
 
 export function SettingsPage() {
@@ -40,6 +42,7 @@ export function SettingsPage() {
     const [isInitialized, setIsInitialized] = useState(false);
     const [localAutomation, setLocalAutomation] = useState<AutomationSettingsMap>({});
     const [saved, setSaved] = useState(false);
+    const [cepsLoading, setCepsLoading] = useState<Record<number, boolean>>({});
 
     // Sync local automation when context loads
     useEffect(() => {
@@ -101,7 +104,9 @@ export function SettingsPage() {
                         complement: s.complement || "",
                         neighborhood: s.neighborhood || "",
                         city: s.city || "",
-                        state: s.state || ""
+                        state: s.state || "",
+                        latitude: s.latitude,
+                        longitude: s.longitude
                     })));
                 }
                 setIsInitialized(true);
@@ -137,7 +142,9 @@ export function SettingsPage() {
             complement: "",
             neighborhood: "",
             city: "",
-            state: ""
+            state: "",
+            latitude: undefined,
+            longitude: undefined
         }]);
     };
 
@@ -146,6 +153,7 @@ export function SettingsPage() {
         handleStoreChange(idx, 'cep', cleanCep);
 
         if (cleanCep.length === 8) {
+            setCepsLoading(prev => ({ ...prev, [idx]: true }));
             try {
                 console.log(`SettingsPage: Searching CEP ${cleanCep}...`);
                 const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
@@ -172,6 +180,8 @@ export function SettingsPage() {
                 }
             } catch (e) {
                 console.error("SettingsPage: CEP Lookup failed", e);
+            } finally {
+                setCepsLoading(prev => ({ ...prev, [idx]: false }));
             }
         }
     };
@@ -224,34 +234,52 @@ export function SettingsPage() {
                 }
             }
 
-            // 2. Save ALL Stores to Supabase
+            // 2. Geocode and Save ALL Stores to Supabase
             if (stores.length > 0) {
-                const storesPayload = stores.map(store => ({
-                    id: store.id || undefined, // Send undefined for new stores
-                    cnpj: store.cnpj.replace(/\D/g, ''), // Sanitize CNPJ
-                    name: store.name || "Sem Nome",
-                    api_key: store.api_key || "",
-                    open_time: store.open_time || "07:00:00",
-                    close_time: store.close_time || "23:00:00",
-                    is_active: store.is_active,
-                    cep: store.cep?.replace(/\D/g, '') || "",
-                    address: store.address || "",
-                    number: store.number || "",
-                    complement: store.complement || "",
-                    neighborhood: store.neighborhood || "",
-                    city: store.city || "",
-                    state: store.state || "",
-                    updated_at: new Date().toISOString()
+                const { getCoordinatesFromAddress } = await import("@/lib/weather");
+
+                const storesPayload = await Promise.all(stores.map(async (store) => {
+                    let lat = store.latitude;
+                    let lon = store.longitude;
+
+                    // Re-geocode if address changed or coordinates missing
+                    if (store.address && (!lat || !lon)) {
+                        console.log(`SettingsPage: Geocoding address for ${store.name}...`);
+                        const coords = await getCoordinatesFromAddress(store.address, store.city, store.state);
+                        if (coords) {
+                            lat = coords.lat;
+                            lon = coords.lon;
+                        }
+                    }
+
+                    return {
+                        id: store.id || undefined,
+                        cnpj: store.cnpj.replace(/\D/g, ''),
+                        name: store.name || "Sem Nome",
+                        api_key: store.api_key || "",
+                        open_time: store.open_time || "07:00:00",
+                        close_time: store.close_time || "23:00:00",
+                        is_active: store.is_active,
+                        cep: store.cep?.replace(/\D/g, '') || "",
+                        address: store.address || "",
+                        number: store.number || "",
+                        complement: store.complement || "",
+                        neighborhood: store.neighborhood || "",
+                        city: store.city || "",
+                        state: store.state || "",
+                        latitude: lat,
+                        longitude: lon,
+                        updated_at: new Date().toISOString()
+                    };
                 }));
 
                 console.log(`SettingsPage: Upserting ${storesPayload.length} stores...`);
-                // Use a single upsert. If ID exists, it updates; otherwise, it inserts based on CNPJ conflict.
                 const { error: storeError } = await supabase
                     .from('stores')
                     .upsert(storesPayload, { onConflict: 'cnpj' });
 
                 if (storeError) {
-                    console.error("SettingsPage: Store upsert error", storeError);
+                    console.error("SettingsPage: Store upsert error", storeError, storesPayload);
                     throw new Error(`Erro ao salvar lojas: ${storeError.message}`);
                 }
             }
@@ -489,14 +517,22 @@ export function SettingsPage() {
                                     <div className="flex items-center gap-2 text-indigo-400">
                                         <MapPin className="w-3 h-3" />
                                         <span className="text-[10px] font-bold uppercase tracking-wider">Endereço & Localização</span>
+                                        {store.latitude && store.longitude && (
+                                            <span className="ml-2 px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 text-[8px] font-bold border border-indigo-500/20">
+                                                COORDENADAS ATIVAS
+                                            </span>
+                                        )}
                                     </div>
 
                                     <div className="grid md:grid-cols-4 gap-4">
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-bold text-neutral-500 uppercase">CEP</label>
+                                            <label className="text-[10px] font-bold text-neutral-500 uppercase flex items-center justify-between">
+                                                CEP
+                                                {cepsLoading[idx] && <RefreshCw className="w-2 h-2 animate-spin text-indigo-500" />}
+                                            </label>
                                             <input
                                                 type="text"
-                                                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none"
+                                                className={`w-full bg-neutral-900 border ${cepsLoading[idx] ? 'border-indigo-500/50' : 'border-neutral-800'} rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none`}
                                                 placeholder="00000-000"
                                                 maxLength={9}
                                                 value={store.cep || ''}

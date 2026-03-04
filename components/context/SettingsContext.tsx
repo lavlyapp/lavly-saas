@@ -6,6 +6,8 @@ import { supabase } from "@/lib/supabase";
 
 interface StoreSettings {
     address: string;
+    latitude?: number;
+    longitude?: number;
 }
 
 export interface StoreAutomationSettings {
@@ -69,7 +71,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             console.log("SettingsContext: Fetching stores from DB...");
             const { data, error } = await supabase
                 .from('stores')
-                .select('name, address, neighborhood, city, state');
+                .select('name, address, neighborhood, city, state, latitude, longitude');
 
             if (error) throw error;
 
@@ -79,7 +81,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                     if (s.name) {
                         // Construct full address string for backward compatibility with components using it
                         const fullAddress = `${s.address || ''}${s.neighborhood ? `, ${s.neighborhood}` : ''}${s.city ? `, ${s.city}` : ''}${s.state ? ` - ${s.state}` : ''}`;
-                        dbMap[s.name.toUpperCase()] = { address: fullAddress };
+                        dbMap[s.name.toUpperCase()] = {
+                            address: fullAddress,
+                            latitude: s.latitude,
+                            longitude: s.longitude
+                        };
                     }
                 });
                 console.log(`SettingsContext: Loaded ${Object.keys(dbMap).length} stores from DB.`);
