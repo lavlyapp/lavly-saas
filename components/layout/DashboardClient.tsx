@@ -424,32 +424,59 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         setMessage("Carregando 100% do histórico inicial (Pode demorar na primeira vez)...");
       }
 
-      // 3. Delta Sync (Fetch only what's new from Supabase)
-      setLogs(prev => [...prev, `[System] Buscando apenas mudanças recentes no servidor...`]);
+      // 3. Fallback ou Delta Sync
+      let newSales: any[] = [];
+      let newOrders: any[] = [];
+      let newCustomers: any[] = [];
 
-      let salesQuery = supabase.from('sales').select('id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age');
-      if (lastCachedDate) {
-        // Add 1ms so we don't fetch the exact same record again
+      if (!lastCachedDate || cachedSales.length === 0) {
+        // FULL LOAD (Paginated & Robust for first run)
+        setLogs(prev => [...prev, `[System] Baixando banco de dados completo (primeiro acesso neste dispositivo)...`]);
+
+        const fetchTable = async (tableName: string, columns: string) => {
+          const { count } = await supabase.from(tableName).select('*', { count: 'exact', head: true });
+          if (!count) return [];
+
+          const pageSize = 10000;
+          const pages = Math.ceil(count / pageSize);
+          const promises = [];
+          for (let i = 0; i < pages; i++) {
+            promises.push(supabase.from(tableName).select(columns).range(i * pageSize, (i + 1) * pageSize - 1).order('data', { ascending: false }));
+          }
+
+          const results = await Promise.all(promises);
+          return results.flatMap(r => r.data || []);
+        };
+
+        [newSales, newOrders, newCustomers] = await Promise.all([
+          fetchTable('sales', 'id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age'),
+          fetchTable('orders', 'data, loja, cliente, machine, service, status, valor, customer_id, sale_id'),
+          supabase.from('customers').select('id, cpf, name, phone, email, gender, registration_date').limit(15000).then(r => r.data || [])
+        ]);
+
+      } else {
+        // DELTA SYNC (Only fetch newer records)
+        setLogs(prev => [...prev, `[System] Buscando apenas mudanças recentes no servidor...`]);
+
         const offsetDate = new Date(lastCachedDate.getTime() + 1000);
-        salesQuery = salesQuery.gte('data', offsetDate.toISOString());
+        const salesQuery = supabase.from('sales').select('id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age').gte('data', offsetDate.toISOString()).order('data', { ascending: false });
+
+        let ordersQuery: any = supabase.from('orders').select('data, loja, cliente, machine, service, status, valor, customer_id, sale_id').order('data', { ascending: false }).limit(2000);
+        if (lastCachedOrderDate) {
+          const offsetOrderDate = new Date(lastCachedOrderDate.getTime() + 1000);
+          ordersQuery = ordersQuery.gte('data', offsetOrderDate.toISOString());
+        }
+
+        const [newSalesRes, newOrdersRes, newCustomersRes] = await Promise.all([
+          salesQuery,
+          ordersQuery,
+          supabase.from('customers').select('id, cpf, name, phone, email, gender, registration_date').limit(10000)
+        ]);
+
+        newSales = newSalesRes.data || [];
+        newOrders = newOrdersRes.data || [];
+        newCustomers = newCustomersRes.data || [];
       }
-
-      let ordersQuery: any = supabase.from('orders').select('data, loja, cliente, machine, service, status, valor, customer_id, sale_id');
-      if (lastCachedOrderDate) {
-        const offsetDate = new Date(lastCachedOrderDate.getTime() + 1000);
-        ordersQuery = ordersQuery.gte('data', offsetDate.toISOString());
-      }
-
-      // Execute tiny Delta Sync
-      const [newSalesRes, newOrdersRes, newCustomersRes] = await Promise.all([
-        salesQuery.order('data', { ascending: false }),
-        ordersQuery.order('data', { ascending: false }).limit(2000), // Limits for safety
-        supabase.from('customers').select('id, cpf, name, phone, email, gender, registration_date').limit(10000)
-      ]);
-
-      const newSales = newSalesRes.data || [];
-      const newOrders = newOrdersRes.data || [];
-      const newCustomers = newCustomersRes.data || [];
 
       if (newSales.length > 0 || cachedSales.length === 0) {
         if (newSales.length > 0) setLogs(prev => [...prev, `[System] Delta Sync: ${newSales.length} novas vendas integradas.`]);
