@@ -434,7 +434,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         setLogs(prev => [...prev, `[System] Baixando banco de dados completo (primeiro acesso neste dispositivo)...`]);
 
         const fetchTable = async (tableName: string, columns: string) => {
-          const pageSize = 10000;
+          const pageSize = 2000;
           const allResults: any[] = [];
 
           let hasMore = true;
