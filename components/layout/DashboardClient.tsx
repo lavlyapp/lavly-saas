@@ -472,7 +472,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         };
 
         const fetchTable = async (tableName: string, columns: string) => {
-          const pageSize = 2000;
+          const pageSize = 1000;
           const allResults: any[] = [];
 
           let hasMore = true;
@@ -482,7 +482,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
             setLogs(prev => [...prev, `[System] Baixando ${tableName}: Lote ${i + 1} (até ${pageSize} registros)...`]);
             try {
               const { data, error } = await withDbTimeout(
-                rawSupabase.from(tableName).select(columns).range(i * pageSize, (i + 1) * pageSize - 1) as any,
+                rawSupabase.from(tableName).select(columns).order('id', { ascending: true }).range(i * pageSize, (i + 1) * pageSize - 1) as any,
                 20000 // 20s rigid timeout per chunk
               );
 
