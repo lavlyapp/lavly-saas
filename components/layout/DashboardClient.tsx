@@ -444,6 +444,8 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
       // requests indefinitely if it thinks the auth cookie resolution is still pending.
       // This guarantees the request hits the physical network layer immediately.
       const { data: { session } } = await supabase.auth.getSession();
+      setLogs(prev => [...prev, `[System-Debug] Token JWT capturado: ${!!session?.access_token}`]);
+
       const rawSupabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -489,6 +491,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
               }
 
               if (data && data.length > 0) {
+                setLogs(prev => [...prev, `[System-Debug] Lote ${i + 1} retornou ${data.length} linhas da nuvem.`]);
                 allResults.push(...data);
                 if (data.length < pageSize) {
                   hasMore = false; // Last page reached
@@ -496,6 +499,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
                   i++;
                 }
               } else {
+                setLogs(prev => [...prev, `[System-Debug] Lote ${i + 1} VAZIO (0 linhas). Supabase não retornou erro, mas ocultou os dados (Possível bloqueio RLS).`]);
                 hasMore = false; // Empty page
               }
             } catch (timeoutErr) {
