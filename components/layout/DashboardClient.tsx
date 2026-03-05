@@ -414,7 +414,14 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
       if (cachedSales.length > 0) {
         // Hydrate right away to show data instantly
         const hydratedCachedSales = cachedSales.map((s: any) => ({
-          ...s, data: new Date(s.data), birthDate: s.birthDate ? new Date(s.birthDate) : undefined,
+          ...s,
+          data: new Date(s.data),
+          produto: s.produto || s.service || "",
+          formaPagamento: s.formaPagamento || s.forma_pagamento || s.tipoPagamento || "Outros",
+          tipoCartao: s.tipoCartao || s.tipo_cartao || "",
+          categoriaVoucher: s.categoriaVoucher || s.categoria_voucher || "",
+          customerId: s.customerId || s.customer_id,
+          birthDate: s.birthDate || s.birth_date ? new Date(s.birthDate || s.birth_date) : undefined,
           items: s.items ? s.items.map((i: any) => ({ ...i, startTime: new Date(i.startTime) })) : []
         }));
         const hydratedCachedOrders = cachedOrders.map((o: any) => ({ ...o, data: new Date(o.data) }));

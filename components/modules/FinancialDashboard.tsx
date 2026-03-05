@@ -379,10 +379,12 @@ export function FinancialDashboard({ data, allRecords, selectedStore = 'Todas' }
         for (let i = 0; i < filteredRecords.length; i++) {
             const r = filteredRecords[i];
 
-            // Fast lowercase extraction without heavy unicode normalization matrix
-            const type = (r.formaPagamento || 'não identificado').toLowerCase();
-            const cardType = (r.tipoCartao || '').toLowerCase();
-            const voucherCat = (r.categoriaVoucher || 'Geral').trim();
+            // Fast lowercase extraction
+            const rawType = r.formaPagamento || r.forma_pagamento || r.tipoPagamento || 'não identificado';
+            const rawCard = r.tipoCartao || r.tipo_cartao || '';
+            const type = String(rawType).toLowerCase();
+            const cardType = String(rawCard).toLowerCase();
+            const voucherCat = String(r.categoriaVoucher || r.categoria_voucher || 'Geral').trim();
             const value = r.valor || 0;
 
             if (type.includes('pix') || type.includes('qrcode')) {
