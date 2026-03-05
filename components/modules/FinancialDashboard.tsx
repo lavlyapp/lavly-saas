@@ -257,12 +257,26 @@ export function FinancialDashboard({ data, allRecords, selectedStore = 'Todas' }
     }, [filteredOrders]);
 
     const summary = useMemo(() => {
+        let minTime = Infinity;
+        let maxTime = -Infinity;
+        let totalValue = 0;
+        const uniqueKeys = new Set();
+
+        for (let i = 0; i < filteredRecords.length; i++) {
+            const r = filteredRecords[i];
+            const ts = r.data instanceof Date ? r.data.getTime() : new Date(r.data).getTime();
+            if (ts < minTime) minTime = ts;
+            if (ts > maxTime) maxTime = ts;
+            totalValue += (r.valor || 0);
+            uniqueKeys.add(r.cliente || 'Anonimo');
+        }
+
         return {
             totalSales: filteredRecords.length,
-            totalValue: filteredRecords.reduce((acc: number, r: any) => acc + (r.valor || 0), 0),
-            startDate: filteredRecords.length > 0 ? filteredRecords[0].data : null,
-            endDate: filteredRecords.length > 0 ? filteredRecords[filteredRecords.length - 1].data : null,
-            uniqueCustomers: new Set(filteredRecords.map((r: any) => r.cliente || 'Anonimo')).size
+            totalValue,
+            startDate: minTime !== Infinity ? new Date(minTime) : null,
+            endDate: maxTime !== -Infinity ? new Date(maxTime) : null,
+            uniqueCustomers: uniqueKeys.size
         };
     }, [filteredRecords]);
 
@@ -361,32 +375,33 @@ export function FinancialDashboard({ data, allRecords, selectedStore = 'Todas' }
 
         if (filteredRecords.length === 0) return initial;
 
-        // Helper to remove accents for comparison
-        const normalizeStr = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        // Optimized parsing logic mapping VMPay exact strings vs general heuristic
+        for (let i = 0; i < filteredRecords.length; i++) {
+            const r = filteredRecords[i];
 
-        return filteredRecords.reduce((acc: any, r: any) => {
-            const type = normalizeStr(r.formaPagamento || 'não identificado');
-            const cardType = normalizeStr(r.tipoCartao || '');
+            // Fast lowercase extraction without heavy unicode normalization matrix
+            const type = (r.formaPagamento || 'não identificado').toLowerCase();
+            const cardType = (r.tipoCartao || '').toLowerCase();
             const voucherCat = (r.categoriaVoucher || 'Geral').trim();
             const value = r.valor || 0;
 
-            if (type.includes('qrcode') || type.includes('pix')) {
-                acc.pix += value;
-            } else if (type.includes('voucher') || type.includes('pre-pago') || type.includes('saldo')) {
-                acc.voucher += value;
-                acc.voucherDetails[voucherCat] = (acc.voucherDetails[voucherCat] || 0) + value;
-            } else if (cardType.includes('credito') || type.includes('credito') || type.includes('app') || type.includes('online')) {
-                acc.credit += value;
-            } else if (cardType.includes('debito') || type.includes('debito') || type.includes('classico')) {
-                acc.debit += value;
+            if (type.includes('pix') || type.includes('qrcode')) {
+                initial.pix += value;
+            } else if (type.includes('voucher') || type.includes('prepago') || type.includes('pre-pago') || type.includes('saldo')) {
+                initial.voucher += value;
+                initial.voucherDetails[voucherCat] = (initial.voucherDetails[voucherCat] || 0) + value;
+            } else if (type.includes('credito') || type.includes('crédito') || cardType.includes('credito') || cardType.includes('crédito') || type.includes('app') || type.includes('online')) {
+                initial.credit += value;
+            } else if (type.includes('debito') || type.includes('débito') || cardType.includes('debito') || cardType.includes('débito') || type.includes('classico')) {
+                initial.debit += value;
             } else {
-                acc.others += value;
+                initial.others += value;
                 const debugTag = `${r.formaPagamento} [N:${r.tipoCartao}]`;
-                if (!acc.otherTypes.includes(debugTag)) acc.otherTypes.push(debugTag);
+                if (!initial.otherTypes.includes(debugTag)) initial.otherTypes.push(debugTag);
             }
-            if (r.desconto > 0) acc.coupons++;
-            return acc;
-        }, initial);
+            if (r.desconto > 0) initial.coupons++;
+        }
+        return initial;
     }, [filteredRecords]);
 
     if (!data) return null;

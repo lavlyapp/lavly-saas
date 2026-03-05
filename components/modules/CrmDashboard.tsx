@@ -23,6 +23,7 @@ import { SegmentedCustomer } from "@/lib/processing/crm"; // Existing import nee
 interface CrmDashboardProps {
     data: {
         records: SaleRecord[];
+        orders?: any[];
     };
     customers?: CustomerRecord[];
     selectedStore?: string;
@@ -583,7 +584,7 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
                 </TabsContent>
 
                 <TabsContent value="machines">
-                    <MachineAnalysis data={{ records: data.records }} />
+                    <MachineAnalysis data={{ records: data.records, orders: data.orders }} />
                 </TabsContent>
 
                 <TabsContent value="availability">

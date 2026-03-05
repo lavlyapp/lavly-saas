@@ -8,7 +8,10 @@ import { MachineGanttChart } from "./MachineGanttChart";
 import { startOfDay, endOfDay, startOfMonth, endOfMonth, subDays, subMonths } from "date-fns";
 
 interface MachineAnalysisProps {
-    data: { records: SaleRecord[] };
+    data: {
+        records: SaleRecord[],
+        orders?: any[]
+    };
     selectedStore?: string;
 }
 
@@ -17,9 +20,9 @@ type PeriodOption = 'today' | 'yesterday' | 'thisMonth' | 'lastMonth';
 export function MachineAnalysis({ data, selectedStore }: MachineAnalysisProps) {
     const [period, setPeriod] = useState<PeriodOption>('today');
 
-    // Filter records based on selected period
-    const filteredRecords = useMemo(() => {
-        if (!data?.records) return [];
+    // Filter orders based on selected period
+    const filteredOrders = useMemo(() => {
+        if (!data?.orders) return [];
 
         const now = new Date();
         let interval: { start: Date; end: Date };
@@ -43,15 +46,15 @@ export function MachineAnalysis({ data, selectedStore }: MachineAnalysisProps) {
                 interval = { start: startOfDay(now), end: endOfDay(now) };
         }
 
-        return data.records.filter(r => {
-            if (!r.data) return false;
-            const recordDate = new Date(r.data);
+        return data.orders.filter((o: any) => {
+            if (!o.data) return false;
+            const recordDate = o.data instanceof Date ? o.data : new Date(o.data);
             return recordDate >= interval.start && recordDate <= interval.end;
         });
-    }, [data?.records, period]);
+    }, [data?.orders, period]);
 
     const { machines, summary, topRevenueMachine, topCyclesMachine } = useMemo(() => {
-        if (!filteredRecords.length) return { machines: [], summary: {}, topRevenueMachine: null, topCyclesMachine: null };
+        if (!filteredOrders.length) return { machines: [], summary: {}, topRevenueMachine: null, topCyclesMachine: null };
 
         const machineMap = new Map<string, {
             id: string;
@@ -64,37 +67,33 @@ export function MachineAnalysis({ data, selectedStore }: MachineAnalysisProps) {
         let totalRevenueAll = 0;
         let totalCyclesAll = 0;
 
-        filteredRecords.forEach(r => {
-            if (!r.items || r.items.length === 0) return;
+        filteredOrders.forEach((item: any) => {
+            const machineId = item.machine;
+            if (!machineId) return;
 
-            r.items.forEach(item => {
-                const machineId = item.machine;
-                if (!machineId) return;
+            const isWash = (item.service || '').toLowerCase().includes('lav') || machineId.toLowerCase().includes('lav') || machineId.toLowerCase().includes('inferior');
+            const isDry = (item.service || '').toLowerCase().includes('sec') || machineId.toLowerCase().includes('sec') || machineId.toLowerCase().includes('superior');
+            const type = isWash ? 'Lavadora' : (isDry ? 'Secadora' : 'Outro');
 
-                const isWash = item.service.toLowerCase().includes('lav') || item.machine.toLowerCase().includes('lav') || item.machine.toLowerCase().includes('inferior');
-                const isDry = item.service.toLowerCase().includes('sec') || item.machine.toLowerCase().includes('sec') || item.machine.toLowerCase().includes('superior');
-                const type = isWash ? 'Lavadora' : (isDry ? 'Secadora' : 'Outro');
+            const current = machineMap.get(machineId) || {
+                id: machineId,
+                type,
+                cycles: 0,
+                totalRevenue: 0,
+                lastUse: new Date(0)
+            };
 
-                const current = machineMap.get(machineId) || {
-                    id: machineId,
-                    type,
-                    cycles: 0,
-                    totalRevenue: 0,
-                    lastUse: new Date(0)
-                };
+            const val = item.valor || item.value || 0; // fallback to valor from DB
+            current.cycles++;
+            current.totalRevenue += val;
 
-                const val = item.value || 0;
-                current.cycles++;
-                current.totalRevenue += val;
+            totalCyclesAll++;
+            totalRevenueAll += val;
 
-                totalCyclesAll++;
-                totalRevenueAll += val;
+            const itemDate = item.data ? (item.data instanceof Date ? item.data : new Date(item.data)) : new Date();
+            if (itemDate > current.lastUse) current.lastUse = itemDate;
 
-                const itemDate = item.startTime ? new Date(item.startTime) : r.data;
-                if (itemDate > current.lastUse) current.lastUse = itemDate;
-
-                machineMap.set(machineId, current);
-            });
+            machineMap.set(machineId, current);
         });
 
         const machineList = Array.from(machineMap.values()).map(m => ({
@@ -125,7 +124,7 @@ export function MachineAnalysis({ data, selectedStore }: MachineAnalysisProps) {
             topCyclesMachine: topCyc
         };
 
-    }, [filteredRecords]);
+    }, [filteredOrders]);
 
     // Show empty state only if NO records exist at all, otherwise show filtered empty state
     if (!data?.records || data.records.length === 0) {
@@ -163,8 +162,8 @@ export function MachineAnalysis({ data, selectedStore }: MachineAnalysisProps) {
 
             {/* 1. Machine Gantt Chart (Moved here) */}
             <div className="mb-8">
-                {/* We pass filteredRecords, so the Gannt dropdown will only show relevant days */}
-                <MachineGanttChart records={filteredRecords} />
+                {/* We pass filteredOrders, translated to items for the Gantt component which expects sale-like items format or items array */}
+                <MachineGanttChart records={[{ items: filteredOrders, data: new Date() }] as any} />
             </div>
 
             {/* KPI Cards */}

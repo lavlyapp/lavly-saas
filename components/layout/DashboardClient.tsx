@@ -582,19 +582,29 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         ...s,
         data: s.data ? new Date(s.data) : new Date(),
         loja: getCanonicalStoreName(s.loja),
-        birthDate: s.birthDate ? new Date(s.birthDate) : undefined,
+        produto: s.produto || s.service || '',
+        formaPagamento: s.formaPagamento || s.forma_pagamento || "Outros",
+        tipoCartao: s.tipoCartao || s.tipo_cartao || "",
+        categoriaVoucher: s.categoriaVoucher || s.categoria_voucher || "",
+        customerId: s.customerId || s.customer_id,
+        birthDate: s.birthDate || s.birth_date ? new Date(s.birthDate || s.birth_date) : undefined,
         items: s.items ? s.items.map((i: any) => ({ ...i, startTime: i.startTime ? new Date(i.startTime) : new Date() })) : []
       }));
 
       const hydratedOrders = finalRawOrders.map((o: any) => ({
         ...o,
         data: o.data ? new Date(o.data) : new Date(),
-        loja: getCanonicalStoreName(o.loja)
+        loja: getCanonicalStoreName(o.loja),
+        customerId: o.customerId || o.customer_id
       }));
 
       const hydratedCustomers = finalRawCustomers.map((c: any) => ({
         ...c,
-        registrationDate: c.registrationDate ? new Date(c.registrationDate) : undefined
+        cpf: c.cpf || '',
+        email: c.email || '',
+        phone: c.phone || c.telefone || '',
+        gender: c.gender || c.genero || 'U',
+        registrationDate: c.registrationDate || c.registration_date ? new Date(c.registrationDate || c.registration_date) : undefined
       }));
 
       // Update State definitively so the UI un-freezes
