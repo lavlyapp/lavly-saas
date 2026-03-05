@@ -9,6 +9,7 @@ export type Role = "superadmin" | "owner" | "attendant";
 interface AuthContextType {
     user: User | null;
     role: Role | null;
+    token: string | null;
     isAuthenticated: boolean;
     isLoading: boolean;
     login: (email: string, password: string) => Promise<{ error: any }>;
@@ -20,6 +21,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children, initialSession, initialRole }: { children: ReactNode, initialSession?: any, initialRole?: Role | null }) {
     const [user, setUser] = useState<User | null>(initialSession?.user ?? null);
     const [role, setRole] = useState<Role | null>(initialRole ?? null);
+    const [token, setToken] = useState<string | null>(initialSession?.access_token ?? null);
     const [isLoading, setIsLoading] = useState(!initialSession || (initialSession.user && !initialRole));
 
     useEffect(() => {
@@ -46,6 +48,7 @@ export function AuthProvider({ children, initialSession, initialRole }: { childr
             console.log("[Auth] No initial session, fetching...");
             supabase.auth.getSession().then(({ data: { session } }) => {
                 setUser(session?.user ?? null);
+                setToken(session?.access_token ?? null);
                 if (session?.user) {
                     fetchProfile(session.user.id);
                 } else {
@@ -63,6 +66,7 @@ export function AuthProvider({ children, initialSession, initialRole }: { childr
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
             const currentUser = session?.user ?? null;
             setUser(currentUser);
+            setToken(session?.access_token ?? null);
             if (currentUser) {
                 await fetchProfile(currentUser.id);
             } else {
@@ -99,6 +103,7 @@ export function AuthProvider({ children, initialSession, initialRole }: { childr
         <AuthContext.Provider value={{
             user,
             role,
+            token,
             isAuthenticated: !!user,
             isLoading,
             login,

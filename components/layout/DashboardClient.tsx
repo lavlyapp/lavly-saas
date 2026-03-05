@@ -99,7 +99,7 @@ function AppContent({
   renderContent
 }: any) {
   const { selectedCustomerName, closeCustomerDetails } = useCustomerContext();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, token } = useAuth();
   const [showTerms, setShowTerms] = useState(false);
 
   // Derive profile on the fly when selected (Global Modal Logic)
@@ -298,6 +298,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
   const [activeTab, setActiveTab] = useState("financial");
   const [status, setStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
+  const { token } = useAuth();
   const [logs, setLogs] = useState<string[]>([]); // Debug Logs
 
   // Data States
@@ -435,15 +436,14 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
       // global @supabase/ssr one), we bypass a known bug where the SSR wrapper queues 
       // requests indefinitely if it thinks the auth cookie resolution is still pending.
       // This guarantees the request hits the physical network layer immediately.
-      const { data: { session } } = await supabase.auth.getSession();
-      setLogs(prev => [...prev, `[System-Debug] Token JWT capturado: ${!!session?.access_token}`]);
+      setLogs(prev => [...prev, `[System-Debug] Token JWT capturado: ${!!token}`]);
 
       const rawSupabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
         {
           global: {
-            headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
           },
           auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
         }
