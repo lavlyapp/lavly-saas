@@ -41,6 +41,14 @@ async function fetchMachines(apiKey: string): Promise<EquipmentMap> {
     return map;
 }
 
+function toLocalVMPayDateString(date: Date): string {
+    // VMPay API ignores the UTC 'Z' offset and expects the raw string to represent local BRT time
+    // Since Vercel servers run in UTC, we must manually shift to UTC-3
+    const brtOffsetMs = 3 * 60 * 60 * 1000;
+    const localDate = new Date(date.getTime() - brtOffsetMs);
+    return localDate.toISOString().replace('Z', '');
+}
+
 export async function syncVMPaySales(startDate: Date, endDate: Date, specificCred?: VMPayCredential): Promise<SaleRecord[]> {
     const salesMap = new Map<string, SaleRecord>(); // Dedup by CNPJ + ID
 
@@ -71,8 +79,8 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                 let page = 0;
                 const size = 1000; // API max
 
-                const startStr = chunk.start.toISOString();
-                const endStr = chunk.end.toISOString();
+                const startStr = toLocalVMPayDateString(chunk.start);
+                const endStr = toLocalVMPayDateString(chunk.end);
 
                 console.log(`[VMPay Client] Syncing ${cred.name} chunk: ${startStr} to ${endStr}`);
 
