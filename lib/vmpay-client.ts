@@ -134,9 +134,12 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                         // We must append the offset -03:00 so the Date parser treats it correctly as local time
                         // and not as UTC (which happens on Vercel servers).
                         let dateStr = sale.data;
-                        if (dateStr && !dateStr.includes('-') && !dateStr.endsWith('Z') && (dateStr.match(/:/g) || []).length >= 2) {
-                            // Only append if it looks like a datetime string without offset
-                            dateStr += "-03:00";
+                        if (dateStr && !dateStr.endsWith('Z')) {
+                            // Check if it already has an offset like -03:00 or +00:00
+                            const hasOffset = /[-+]\d{2}:\d{2}$/.test(dateStr);
+                            if (!hasOffset) {
+                                dateStr += "-03:00";
+                            }
                         }
 
                         const safeDate = new Date(dateStr);
