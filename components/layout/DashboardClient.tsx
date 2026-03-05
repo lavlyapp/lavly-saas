@@ -999,10 +999,13 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
       setStatus("uploading");
       setMessage("Preparando sincronização...");
       setLogs(prev => [...prev, "[VMPay] Verificando sessão segura..."]);
-      const { supabase } = await import("@/lib/supabase");
-      const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
-      if (sessionErr) setLogs(prev => [...prev, `[Aviso] Erro de sessão: ${sessionErr.message}`]);
-      const token = passedToken || sessionData.session?.access_token;
+      let token = passedToken;
+      if (!token) {
+        const { supabase } = await import("@/lib/supabase");
+        const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+        if (sessionErr) setLogs(prev => [...prev, `[Aviso] Erro de sessão: ${sessionErr.message}`]);
+        token = sessionData?.session?.access_token || null;
+      }
 
       setLogs(prev => [...prev, "[VMPay] Buscando lista de lojas cadastradas..."]);
       // 1. Get available store credentials first
