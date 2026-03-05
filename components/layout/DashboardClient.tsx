@@ -20,6 +20,7 @@ import { LoginForm } from "@/components/auth/LoginForm";
 import { TermsOfUse } from "@/components/modules/TermsOfUse";
 import { getCanonicalStoreName } from "@/lib/vmpay-config";
 import { supabase } from "@/lib/supabase";
+import { createClient } from "@supabase/supabase-js";
 
 // Dynamically import CrmDashboard with SSR disabled to prevent hydration errors
 const CrmDashboard = dynamic(
@@ -429,6 +430,23 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
       let newOrders: any[] = [];
       let newCustomers: any[] = [];
 
+      // DEDICATED FETCH CLIENT
+      // By explicitly creating a raw @supabase/supabase-js client (instead of using the 
+      // global @supabase/ssr one), we bypass a known bug where the SSR wrapper queues 
+      // requests indefinitely if it thinks the auth cookie resolution is still pending.
+      // This guarantees the request hits the physical network layer immediately.
+      const { data: { session } } = await supabase.auth.getSession();
+      const rawSupabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          global: {
+            headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}
+          },
+          auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+        }
+      );
+
       if (!lastCachedDate || cachedSales.length === 0) {
         // FULL LOAD (Paginated & Robust for first run)
         setLogs(prev => [...prev, `[System] Baixando banco de dados completo (primeiro acesso neste dispositivo)...`]);
@@ -452,7 +470,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
             setLogs(prev => [...prev, `[System] Baixando ${tableName}: Lote ${i + 1} (até ${pageSize} registros)...`]);
             try {
               const { data, error } = await withDbTimeout(
-                supabase.from(tableName).select(columns).range(i * pageSize, (i + 1) * pageSize - 1) as any,
+                rawSupabase.from(tableName).select(columns).range(i * pageSize, (i + 1) * pageSize - 1) as any,
                 20000 // 20s rigid timeout per chunk
               );
 
@@ -490,7 +508,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         newOrders = await fetchTable('orders', 'data, loja, cliente, machine, service, status, valor, customer_id, sale_id');
 
         setLogs(prev => [...prev, `[System] Iniciando download dos Clientes...`]);
-        const custRes = await supabase.from('customers').select('id, cpf, name, phone, email, gender, registration_date').limit(15000);
+        const custRes = await rawSupabase.from('customers').select('id, cpf, name, phone, email, gender, registration_date').limit(15000);
         newCustomers = custRes.data || [];
 
       } else {
@@ -498,9 +516,9 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         setLogs(prev => [...prev, `[System] Buscando apenas mudanças recentes no servidor...`]);
 
         const offsetDate = new Date(lastCachedDate.getTime() + 1000);
-        const salesQuery = supabase.from('sales').select('id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age').gte('data', offsetDate.toISOString()).order('data', { ascending: false });
+        const salesQuery = rawSupabase.from('sales').select('id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age').gte('data', offsetDate.toISOString()).order('data', { ascending: false });
 
-        let ordersQuery: any = supabase.from('orders').select('data, loja, cliente, machine, service, status, valor, customer_id, sale_id').order('data', { ascending: false }).limit(2000);
+        let ordersQuery: any = rawSupabase.from('orders').select('data, loja, cliente, machine, service, status, valor, customer_id, sale_id').order('data', { ascending: false }).limit(2000);
         if (lastCachedOrderDate) {
           const offsetOrderDate = new Date(lastCachedOrderDate.getTime() + 1000);
           ordersQuery = ordersQuery.gte('data', offsetOrderDate.toISOString());
@@ -509,7 +527,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         const [newSalesRes, newOrdersRes, newCustomersRes] = await Promise.all([
           salesQuery as any,
           ordersQuery as any,
-          supabase.from('customers').select('id, cpf, name, phone, email, gender, registration_date').limit(10000) as any
+          rawSupabase.from('customers').select('id, cpf, name, phone, email, gender, registration_date').limit(10000) as any
         ]);
 
         newSales = newSalesRes.data || [];
