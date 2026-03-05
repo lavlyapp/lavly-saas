@@ -96,11 +96,22 @@ function AppContent({
   handleFileUpload,
   handleSyncVMPay,
   handleForceSync,
-  renderContent
+  renderContent,
+  stableInitialLoad
 }: any) {
   const { selectedCustomerName, closeCustomerDetails } = useCustomerContext();
   const { isAuthenticated, isLoading, token } = useAuth();
   const [showTerms, setShowTerms] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const hasLoaded = useRef(false);
+
+  useEffect(() => {
+    setMounted(true);
+    if (!hasLoaded.current && isAuthenticated && token && stableInitialLoad) {
+      hasLoaded.current = true;
+      stableInitialLoad(token);
+    }
+  }, [isAuthenticated, token, stableInitialLoad]);
 
   // Derive profile on the fly when selected (Global Modal Logic)
   const selectedProfile = useMemo(() => {
@@ -256,7 +267,7 @@ function AppContent({
 
             {/* Content Area - Only force remount on tab change to preserve form state (Settings) */}
             <div key={activeTab}>
-              {renderContent()}
+              {renderContent(token)}
             </div>
           </div>
         </div>
@@ -321,7 +332,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
   useEffect(() => {
     setMounted(true);
     console.log("[DashboardClient] ✅ Component mounted and hydrated.");
-    setLogs(prev => [...prev, "[System] Interface carregada e hidratada."]);
+    setLogs(prev => [...prev, "[System] Processando interface..."]);
   }, []);
 
   const data = useMemo(() => {
@@ -965,7 +976,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
     }
   }
 
-  async function handleSyncVMPay() {
+  async function handleSyncVMPay(passedToken: string | null = null) {
     if (status === "uploading") {
       console.warn("[DashboardClient] Sync already in progress. Ignoring request.");
       return;
@@ -978,7 +989,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
       const { supabase } = await import("@/lib/supabase");
       const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
       if (sessionErr) setLogs(prev => [...prev, `[Aviso] Erro de sessão: ${sessionErr.message}`]);
-      const token = sessionData.session?.access_token;
+      const token = passedToken || sessionData.session?.access_token;
 
       setLogs(prev => [...prev, "[VMPay] Buscando lista de lojas cadastradas..."]);
       // 1. Get available store credentials first
@@ -1038,7 +1049,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
       setLogs(prev => [...prev, `[Sistema] Atualizando painel...`]);
 
       try {
-        await reloadAllData("Sincronismo");
+        await reloadAllData("Sincronismo", token);
       } catch (dbErr: any) {
         setLogs(prev => [...prev, `[Aviso] Falha ao recarregar a tela automaticamente: ${dbErr.message}`]);
       }
@@ -1054,7 +1065,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
   }
 
   // Content Rendering Logic
-  const renderContent = () => {
+  const renderContent = (token: string | null = null) => {
     // 1. Strict Mount Check (Hydration Fix)
     if (!mounted) return null;
 
@@ -1119,7 +1130,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
             </div>
 
             <button
-              onClick={handleSyncVMPay}
+              onClick={() => handleSyncVMPay(token)}
               className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full font-bold text-lg shadow-lg shadow-emerald-500/25 transition-all cursor-pointer flex items-center gap-3"
             >
               <RefreshCw className={`w-6 h-6 ${(status as string) === 'uploading' ? 'animate-spin' : ''}`} />
@@ -1229,6 +1240,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
               handleSyncVMPay={handleSyncVMPay}
               handleForceSync={handleForceSync}
               renderContent={renderContent}
+              stableInitialLoad={stableInitialLoad}
             />
           </CustomerProvider>
         </SubscriptionProvider>
