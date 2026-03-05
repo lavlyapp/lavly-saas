@@ -551,54 +551,57 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
 
       if (newSales.length > 0 || cachedSales.length === 0) {
         if (newSales.length > 0) setLogs(prev => [...prev, `[System] Delta Sync: ${newSales.length} novas vendas integradas.`]);
+      } else {
+        setLogs(prev => [...prev, "[System] Histórico validado. Sem novas vendas externas."]);
+      }
 
-        // Merge old + new
-        const combinedSales = [...newSales, ...cachedSales];
-        // Simple deduplication by ID just in case
-        const uniqueSalesMap = new Map();
-        combinedSales.forEach(s => uniqueSalesMap.set(s.id, s));
-        const finalRawSales = Array.from(uniqueSalesMap.values()).sort((a: any, b: any) => new Date(b.data).getTime() - new Date(a.data).getTime());
+      // Merge old + new (if any) AND always Hydrate & Normalize for UI
+      const combinedSales = [...newSales, ...cachedSales];
+      // Simple deduplication by ID just in case
+      const uniqueSalesMap = new Map();
+      combinedSales.forEach(s => uniqueSalesMap.set(s.id, s));
+      const finalRawSales = Array.from(uniqueSalesMap.values()).sort((a: any, b: any) => new Date(b.data).getTime() - new Date(a.data).getTime());
 
-        // Orders merge (no unique ID typically, so simple concat)
-        const finalRawOrders = [...newOrders, ...cachedOrders];
+      // Orders merge (no unique ID typically, so simple concat)
+      const finalRawOrders = [...newOrders, ...cachedOrders];
 
-        // Customers (replace entirely as it's small)
-        const finalRawCustomers = newCustomers;
+      // Customers (replace entirely as it's small)
+      const finalRawCustomers = newCustomers.length > 0 ? newCustomers : cachedCustomers;
 
-        // Save to super-fast IndexedDB in background
+      // Save to super-fast IndexedDB in background ONLY if there are new records
+      if (newSales.length > 0 || newOrders.length > 0 || newCustomers.length > 0 || cachedSales.length === 0) {
         Promise.all([
           withLocalTimeout(set('lavly_sales', finalRawSales), 5000, undefined),
           withLocalTimeout(set('lavly_orders', finalRawOrders), 5000, undefined),
           withLocalTimeout(set('lavly_customers', finalRawCustomers), 5000, undefined)
         ]).catch(e => console.warn("Failed to cache to IndexedDB", e));
-
-        // Hydrate & Normalize for UI
-        const hydratedSales = finalRawSales.map((s: any) => ({
-          ...s,
-          data: s.data ? new Date(s.data) : new Date(),
-          loja: getCanonicalStoreName(s.loja),
-          birthDate: s.birthDate ? new Date(s.birthDate) : undefined,
-          items: s.items ? s.items.map((i: any) => ({ ...i, startTime: i.startTime ? new Date(i.startTime) : new Date() })) : []
-        }));
-
-        const hydratedOrders = finalRawOrders.map((o: any) => ({
-          ...o,
-          data: o.data ? new Date(o.data) : new Date(),
-          loja: getCanonicalStoreName(o.loja)
-        }));
-
-        const hydratedCustomers = finalRawCustomers.map((c: any) => ({
-          ...c,
-          registrationDate: c.registrationDate ? new Date(c.registrationDate) : undefined
-        }));
-
-        // Update State definitively
-        setAllRecords(hydratedSales);
-        setAllOrders(hydratedOrders);
-        if (hydratedCustomers.length > 0) setAllCustomers(hydratedCustomers);
-      } else {
-        setLogs(prev => [...prev, "[System] Histórico validado. Sem novas vendas externas."]);
       }
+
+      // Hydrate & Normalize for UI MUST run to populate the screen
+      const hydratedSales = finalRawSales.map((s: any) => ({
+        ...s,
+        data: s.data ? new Date(s.data) : new Date(),
+        loja: getCanonicalStoreName(s.loja),
+        birthDate: s.birthDate ? new Date(s.birthDate) : undefined,
+        items: s.items ? s.items.map((i: any) => ({ ...i, startTime: i.startTime ? new Date(i.startTime) : new Date() })) : []
+      }));
+
+      const hydratedOrders = finalRawOrders.map((o: any) => ({
+        ...o,
+        data: o.data ? new Date(o.data) : new Date(),
+        loja: getCanonicalStoreName(o.loja)
+      }));
+
+      const hydratedCustomers = finalRawCustomers.map((c: any) => ({
+        ...c,
+        registrationDate: c.registrationDate ? new Date(c.registrationDate) : undefined
+      }));
+
+      // Update State definitively so the UI un-freezes
+      setAllRecords(hydratedSales);
+      setAllOrders(hydratedOrders);
+      if (hydratedCustomers.length > 0) setAllCustomers(hydratedCustomers);
+
 
       const finalCount = (newSales.length > 0 || cachedSales.length === 0)
         ? (cachedSales.length + newSales.length)
