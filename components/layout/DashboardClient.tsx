@@ -393,9 +393,17 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
       const { get, set } = await import('idb-keyval');
       setLogs(prev => [...prev, "[System] Verificando cache offline ultrarrápido..."]);
 
-      let cachedSales = await get('lavly_sales') || [];
-      let cachedOrders = await get('lavly_orders') || [];
-      let cachedCustomers = await get('lavly_customers') || [];
+      const withLocalTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> => {
+        let timeoutId: NodeJS.Timeout;
+        const timeoutPromise = new Promise<T>((resolve) => {
+          timeoutId = setTimeout(() => resolve(fallback), timeoutMs);
+        });
+        return Promise.race([promise.catch(() => fallback), timeoutPromise]).finally(() => clearTimeout(timeoutId));
+      };
+
+      let cachedSales = await withLocalTimeout(get('lavly_sales'), 2000, []) || [];
+      let cachedOrders = await withLocalTimeout(get('lavly_orders'), 2000, []) || [];
+      let cachedCustomers = await withLocalTimeout(get('lavly_customers'), 2000, []) || [];
 
       let lastCachedDate = null;
       let lastCachedOrderDate = null;
@@ -553,9 +561,9 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
 
         // Save to super-fast IndexedDB in background
         Promise.all([
-          set('lavly_sales', finalRawSales),
-          set('lavly_orders', finalRawOrders),
-          set('lavly_customers', finalRawCustomers)
+          withLocalTimeout(set('lavly_sales', finalRawSales), 5000, undefined),
+          withLocalTimeout(set('lavly_orders', finalRawOrders), 5000, undefined),
+          withLocalTimeout(set('lavly_customers', finalRawCustomers), 5000, undefined)
         ]).catch(e => console.warn("Failed to cache to IndexedDB", e));
 
         // Hydrate & Normalize for UI
