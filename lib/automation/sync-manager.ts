@@ -67,10 +67,19 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
 
     if (!lastSync) lastSync = fallbackDate;
 
-    // A pedido do usuário, se a tabela estiver 100% vazia (forçando 10 dias)
-    if (force || (isManual && lastSync.getTime() === fallbackDate.getTime())) {
+    // Se a tabela estiver 100% vazia ou forçando (10 dias)
+    if (force || (!lastSync && isManual)) {
         lastSync = fallbackDate;
         console.log(`[Sync Manager] No last sync found OR force=true for ${cred.name}. Fetching 10-day history: ${lastSync.toISOString()}`);
+    }
+
+    // Auto-Heal: Manual syncs always look back at least 3 days to cover temporary cloud outages or timezone holes
+    if (isManual && !force) {
+        const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+        if (lastSync > threeDaysAgo) {
+            lastSync = threeDaysAgo;
+            console.log(`[Sync Manager] Manual Sync Auto-Heal: Reverting lastSync to ${lastSync.toISOString()} for ${cred.name}`);
+        }
     }
 
     const acTurnOffAt = storeData?.ac_turn_off_at ? new Date(storeData.ac_turn_off_at) : null;
