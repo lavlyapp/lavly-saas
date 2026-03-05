@@ -426,12 +426,12 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
 
         setLogs(prev => [...prev, `[System] Flash Load: ${cachedSales.length} registros restaurados do dispositivo local.`]);
 
-        // Find max dates for Delta Sync
+        // Find max dates for Delta Sync safely to prevent Maximum Call Stack Size Exceeded
         const dates = hydratedCachedSales.map((s: any) => s.data.getTime());
-        lastCachedDate = new Date(Math.max(...dates));
+        lastCachedDate = new Date(dates.reduce((max: number, d: number) => Math.max(max, d), dates[0] || 0));
 
         const orderDates = hydratedCachedOrders.map((o: any) => o.data.getTime());
-        if (orderDates.length > 0) lastCachedOrderDate = new Date(Math.max(...orderDates));
+        if (orderDates.length > 0) lastCachedOrderDate = new Date(orderDates.reduce((max: number, d: number) => Math.max(max, d), orderDates[0]));
       } else {
         setMessage("Carregando 100% do histórico inicial (Pode demorar na primeira vez)...");
       }
