@@ -393,7 +393,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
       setDbStores(configuredNames);
 
       // 2. Load from Local Cache (IndexedDB)
-      const { get, set } = await import('idb-keyval');
+      const { get, set, clear } = await import('idb-keyval');
       setLogs(prev => [...prev, "[System] Verificando cache offline ultrarrápido..."]);
 
       const withLocalTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> => {
@@ -458,6 +458,33 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
           auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
         }
       );
+
+      // --- AUTO-HEALING CACHE BUSTER ---
+      // If the local database has significantly more records than the true cloud database,
+      // it means the user's browser is hoarding deleted ghost duplicates. We must wipe it.
+      if (cachedSales.length > 0) {
+        setLogs(prev => [...prev, "[System] Validando integridade do cache local..."]);
+        const { count: dbSalesCount, error: countErr } = await rawSupabase
+          .from('sales')
+          .select('*', { count: 'exact', head: true });
+
+        if (!countErr && dbSalesCount !== null) {
+          if (cachedSales.length > dbSalesCount + 500) {
+            setLogs(prev => [...prev, `[System] Inconsistência Crítica (Local: ${cachedSales.length} vs Nuvem: ${dbSalesCount}). Destruindo cache fantasma...`]);
+            lastCachedDate = null;
+            lastCachedOrderDate = null;
+            cachedSales = [];
+            cachedOrders = [];
+            cachedCustomers = [];
+            await clear();
+            setAllRecords([]);
+            setAllOrders([]);
+          } else {
+            setLogs(prev => [...prev, `[System] Cache validado (Nuvem possui ${dbSalesCount} vendas).`]);
+          }
+        }
+      }
+      // -----------------------------------
 
       if (!lastCachedDate || cachedSales.length === 0) {
         // FULL LOAD (Paginated & Robust for first run)
