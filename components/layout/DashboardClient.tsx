@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Upload, FileUp, CheckCircle, AlertCircle, Building2, Filter, RefreshCw, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AppSidebar } from "@/components/layout/AppSidebar";
@@ -176,7 +176,7 @@ function AppContent({
           {/* Quick Actions */}
           <div className="flex gap-2">
             <button
-              onClick={handleSyncVMPay}
+              onClick={() => handleSyncVMPay(token)}
               disabled={status === 'uploading'}
               className={cn(
                 "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
@@ -298,7 +298,6 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
   const [activeTab, setActiveTab] = useState("financial");
   const [status, setStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
-  const { token } = useAuth();
   const [logs, setLogs] = useState<string[]>([]); // Debug Logs
 
   // Data States
@@ -368,7 +367,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
 
   const isInitializing = useRef(false);
 
-  const reloadAllData = async (reason: string = "Inicial") => {
+  const reloadAllData = async (reason: string = "Inicial", authToken: string | null = null) => {
     if (isInitializing.current) return;
     isInitializing.current = true;
 
@@ -436,14 +435,14 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
       // global @supabase/ssr one), we bypass a known bug where the SSR wrapper queues 
       // requests indefinitely if it thinks the auth cookie resolution is still pending.
       // This guarantees the request hits the physical network layer immediately.
-      setLogs(prev => [...prev, `[System-Debug] Token JWT capturado: ${!!token}`]);
+      setLogs(prev => [...prev, `[System-Debug] Token JWT capturado: ${!!authToken}`]);
 
       const rawSupabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
         {
           global: {
-            headers: token ? { Authorization: `Bearer ${token}` } : {}
+            headers: authToken ? { Authorization: `Bearer ${authToken}` } : {}
           },
           auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
         }
@@ -607,9 +606,20 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
     }
   };
 
+  // We expose a stable ref to reloadAllData so that child components can call it,
+  // passing the token, without causing infinite render loops due to dependency changes.
+  const reloadDataRef = useRef(reloadAllData);
   useEffect(() => {
-    if (mounted) reloadAllData("Inicial");
-  }, [mounted]);
+    reloadDataRef.current = reloadAllData;
+  }, [reloadAllData]);
+
+  const stableHandleSync = useCallback((token: string | null) => {
+    reloadDataRef.current("User Sync click", token);
+  }, []);
+
+  const stableInitialLoad = useCallback((token: string | null) => {
+    reloadDataRef.current("Inicial", token);
+  }, []);
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
