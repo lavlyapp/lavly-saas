@@ -322,14 +322,6 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
     setMounted(true);
     console.log("[DashboardClient] ✅ Component mounted and hydrated.");
     setLogs(prev => [...prev, "[System] Interface carregada e hidratada."]);
-
-    // Safety timeout: If status is still 'uploading' after 15 seconds, show warning in logs
-    const timer = setTimeout(() => {
-      console.log("[DashboardClient] ⚠️ Initialization taking a while. Checking logs...");
-      setLogs(prev => [...prev, "[System] Aviso: O carregamento inicial está demorando. Verificando conectividade..."]);
-    }, 15000);
-
-    return () => clearTimeout(timer);
   }, []);
 
   const data = useMemo(() => {
