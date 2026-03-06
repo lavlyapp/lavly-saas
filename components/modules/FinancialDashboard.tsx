@@ -29,6 +29,11 @@ type PeriodOption = 'today' | 'yesterday' | 'thisMonth' | 'lastMonth' | 'custom'
 export function FinancialDashboard({ data, allRecords, allOrders, selectedStore = 'Todas' }: FinancialDashboardProps) {
     const { role } = useAuth();
 
+    // DEBUG: Inject precise length check
+    console.log(`[DEBUG-FinancialDashboard] Mounted. Stores: ${selectedStore}`);
+    console.log(`[DEBUG-FinancialDashboard] data.records: ${data?.records?.length} | data.orders: ${data?.orders?.length}`);
+    console.log(`[DEBUG-FinancialDashboard] allRecords: ${allRecords?.length} | allOrders: ${allOrders?.length}`);
+
     // --- State for Filters ---
     // --- Smart Date Initialization (Lazy State) ---
     const [period, setPeriod] = useState<PeriodOption>(() => {
@@ -191,18 +196,23 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
 
 
 
-    // --- Metrics Calculations
     const basketsMetrics = useMemo(() => {
-        let totalBaskets = 0;
         let totalWashes = 0;
         let totalDries = 0;
         let totalOthers = 0;
         const unclassifiedList: string[] = [];
+        const uniqueKeys = new Set<string>();
 
         if (filteredOrders.length > 0) {
-            totalBaskets = filteredOrders.length;
-
             filteredOrders.forEach((o: any) => {
+                // Determine a safe composite key that ignores Supabase 'id' 
+                // and works pure functionally based on business context
+                const safeKey = `${o.sale_id}-${o.machine}-${new Date(o.data).getTime()}`;
+
+                // If we've already counted this exact basket (cache collision), skip
+                if (uniqueKeys.has(safeKey)) return;
+                uniqueKeys.add(safeKey);
+
                 const service = (o.service || o.produto || '').toLowerCase();
                 const machine = (o.machine || '').toLowerCase();
 
@@ -254,7 +264,7 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
             });
         }
 
-        return { totalBaskets, totalWashes, totalDries, totalOthers, unclassifiedList };
+        return { totalBaskets: uniqueKeys.size, totalWashes, totalDries, totalOthers, unclassifiedList };
     }, [filteredOrders]);
 
     const summary = useMemo(() => {

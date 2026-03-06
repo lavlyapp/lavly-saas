@@ -199,8 +199,15 @@ export function calculateCrmMetrics(records: SaleRecord[], customerRegistry?: Cu
 
         let profileWashCount = 0;
         let profileDryCount = 0;
+        const uniqueSales = new Set<string>();
 
         sales.forEach(r => {
+            // --- EMERGENCY DEDUPLICATION ---
+            // Protect against ghost IndexedDB arrays multiplying the metrics
+            const safeKey = `${r.id || 'noid'}-${new Date(r.data).getTime()}-${r.produto || 'noprod'}`;
+            if (uniqueSales.has(safeKey)) return;
+            uniqueSales.add(safeKey);
+
             // Count Cycles per Sale Item (Independent of Visit grouping for totals)
             let wDetails = 0;
             let dDetails = 0;
