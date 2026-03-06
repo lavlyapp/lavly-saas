@@ -138,6 +138,19 @@ export function calculateCrmMetrics(records: SaleRecord[], customerRegistry?: Cu
         }
     }
 
+    // Pre-calculate O(1) Order Map to prevent O(N^2) browser freeze loop
+    const ordersBySaleId = new Map<number, any[]>();
+    if (allOrders && allOrders.length > 0) {
+        for (let i = 0; i < allOrders.length; i++) {
+            const order = allOrders[i];
+            if (order.sale_id) {
+                const existing = ordersBySaleId.get(order.sale_id) || [];
+                existing.push(order);
+                ordersBySaleId.set(order.sale_id, existing);
+            }
+        }
+    }
+
     // 1. Single Pass for Min/Max date, possible prices, and grouping
     let latestTimestamp = 0;
     records.forEach(r => {
@@ -194,26 +207,22 @@ export function calculateCrmMetrics(records: SaleRecord[], customerRegistry?: Cu
         sales.sort((a, b) => a.data.getTime() - b.data.getTime());
 
         // New Grouping Logic: 180-minute window = 1 Visit
-        // A visit is defined by the first purchase time. Any purchase within 180 minutes belongs to it.
-        const visitsList: { date: Date, items: SaleRecord[], totalValue: number, washCount: number, dryCount: number }[] = [];
+        const salesCount = sales.length;
 
-        let profileWashCount = 0;
-        let profileDryCount = 0;
-        const uniqueSales = new Set<string>();
-
-        sales.forEach(r => {
+        for (let k = 0; k < salesCount; k++) {
+            const r = sales[k];
             // --- EMERGENCY DEDUPLICATION ---
             // Protect against ghost IndexedDB arrays multiplying the metrics
             // Using ID and product name is enough mathematically because VMPay forbids selecting the same product twice.
             const safeKey = `${r.id || 'noid'}-${r.produto || 'noprod'}`;
-            if (uniqueSales.has(safeKey)) return;
+            if (uniqueSales.has(safeKey)) continue;
             uniqueSales.add(safeKey);
 
             // Count Cycles per Sale Item (Independent of Visit grouping for totals)
             let wDetails = 0;
             let dDetails = 0;
 
-            const saleOrders = allOrders ? allOrders.filter(o => o.sale_id === r.id) : [];
+            const saleOrders = ordersBySaleId.get(r.id) || [];
 
             if (saleOrders.length > 0) {
                 // Precision: Count exact baskets from the orders table
@@ -278,7 +287,7 @@ export function calculateCrmMetrics(records: SaleRecord[], customerRegistry?: Cu
                     dryCount: dDetails
                 });
             }
-        });
+        }
 
         const profileTotalCycles = profileWashCount + profileDryCount;
         totalCycles += profileTotalCycles;
@@ -477,104 +486,106 @@ export function calculateCrmMetrics(records: SaleRecord[], customerRegistry?: Cu
         });
     }
 
-    // ... (rest of function)
+}
 
-    // ... (rest of function)
+// ... (rest of function)
 
-    // Sort by Total Spent Descending (for Top 15)
-    profiles.sort((a, b) => b.totalSpent - a.totalSpent);
+// ... (rest of function)
 
-    // Global Stats
-    const totalUniqueCustomers = profiles.length;
-    const totalBaskets = 0;
+// Sort by Total Spent Descending (for Top 15)
+profiles.sort((a, b) => b.totalSpent - a.totalSpent);
 
-    let active30d = 0;
-    let inactive30 = 0;
-    let inactive60 = 0;
-    let inactive90 = 0;
-    let newCustomers = 0;
-    let recurring = 0;
-    let totalRevenue = 0;
-    let totalVisitsGlobal = 0;
-    let sumFreq = 0;
-    let freqCount = 0;
-    const churnRiskStats = { high: 0, medium: 0, low: 0 };
+// Global Stats
+const totalUniqueCustomers = profiles.length;
+const totalBaskets = 0;
 
-    const startOf30d = subDays(today, 30);
-    const startOf60d = subDays(today, 60);
-    const startOf90d = subDays(today, 90);
+let active30d = 0;
+let inactive30 = 0;
+let inactive60 = 0;
+let inactive90 = 0;
+let newCustomers = 0;
+let recurring = 0;
+let totalRevenue = 0;
+let totalVisitsGlobal = 0;
+let sumFreq = 0;
+let freqCount = 0;
+const churnRiskStats = { high: 0, medium: 0, low: 0 };
 
-    for (let i = 0; i < profiles.length; i++) {
-        const p = profiles[i];
-        const last = p.lastVisitDate;
-        const first = p.firstVisitDate;
+const startOf30d = subDays(today, 30);
+const startOf60d = subDays(today, 60);
+const startOf90d = subDays(today, 90);
 
-        totalRevenue += p.totalSpent;
-        totalVisitsGlobal += p.totalVisits;
-        churnRiskStats[p.churnRisk]++;
+for (let i = 0; i < profiles.length; i++) {
+    const p = profiles[i];
+    const last = p.lastVisitDate;
+    const first = p.firstVisitDate;
 
-        if (isAfter(last, startOf30d)) active30d++;
-        else if (isAfter(last, startOf60d)) inactive30++;
-        else if (isAfter(last, startOf90d)) inactive60++;
-        else inactive90++;
+    totalRevenue += p.totalSpent;
+    totalVisitsGlobal += p.totalVisits;
+    churnRiskStats[p.churnRisk]++;
 
-        if (isAfter(first, startOf30d)) newCustomers++;
-        if (p.totalVisits > 1) recurring++;
+    if (isAfter(last, startOf30d)) active30d++;
+    else if (isAfter(last, startOf60d)) inactive30++;
+    else if (isAfter(last, startOf90d)) inactive60++;
+    else inactive90++;
 
-        // Frequency (Visits / Month)
-        const daysSinceFirst = Math.max(todayTs - p.firstVisitDate.getTime(), 1000) / (1000 * 60 * 60 * 24);
-        let months = Math.max(daysSinceFirst, 1) / 30;
-        if (months < 1) months = 1;
-        sumFreq += p.totalVisits / months;
-        freqCount++;
-    }
+    if (isAfter(first, startOf30d)) newCustomers++;
+    if (p.totalVisits > 1) recurring++;
 
-    const avgTypeFrequency = freqCount > 0 ? sumFreq / freqCount : 0;
-    const globalAverageTicket = totalVisitsGlobal > 0 ? totalRevenue / totalVisitsGlobal : 0;
-    const globalAvgBasketsPerVisit = 0;
-    const avgLtv = totalUniqueCustomers > 0 ? (totalRevenue / totalUniqueCustomers) : 0;
-    const retentionRate = totalUniqueCustomers > 0 ? recurring / totalUniqueCustomers : 0;
-    const churnRate = totalUniqueCustomers > 0 ? inactive90 / totalUniqueCustomers : 0;
+    // Frequency (Visits / Month)
+    const daysSinceFirst = Math.max(todayTs - p.firstVisitDate.getTime(), 1000) / (1000 * 60 * 60 * 24);
+    let months = Math.max(daysSinceFirst, 1) / 30;
+    if (months < 1) months = 1;
+    sumFreq += p.totalVisits / months;
+    freqCount++;
+}
 
-    // Final Aggregates
-    const activeCustomers = active30d + newCustomers + recurring;
-    const totalCyclesGlobal = washCount + dryCount;
-    const conversionRate = washCount > 0 ? (dryCount / washCount) * 100 : 0;
+const avgTypeFrequency = freqCount > 0 ? sumFreq / freqCount : 0;
+const globalAverageTicket = totalVisitsGlobal > 0 ? totalRevenue / totalVisitsGlobal : 0;
+const globalAvgBasketsPerVisit = 0;
+const avgLtv = totalUniqueCustomers > 0 ? (totalRevenue / totalUniqueCustomers) : 0;
+const retentionRate = totalUniqueCustomers > 0 ? recurring / totalUniqueCustomers : 0;
+const churnRate = totalUniqueCustomers > 0 ? inactive90 / totalUniqueCustomers : 0;
 
-    console.timeEnd(profilerLabel);
+// Final Aggregates
+const activeCustomers = active30d + newCustomers + recurring;
+const totalCyclesGlobal = washCount + dryCount;
+const conversionRate = washCount > 0 ? (dryCount / washCount) * 100 : 0;
 
-    return {
-        profiles,
-        globalAvgBasketsPerVisit,
-        globalAverageTicket,
-        totalUniqueCustomers,
-        totalCycles: totalCyclesGlobal,
-        totalRevenue,
-        totalVisits: totalVisitsGlobal,
+console.timeEnd(profilerLabel);
+
+return {
+    profiles,
+    globalAvgBasketsPerVisit,
+    globalAverageTicket,
+    totalUniqueCustomers,
+    totalCycles: totalCyclesGlobal,
+    totalRevenue,
+    totalVisits: totalVisitsGlobal,
+    totalBaskets: totalCyclesGlobal,
+    activeCustomers,
+    churnRate,
+    washDryStats: {
+        washCount,
+        dryCount,
+        ratio: washCount > 0 ? dryCount / washCount : 0,
         totalBaskets: totalCyclesGlobal,
-        activeCustomers,
-        churnRate,
-        washDryStats: {
-            washCount,
-            dryCount,
-            ratio: washCount > 0 ? dryCount / washCount : 0,
-            totalBaskets: totalCyclesGlobal,
-            conversionRate
-        },
-        customerStats: {
-            active30d,
-            newCustomers,
-            recurring,
-            inactive30,
-            inactive60,
-            inactive90,
-            churnRiskStats,
-            avgTypeFrequency,
-            avgLtv,
-            retentionRate,
-            churnRate
-        }
-    };
+        conversionRate
+    },
+    customerStats: {
+        active30d,
+        newCustomers,
+        recurring,
+        inactive30,
+        inactive60,
+        inactive90,
+        churnRiskStats,
+        avgTypeFrequency,
+        avgLtv,
+        retentionRate,
+        churnRate
+    }
+};
 }
 
 // ... existing code ...

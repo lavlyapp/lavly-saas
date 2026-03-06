@@ -216,38 +216,6 @@ function AppContent({
 
             <button
               onClick={async () => {
-                try {
-                  setStatus("uploading");
-                  setMessage("Sincronizando cadastros de clientes (Gênero)...");
-                  const res = await fetch('/api/vmpay/sync-customers');
-                  const data = await res.json();
-                  if (data.success) {
-                    setMessage(`Sucesso! ${data.total} perfis atualizados com gênero.`);
-                    setStatus("success");
-                    // Force a reload of the UI after 2s to reflect Demographic changes
-                    setTimeout(() => window.location.reload(), 2000);
-                  } else {
-                    setMessage(`Erro na sincronização de clientes: ${data.error}`);
-                    setStatus("error");
-                  }
-                } catch (e: any) {
-                  setMessage(`Erro na conexão: ${e.message}`);
-                  setStatus("error");
-                }
-              }}
-              disabled={status === 'uploading'}
-              title="Sincronizar nomes e gêneros da VMPay"
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
-                status === 'uploading' ? "bg-neutral-800 text-neutral-400" : "bg-pink-600 hover:bg-pink-500 text-white shadow-lg shadow-pink-500/20"
-              )}
-            >
-              <Users className={cn("w-4 h-4", status === 'uploading' && "animate-pulse")} />
-              <span>Sync Clientes (Gênero)</span>
-            </button>
-
-            <button
-              onClick={async () => {
                 const { clear } = await import('idb-keyval');
                 await clear();
                 window.location.reload();
