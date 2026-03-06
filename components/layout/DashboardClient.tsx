@@ -1310,6 +1310,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
               logs={logs}
               allRecords={allRecords}
               data={viewData}
+              stores={stores}
               allOrders={allOrders}
               selectedStore={selectedStore}
               setSelectedStore={setSelectedStore}
