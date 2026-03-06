@@ -41,6 +41,7 @@ export interface OrderRecord {
     service: string;
     status: string;
     valor: number;
+    sale_id?: string;
     customerId?: string; // New: Link to Customer Registry
     originalRow: number;
     birthDate?: Date;

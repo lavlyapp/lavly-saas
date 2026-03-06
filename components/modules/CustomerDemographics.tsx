@@ -11,11 +11,12 @@ interface CustomerDemographicsProps {
     records: SaleRecord[];
     customers: CustomerRecord[];
     selectedStore?: string;
+    orders?: any[];
 }
 
 type PeriodOption = 'today' | 'yesterday' | 'thisMonth' | 'lastMonth' | 'custom' | 'allTime';
 
-export function CustomerDemographics({ records, customers, selectedStore }: CustomerDemographicsProps) {
+export function CustomerDemographics({ records, customers, selectedStore, orders }: CustomerDemographicsProps) {
     const { canAccess } = useSubscription();
 
     // --- Filter State (Copied from FinancialDashboard) ---
@@ -80,7 +81,7 @@ export function CustomerDemographics({ records, customers, selectedStore }: Cust
     }, [records, period, customRange]);
 
     // --- Metrics Calculation ---
-    const metrics = useMemo(() => calculateCrmMetrics(filteredRecords, customers), [filteredRecords, customers]);
+    const metrics = useMemo(() => calculateCrmMetrics(filteredRecords, customers, orders), [filteredRecords, customers, orders]);
     const profiles = metrics.profiles;
 
 

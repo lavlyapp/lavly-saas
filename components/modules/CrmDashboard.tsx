@@ -87,8 +87,8 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
     // --- Global Data (Always calculates on ALL records) ---
     // This is vital for Customer Profiles, Churn, LTV, etc.
     const globalCrmData = useMemo(() => {
-        return calculateCrmMetrics(data.records, customers);
-    }, [data.records, customers]);
+        return calculateCrmMetrics(data.records, customers, data.orders);
+    }, [data.records, customers, data.orders]);
 
     // Search Logic
     const searchResults = useMemo(() => {
@@ -143,8 +143,17 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
 
     // --- Period specific calculations ---
     const { visitsHeatmapData, periodWashDryStats, periodStats, filteredMetrics } = useMemo(() => {
+        // --- LIVE DEBUG FOR RAVIDE ---
+        const ravideSales = filteredRecords.filter(r => r.cliente && r.cliente.toUpperCase().includes('RAVIDE'));
+        if (ravideSales.length > 0) {
+            console.log("[DEBUG-RAVIDE] Found sales:", ravideSales);
+            const ravideOrders = data.orders.filter(o => ravideSales.some(s => s.id === o.sale_id));
+            console.log("[DEBUG-RAVIDE] Found orders linked by sale_id:", ravideOrders);
+        }
+        // -----------------------------
+
         // We re-use calculateCrmMetrics primarily to get the wash/dry stats for the period
-        const periodMetrics = calculateCrmMetrics(filteredRecords, customers);
+        const periodMetrics = calculateCrmMetrics(filteredRecords, customers, data.orders);
         // Calculate new Advanced Period Stats (with 180d lookback for new customers)
         const advPeriodStats = calculatePeriodStats(filteredRecords, data.records);
 

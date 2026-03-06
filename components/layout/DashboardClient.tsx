@@ -91,6 +91,7 @@ function AppContent({
   allRecords,
   data,
   stores,
+  allOrders,
   selectedStore,
   setSelectedStore,
   handleFileUpload,
@@ -116,8 +117,8 @@ function AppContent({
   // Derive profile on the fly when selected (Global Modal Logic)
   const selectedProfile = useMemo(() => {
     if (!selectedCustomerName || !allRecords) return null;
-    return getProfile(selectedCustomerName, allRecords);
-  }, [selectedCustomerName, allRecords]);
+    return getProfile(selectedCustomerName, allRecords, allOrders);
+  }, [selectedCustomerName, allRecords, allOrders]);
 
   if (isLoading) {
     return (
@@ -1277,7 +1278,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
     }
 
     if (activeTab === 'demographics' && viewData) {
-      return <CustomerDemographics records={viewData.records} customers={allCustomers} selectedStore={selectedStore || undefined} />;
+      return <CustomerDemographics records={viewData.records} customers={allCustomers} selectedStore={selectedStore || undefined} orders={viewData.orders} />;
     }
 
     if (activeTab === 'reports' && viewData) {

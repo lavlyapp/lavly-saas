@@ -178,7 +178,7 @@ export function CustomerDetails({ isOpen, onClose, profile, periodRecords }: Cus
 
                             {/* Cestos Card Breakdown */}
                             <div className="bg-neutral-800/50 p-4 rounded-xl border border-neutral-700/50 col-span-2 md:col-span-1">
-                                <span className="text-xs text-neutral-400 block mb-1">Cestos (Vitalício)</span>
+                                <span className="text-xs text-neutral-400 block mb-1">Cestos (Vitalício) {`[DBG: TW=${profile.totalWashes} / pWash=${isPeriodContext ? 'PContext' : 'GContext'}]`} </span>
                                 <div className="flex items-center gap-3">
                                     <div className="flex items-center gap-1">
                                         <span className="text-lg font-mono font-bold text-blue-400">{displayWash}</span>

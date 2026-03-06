@@ -115,7 +115,7 @@ function detectCycleType(service: string, machine: string, store: string): { isW
     return { isWash, isDry };
 }
 
-export function calculateCrmMetrics(records: SaleRecord[], customerRegistry?: CustomerRecord[]): CrmSummary {
+export function calculateCrmMetrics(records: SaleRecord[], customerRegistry?: CustomerRecord[], allOrders?: any[]): CrmSummary {
     const profilerLabel = `calculateCrmMetrics(${records.length})`;
     console.time(profilerLabel);
 
@@ -213,13 +213,24 @@ export function calculateCrmMetrics(records: SaleRecord[], customerRegistry?: Cu
             let wDetails = 0;
             let dDetails = 0;
 
-            if (r.items && r.items.length > 0) {
+            const saleOrders = allOrders ? allOrders.filter(o => o.sale_id === r.id) : [];
+
+            if (saleOrders.length > 0) {
+                // Precision: Count exact baskets from the orders table
+                saleOrders.forEach(o => {
+                    const { isWash, isDry } = detectCycleType(o.service, o.machine, r.loja);
+                    if (isWash) wDetails++;
+                    if (isDry) dDetails++;
+                });
+            } else if (r.items && r.items.length > 0) {
+                // Fallback: Use nested items if provided (rare in Cloud DB, common in manual upload)
                 r.items.forEach(item => {
                     const { isWash, isDry } = detectCycleType(item.service, item.machine, r.loja);
                     if (isWash) wDetails++;
                     if (isDry) dDetails++;
                 });
             } else {
+                // Heuristic Fallback (Only plays if neither is available)
                 const { isWash, isDry } = detectCycleType(r.produto, '', r.loja);
                 if (isWash) wDetails++;
                 if (isDry) dDetails++;
@@ -603,7 +614,7 @@ export interface PeriodStats {
     avgLtv: number;
 }
 
-export function calculatePeriodStats(periodRecords: SaleRecord[], allRecords: SaleRecord[]): PeriodStats {
+export function calculatePeriodStats(periodRecords: SaleRecord[], allRecords: SaleRecord[], allOrders?: any[]): PeriodStats {
     const profilerLabel = `calculatePeriodStats(${periodRecords.length})`;
     console.time(profilerLabel);
 
@@ -708,21 +719,31 @@ export function calculatePeriodStats(periodRecords: SaleRecord[], allRecords: Sa
         let dCount = 0;
 
         sales.forEach(r => {
-            if (r.items && r.items.length > 0) {
+            const saleOrders = allOrders ? allOrders.filter(o => o.sale_id === r.id) : [];
+
+            if (saleOrders.length > 0) {
+                // Precision: Count exact baskets from the orders table
+                saleOrders.forEach(o => {
+                    const { isWash, isDry } = detectCycleType(o.service, o.machine, r.loja);
+                    if (isWash) wCount++;
+                    if (isDry) dCount++;
+                });
+            } else if (r.items && r.items.length > 0) {
+                // Fallback nested items
                 r.items.forEach(item => {
                     const { isWash, isDry } = detectCycleType(item.service, item.machine, r.loja);
                     if (isWash) wCount++;
-                    if (isDry) dCount++; // Corrected variable name
+                    if (isDry) dCount++;
                 });
             } else {
+                // Heuristic Fallback
                 const { isWash, isDry } = detectCycleType(r.produto, '', r.loja);
                 if (isWash) wCount++;
-                if (isDry) dCount++; // Corrected variable name
+                if (isDry) dCount++;
 
                 const store = (r.loja || 'DEFAULT').toUpperCase();
                 const basePrice = (storeCyclePrices && storeCyclePrices[store]) || globalMinCyclePrice || 18.0;
 
-                // Heuristic: If value > basePrice * 1.5, assume multiple baskets
                 if ((wCount > 0 || dCount > 0) && r.valor > basePrice * 1.5) {
                     const impliedCount = Math.round(r.valor / basePrice);
                     if (impliedCount > 1) {
@@ -869,7 +890,7 @@ export function getCycleDuration(productName: string): number {
     return 33; // Lavadora: 33 min
 }
 
-export function getProfile(customerName: string, allRecords: SaleRecord[]): CustomerProfile | null {
+export function getProfile(customerName: string, allRecords: SaleRecord[], allOrders?: any[]): CustomerProfile | null {
     if (!customerName || !allRecords) return null;
 
     // Filter records for this specific customer
@@ -880,7 +901,7 @@ export function getProfile(customerName: string, allRecords: SaleRecord[]): Cust
     if (customerRecords.length === 0) return null;
 
     // Reuse existing calculation logic by passing only this customer's records
-    const summary = calculateCrmMetrics(customerRecords);
+    const summary = calculateCrmMetrics(customerRecords, undefined, allOrders);
 
     return summary.profiles[0] || null;
 }

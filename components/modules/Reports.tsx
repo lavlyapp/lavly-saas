@@ -27,13 +27,13 @@ export function Reports({ data }: ReportsProps) {
 
     const metrics = useMemo(() => {
         if (!data?.records) return null;
-        return calculateCrmMetrics(data.records);
-    }, [data?.records]);
+        return calculateCrmMetrics(data.records, undefined, (data as any).orders);
+    }, [data?.records, (data as any)?.orders]);
 
     const periodStats = useMemo(() => {
         if (!data?.records) return null;
-        return calculatePeriodStats(data.records, data.records);
-    }, [data?.records]);
+        return calculatePeriodStats(data.records, data.records, (data as any).orders);
+    }, [data?.records, (data as any)?.orders]);
 
     // 1. Recovery Logic: High LTV customers, inactive > 30 days
     const recoveryList = useMemo(() => {

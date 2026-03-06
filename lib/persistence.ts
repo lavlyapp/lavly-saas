@@ -200,6 +200,7 @@ export async function fetchSalesHistory(supabaseClient?: any) {
             service: o.service,
             status: o.status,
             valor: Number(o.valor),
+            sale_id: o.sale_id,
             customerId: o.customer_id,
             originalRow: 0
         }));

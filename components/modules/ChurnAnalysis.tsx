@@ -23,8 +23,8 @@ export function ChurnAnalysis({ data, selectedStore }: ChurnAnalysisProps) {
     const { openCustomerDetails } = useCustomerContext();
     const crmData = useMemo(() => {
         if (!data?.records) return null;
-        return calculateCrmMetrics(data.records);
-    }, [data?.records]);
+        return calculateCrmMetrics(data.records, undefined, data.orders);
+    }, [data?.records, data?.orders]);
 
     const handleExport = () => {
         if (!crmData) return;
