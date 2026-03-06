@@ -204,7 +204,8 @@ export function calculateCrmMetrics(records: SaleRecord[], customerRegistry?: Cu
         sales.forEach(r => {
             // --- EMERGENCY DEDUPLICATION ---
             // Protect against ghost IndexedDB arrays multiplying the metrics
-            const safeKey = `${r.id || 'noid'}-${new Date(r.data).getTime()}-${r.produto || 'noprod'}`;
+            // Using ID and product name is enough mathematically because VMPay forbids selecting the same product twice.
+            const safeKey = `${r.id || 'noid'}-${r.produto || 'noprod'}`;
             if (uniqueSales.has(safeKey)) return;
             uniqueSales.add(safeKey);
 

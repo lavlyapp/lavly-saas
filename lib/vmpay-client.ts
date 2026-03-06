@@ -42,8 +42,12 @@ async function fetchMachines(apiKey: string): Promise<EquipmentMap> {
 }
 
 function toLocalVMPayDateString(date: Date): string {
-    // VMPay API ignores the UTC 'Z' offset and expects the raw string to represent UTC time
-    return date.toISOString().replace('Z', '');
+    // VMPay Server operates in UTC-3 (BRT). It ignores 'Z' and assumes the string is LOCAL BRT time.
+    // Our 'date' argument is a perfect absolute UTC Date object. 
+    // To generate a string that visually says '11:00' when the UTC time is '14:00Z', we explicitly subtract 3 hours.
+    const VMPAY_BRT_OFFSET_MS = 3 * 60 * 60 * 1000;
+    const shiftedToBRT = new Date(date.getTime() - VMPAY_BRT_OFFSET_MS);
+    return shiftedToBRT.toISOString().replace('Z', '');
 }
 
 export async function syncVMPaySales(startDate: Date, endDate: Date, specificCred?: VMPayCredential): Promise<SaleRecord[]> {
