@@ -346,7 +346,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
     setLogs(prev => [...prev, "[System] Processando interface..."]);
   }, []);
 
-  const data = useMemo(() => {
+  const viewData = useMemo(() => {
     if (!mounted || allRecords.length === 0) return null;
 
     console.time("[Page] calculate ViewData");
@@ -1175,7 +1175,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
     }
 
     // Default or No Data State
-    if (!data && status !== 'uploading' && allRecords.length === 0) {
+    if (!viewData && status !== 'uploading' && allRecords.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center h-[60vh] w-full border-2 border-dashed border-neutral-800 rounded-3xl bg-neutral-900/50 relative overflow-hidden">
           <div className="bg-neutral-900 p-8 rounded-full mb-6 border border-neutral-800 shadow-2xl relative z-10">
@@ -1252,36 +1252,36 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
     }
 
     // 3. Dashboard Rendering (Strictly if Data Exists)
-    if (activeTab === 'financial' && data) {
-      return <FinancialDashboard data={data} selectedStore={selectedStore || undefined} />;
+    if (activeTab === 'financial' && viewData) {
+      return <FinancialDashboard data={viewData} selectedStore={selectedStore || undefined} />;
     }
 
-    if (activeTab === 'comparative' && data) {
-      return <ComparativeDashboard data={data} customers={allCustomers} selectedStore={selectedStore || undefined} />;
+    if (activeTab === 'comparative' && viewData) {
+      return <ComparativeDashboard data={viewData} customers={allCustomers} selectedStore={selectedStore || undefined} />;
     }
 
-    if (activeTab === 'crm' && data) {
-      return <CrmDashboard data={data} customers={allCustomers} selectedStore={selectedStore || undefined} />;
+    if (activeTab === 'crm' && viewData) {
+      return <CrmDashboard data={viewData} customers={allCustomers} selectedStore={selectedStore || undefined} />;
     }
 
-    if (activeTab === 'churn' && data && data.records.length > 0) {
-      return <ChurnAnalysis data={data} selectedStore={selectedStore || undefined} />;
+    if (activeTab === 'churn' && viewData && viewData.records.length > 0) {
+      return <ChurnAnalysis data={viewData} selectedStore={selectedStore || undefined} />;
     }
 
-    if (activeTab === 'machines' && data) {
-      return <MachineAnalysis data={data} selectedStore={selectedStore || undefined} />;
+    if (activeTab === 'machines' && viewData) {
+      return <MachineAnalysis data={viewData} selectedStore={selectedStore || undefined} />;
     }
 
-    if (activeTab === 'queue' && data) {
-      return <QueueAnalysis data={data.records} selectedStore={selectedStore || undefined} />;
+    if (activeTab === 'queue' && viewData) {
+      return <QueueAnalysis data={viewData.records} selectedStore={selectedStore || undefined} />;
     }
 
-    if (activeTab === 'demographics' && data) {
-      return <CustomerDemographics records={data.records} customers={allCustomers} selectedStore={selectedStore || undefined} />;
+    if (activeTab === 'demographics' && viewData) {
+      return <CustomerDemographics records={viewData.records} customers={allCustomers} selectedStore={selectedStore || undefined} />;
     }
 
-    if (activeTab === 'reports' && data) {
-      return <Reports data={data} />;
+    if (activeTab === 'reports' && viewData) {
+      return <Reports data={viewData} />;
     }
 
     if (activeTab === 'marketing') {
@@ -1310,7 +1310,6 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
               logs={logs}
               allRecords={allRecords}
               data={viewData}
-              allRecords={allRecords}
               allOrders={allOrders}
               selectedStore={selectedStore}
               setSelectedStore={setSelectedStore}
