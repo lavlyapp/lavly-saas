@@ -31,28 +31,42 @@ export function MachineGanttChart({ records }: MachineGanttChartProps) {
         const machines: Record<string, { start: Date; end: Date; type: 'wash' | 'dry'; client: string; value: number }[]> = {};
 
         dailyRecords.forEach(r => {
-            // Try to get machine name from items (if enriched) or fallback
-            let machineName = "Desconhecida";
             if (r.items && r.items.length > 0) {
-                machineName = r.items[0].machine;
+                // Parse all nested items for complex purchases
+                r.items.forEach((item: any) => {
+                    let machineName = (item.machine || "Desconhecida").replace(/Maquina\s*/i, 'Máquina ').trim();
+                    if (machineName === "Desconhecida") return;
+
+                    if (!machines[machineName]) machines[machineName] = [];
+                    const duration = getCycleDuration(item.service || r.produto);
+                    const startTs = item.startTime ? new Date(item.startTime) : r.data;
+                    const endTs = addMinutes(startTs, duration);
+
+                    machines[machineName].push({
+                        start: startTs,
+                        end: endTs,
+                        type: duration > 40 ? 'dry' : 'wash',
+                        client: r.cliente,
+                        value: item.value || r.valor
+                    });
+                });
+            } else {
+                // Fallback for simple purchases or offline ETL without items array
+                let machineName = "Desconhecida";
+                if (machineName === "Desconhecida") return; // Keep skipping if no machine specified
+                if (!machines[machineName]) machines[machineName] = [];
+
+                const duration = getCycleDuration(r.produto);
+                const end = addMinutes(r.data, duration);
+
+                machines[machineName].push({
+                    start: r.data,
+                    end,
+                    type: duration > 40 ? 'dry' : 'wash',
+                    client: r.cliente,
+                    value: r.valor
+                });
             }
-
-            // Clean Machine Name
-            machineName = machineName.replace(/Maquina\s*/i, 'Máquina ').trim();
-            if (machineName === "Desconhecida") return; // Skip unknown machines for cleaner chart
-
-            if (!machines[machineName]) machines[machineName] = [];
-
-            const duration = getCycleDuration(r.produto);
-            const end = addMinutes(r.data, duration);
-
-            machines[machineName].push({
-                start: r.data,
-                end,
-                type: duration > 40 ? 'dry' : 'wash',
-                client: r.cliente,
-                value: r.valor
-            });
         });
 
         // Sort machines: Washers first, then Dryers. Within type, by number.
