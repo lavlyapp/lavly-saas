@@ -51,11 +51,17 @@ export interface VMPayMasterAccount {
     pass: string;
 }
 
+// Cache to avoid slow string normalization loops on the main thread
+const nameCache = new Map<string, string>();
+
 /**
  * Normalizes a store name to its canonical version.
  */
 export function getCanonicalStoreName(rawName: string): string {
     if (!rawName) return "Desconhecido";
+
+    // Fast path: return if we've already resolved this string
+    if (nameCache.has(rawName)) return nameCache.get(rawName)!;
 
     // Normalize string: Remove accents and convert to uppercase
     const normalize = (s: string) =>
@@ -66,7 +72,7 @@ export function getCanonicalStoreName(rawName: string): string {
     // 1. Check direct mapping (with normalization)
     for (const [key, val] of Object.entries(STORE_NAME_MAP)) {
         if (normalize(key) === normalizedRaw) {
-            console.log(`[v3-Config] Match: "${rawName}" -> "${val}"`);
+            nameCache.set(rawName, val);
             return val;
         }
     }
@@ -76,12 +82,12 @@ export function getCanonicalStoreName(rawName: string): string {
     for (const key of sortedKeys) {
         const normalizedKey = normalize(key);
         if (normalizedRaw.includes(normalizedKey) || normalizedKey.includes(normalizedRaw)) {
-            console.log(`[v3-Config] Partial Match: "${rawName}" (key: "${key}") -> "${STORE_NAME_MAP[key]}"`);
+            nameCache.set(rawName, STORE_NAME_MAP[key]);
             return STORE_NAME_MAP[key];
         }
     }
 
-    // console.log(`[v3-Config] No Match: "${rawName}" (normalized: "${normalizedRaw}")`);
+    nameCache.set(rawName, rawName);
     return rawName;
 }
 
