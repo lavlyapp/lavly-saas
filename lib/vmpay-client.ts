@@ -2,7 +2,7 @@ import { VMPAY_API_BASE_URL, getVMPayCredentials, VMPayCredential, getCanonicalS
 import { SaleRecord, CustomerRecord } from "./processing/etl";
 
 interface EquipmentMap {
-    [id: string]: string; // id -> name
+    [id: string]: { name: string, type: string }; // id -> { name, type }
 }
 
 async function fetchMachines(apiKey: string): Promise<EquipmentMap> {
@@ -29,7 +29,10 @@ async function fetchMachines(apiKey: string): Promise<EquipmentMap> {
             if (!Array.isArray(data) || data.length === 0) break;
 
             data.forEach((m: any) => {
-                map[String(m.id)] = m.nome;
+                map[String(m.id)] = {
+                    name: m.nome,
+                    type: (m.tipo || '').toUpperCase()
+                };
             });
 
             if (data.length < size) break;
@@ -123,11 +126,16 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                         // Normalize
                         const item = sale.pedido?.itens?.[0];
                         const machineNameRaw = item?.maquina || sale.equipamento || "Desconhecido";
-                        const mappedMachineName = machineMap[String(machineNameRaw)] || machineNameRaw;
+                        const mappedObj = machineMap[String(machineNameRaw)];
+                        const mappedMachineName = mappedObj ? mappedObj.name : machineNameRaw;
 
                         // Determine product type (wash/dry)
                         let produto = item?.tipoServico?.toUpperCase() || "LAVAGEM";
-                        if (produto === "LAVAGEM" && String(mappedMachineName).toLowerCase().includes("secadora")) {
+
+                        // Strict override if the hardware is definitively a dryer
+                        if (mappedObj?.type === "SECAGEM") {
+                            produto = "SECAGEM";
+                        } else if (produto === "LAVAGEM" && String(mappedMachineName).toLowerCase().includes("secadora")) {
                             produto = "SECAGEM";
                         }
 
@@ -153,11 +161,14 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                         if (sale.pedido?.itens && Array.isArray(sale.pedido.itens)) {
                             items = sale.pedido.itens.map((i: any) => {
                                 const iMachine = i.maquina || i.equipamento || "Desconhecido";
-                                const iName = machineMap[String(iMachine)] || iMachine;
+                                const iMapObj = machineMap[String(iMachine)];
+                                const iName = iMapObj ? iMapObj.name : iMachine;
                                 let iService = i.servico || i.tipoServico || "LAVAGEM"; // Default
 
-                                // Smart Service Detection based on Machine Name if Service is generic
-                                if (String(iName).toLowerCase().includes("secadora") && iService === "LAVAGEM") {
+                                // Strict hardware type check
+                                if (iMapObj?.type === "SECAGEM") {
+                                    iService = "SECAGEM";
+                                } else if (String(iName).toLowerCase().includes("secadora") && iService === "LAVAGEM") {
                                     iService = "SECAGEM";
                                 }
 

@@ -8,14 +8,18 @@ const supabase = createClient(
 );
 
 async function checkGender() {
-    console.log("Fetching customers from Supabase...");
-    const { data: customers, error } = await supabase.from('customers').select('gender, name');
+    console.log("Fetching ALL customers from Supabase in pages...");
 
-    if (error) {
-        console.error("Error fetching customers:", error);
-        return;
+    let allCustomers: any[] = [];
+    let page = 0;
+    while (true) {
+        const { data, error } = await supabase.from('customers').select('gender, name').range(page * 1000, (page + 1) * 1000 - 1);
+        if (error) break;
+        if (!data || data.length === 0) break;
+        allCustomers.push(...data);
+        page++;
     }
-
+    const customers = allCustomers;
     console.log(`Total customers: ${customers.length}`);
 
     const counts = { M: 0, F: 0, U: 0, Outros: 0 };

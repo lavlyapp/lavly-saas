@@ -23,7 +23,7 @@ export interface AvailabilityMetrics {
     };
 }
 
-const WASH_DURATION = 33.5;
+const WASH_DURATION = 33;
 const DRY_DURATION = 49;
 
 export interface FlexibleCustomer {

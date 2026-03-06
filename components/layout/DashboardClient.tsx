@@ -611,8 +611,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         newOrders = await fetchTable('orders', 'id, data, loja, cliente, machine, service, status, valor, customer_id, sale_id');
 
         setLogs(prev => [...prev, `[System] Iniciando download dos Clientes...`]);
-        const custRes = await rawSupabase.from('customers').select('id, cpf, name, phone, email, gender, registration_date').limit(15000);
-        newCustomers = custRes.data || [];
+        newCustomers = await fetchTable('customers', 'id, cpf, name, phone, email, gender, registration_date');
 
       } else {
         // DELTA SYNC (Only fetch newer records)
@@ -627,15 +626,33 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
           ordersQuery = ordersQuery.gte('data', offsetOrderDate.toISOString());
         }
 
-        const [newSalesRes, newOrdersRes, newCustomersRes] = await Promise.all([
+        const [newSalesRes, newOrdersRes] = await Promise.all([
           salesQuery as any,
-          ordersQuery as any,
-          rawSupabase.from('customers').select('id, cpf, name, phone, email, gender, registration_date').limit(10000) as any
+          ordersQuery as any
         ]);
 
         newSales = newSalesRes.data || [];
         newOrders = newOrdersRes.data || [];
-        newCustomers = newCustomersRes.data || [];
+
+        // For customers, since we only have ~18k max, we fetch all of them to ensure the map is full
+        // Delta sync for customers is tricky because we update their gender, so we just fetch all blindly to guarantee correctness
+        setLogs(prev => [...prev, `[System] Sincronizando Dicionário de Clientes...`]);
+
+        const fetchAllCustomers = async () => {
+          let hasMore = true;
+          let i = 0;
+          const pageSize = 5000;
+          const all = [];
+          while (hasMore) {
+            const { data, error } = await rawSupabase.from('customers').select('id, cpf, name, phone, email, gender, registration_date').range(i * pageSize, (i + 1) * pageSize - 1);
+            if (error || !data || data.length === 0) break;
+            all.push(...data);
+            if (data.length < pageSize) hasMore = false;
+            i++;
+          }
+          return all;
+        };
+        newCustomers = await fetchAllCustomers();
       }
 
       if (newSales.length > 0 || cachedSales.length === 0) {

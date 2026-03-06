@@ -167,7 +167,10 @@ export function MachineGanttChart({ records }: MachineGanttChartProps) {
                                 <div className="w-32 flex-shrink-0 sticky left-0 bg-neutral-900/95 border-r border-neutral-800 z-10 flex items-center px-4 font-medium text-sm text-neutral-300 group-hover:text-white transition-colors shadow-[4px_0_12px_-4px_rgba(0,0,0,0.5)]">
                                     <div className={cn(
                                         "w-2 h-2 rounded-full mr-2",
-                                        cycles.length > 0 ? "bg-emerald-500 animate-pulse" : "bg-neutral-700"
+                                        cycles.some(c => {
+                                            const now = new Date();
+                                            return c.start <= now && c.end >= now;
+                                        }) ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" : "bg-neutral-700"
                                     )}></div>
                                     {machine}
                                 </div>
