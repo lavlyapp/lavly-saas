@@ -211,6 +211,19 @@ function AppContent({
               <span>Resgatar Cestos (180d)</span>
             </button>
 
+            <button
+              onClick={async () => {
+                const { clear } = await import('idb-keyval');
+                await clear();
+                window.location.reload();
+              }}
+              title="Apagar dados fantasmas travados na memória do celular"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-500/20 transition-all"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Resetar App</span>
+            </button>
+
             <div className="relative group">
               <button
                 onClick={() => setShowTerms(true)}
@@ -320,8 +333,6 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
   const [dbStores, setDbStores] = useState<string[]>([]);
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
-
-  // Compute available stores from both DB and Data
   const stores = useMemo(() => {
     const dataStores = Array.from(new Set(allRecords.map(r => getCanonicalStoreName(r.loja))));
     const combined = Array.from(new Set([...dbStores, ...dataStores])).filter(Boolean).sort();

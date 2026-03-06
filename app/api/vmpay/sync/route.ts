@@ -13,31 +13,13 @@ export async function GET(request: Request) {
         const force = searchParams.get('force') === 'true';
         const cnpj = searchParams.get('cnpj') || undefined;
 
-        // Retrieve token from Authorization header (sent by the frontend)
-        const authHeader = request.headers.get('Authorization');
-        const token = authHeader?.replace('Bearer ', '');
-
-        console.log(`[Sync API] 🚀 Triggering Sync (Manual: ${isManual}, CNPJ: ${cnpj || 'ALL'})...`);
-
-        // Create an authenticated Supabase client to perform the updates
-        const cookieStore = await cookies();
-        let supabaseClient: any = null;
-
-        if (token) {
-            // Initialize with the user's token so RLS policies pass
-            const { createClient } = await import('@supabase/supabase-js');
-            supabaseClient = createClient(
-                process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-                {
-                    global: {
-                        headers: {
-                            Authorization: `Bearer ${token}`
-                        }
-                    }
-                }
-            );
-        }
+        // We MUST use the service role key for cron jobs and background syncs
+        // because RLS blocking will silently drop the sales but return success
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabaseClient = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
 
         // 1. Run sync (checks hours, ac states, etc.)
         // Pass the authenticated client so sync-manager can use it for RLS-protected updates

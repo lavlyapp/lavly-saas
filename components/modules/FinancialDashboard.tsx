@@ -327,7 +327,8 @@ export function FinancialDashboard({ data, allRecords, selectedStore = 'Todas' }
 
         const grouped: Record<string, number> = {};
         filteredRecords.forEach((r: any) => {
-            const dateKey = format(new Date(r.data), 'dd/MM/yyyy');
+            const d = r.data instanceof Date ? r.data : new Date(r.data);
+            const dateKey = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
             grouped[dateKey] = (grouped[dateKey] || 0) + r.valor;
         });
 
