@@ -147,7 +147,7 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
         const ravideSales = filteredRecords.filter(r => r.cliente && r.cliente.toUpperCase().includes('RAVIDE'));
         if (ravideSales.length > 0) {
             console.log("[DEBUG-RAVIDE] Found sales:", ravideSales);
-            const ravideOrders = data.orders.filter(o => ravideSales.some(s => s.id === o.sale_id));
+            const ravideOrders = (data.orders || []).filter(o => ravideSales.some(s => s.id === o.sale_id));
             console.log("[DEBUG-RAVIDE] Found orders linked by sale_id:", ravideOrders);
         }
         // -----------------------------
