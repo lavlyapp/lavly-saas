@@ -42,11 +42,8 @@ async function fetchMachines(apiKey: string): Promise<EquipmentMap> {
 }
 
 function toLocalVMPayDateString(date: Date): string {
-    // VMPay API ignores the UTC 'Z' offset and expects the raw string to represent local BRT time
-    // Since Vercel servers run in UTC, we must manually shift to UTC-3
-    const brtOffsetMs = 3 * 60 * 60 * 1000;
-    const localDate = new Date(date.getTime() - brtOffsetMs);
-    return localDate.toISOString().replace('Z', '');
+    // VMPay API ignores the UTC 'Z' offset and expects the raw string to represent UTC time
+    return date.toISOString().replace('Z', '');
 }
 
 export async function syncVMPaySales(startDate: Date, endDate: Date, specificCred?: VMPayCredential): Promise<SaleRecord[]> {
@@ -130,15 +127,15 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                             produto = "SECAGEM";
                         }
 
-                        // Fix Timezone: VMPay returns time in local BRT (America/Sao_Paulo). 
-                        // We must append the offset -03:00 so the Date parser treats it correctly as local time
-                        // and not as UTC (which happens on Vercel servers).
+                        // Fix Timezone: VMPay API returns UTC timestamps but entirely drops the 'Z' (e.g. 11:33 instead of 11:33Z)
+                        // This caused 08:33 BRT morning sales to appear as "future sales" (11:33) and get dropped by the Sync boundary.
+                        // Appending 'Z' forces Javascript engines to correctly respect the UTC nature of the timestamp.
                         let dateStr = sale.data;
                         if (dateStr && !dateStr.endsWith('Z')) {
                             // Check if it already has an offset like -03:00 or +00:00
                             const hasOffset = /[-+]\d{2}:\d{2}$/.test(dateStr);
                             if (!hasOffset) {
-                                dateStr += "-03:00";
+                                dateStr += "Z";
                             }
                         }
 
