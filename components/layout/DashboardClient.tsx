@@ -564,7 +564,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         newSales = await fetchTable('sales', 'id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age');
 
         setLogs(prev => [...prev, `[System] Iniciando download dos Pedidos...`]);
-        newOrders = await fetchTable('orders', 'data, loja, cliente, machine, service, status, valor, customer_id, sale_id');
+        newOrders = await fetchTable('orders', 'id, data, loja, cliente, machine, service, status, valor, customer_id, sale_id');
 
         setLogs(prev => [...prev, `[System] Iniciando download dos Clientes...`]);
         const custRes = await rawSupabase.from('customers').select('id, cpf, name, phone, email, gender, registration_date').limit(15000);
@@ -577,7 +577,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         const offsetDate = new Date(lastCachedDate.getTime() + 1000);
         const salesQuery = rawSupabase.from('sales').select('id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age').gte('data', offsetDate.toISOString()).order('data', { ascending: false });
 
-        let ordersQuery: any = rawSupabase.from('orders').select('data, loja, cliente, machine, service, status, valor, customer_id, sale_id').order('data', { ascending: false }).limit(2000);
+        let ordersQuery: any = rawSupabase.from('orders').select('id, data, loja, cliente, machine, service, status, valor, customer_id, sale_id').order('data', { ascending: false }).limit(2000);
         if (lastCachedOrderDate) {
           const offsetOrderDate = new Date(lastCachedOrderDate.getTime() + 1000);
           ordersQuery = ordersQuery.gte('data', offsetOrderDate.toISOString());
@@ -607,8 +607,15 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
       combinedSales.forEach(s => uniqueSalesMap.set(s.id, s));
       const finalRawSales = Array.from(uniqueSalesMap.values()).sort((a: any, b: any) => new Date(b.data).getTime() - new Date(a.data).getTime());
 
-      // Orders merge (no unique ID typically, so simple concat)
-      const finalRawOrders = [...newOrders, ...cachedOrders];
+      // Orders merge
+      const combinedOrders = [...newOrders, ...cachedOrders];
+      const uniqueOrdersMap = new Map();
+      combinedOrders.forEach(o => {
+        if (o.id) uniqueOrdersMap.set(o.id, o);
+        // If no unique ID (legacy cache), fallback to a composite key
+        else uniqueOrdersMap.set(`${o.sale_id}-${o.machine}-${new Date(o.data).getTime()}`, o);
+      });
+      const finalRawOrders = Array.from(uniqueOrdersMap.values()).sort((a: any, b: any) => new Date(b.data).getTime() - new Date(a.data).getTime());
 
       // Customers (replace entirely as it's small)
       const finalRawCustomers = newCustomers.length > 0 ? newCustomers : cachedCustomers;
@@ -1293,8 +1300,9 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
               message={message}
               logs={logs}
               allRecords={allRecords}
-              data={data}
-              stores={stores}
+              data={viewData}
+              allRecords={allRecords}
+              allOrders={allOrders}
               selectedStore={selectedStore}
               setSelectedStore={setSelectedStore}
               handleFileUpload={handleFileUpload}

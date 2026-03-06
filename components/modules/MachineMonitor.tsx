@@ -7,7 +7,8 @@ import { getCycleDuration } from "@/lib/processing/crm";
 import { getCanonicalStoreName } from "@/lib/vmpay-config";
 
 interface MachineMonitorProps {
-    allRecords: SaleRecord[];  // We need ALL records to find the absolute latest for each machine
+    allRecords: SaleRecord[];  // Keep for backwards compatibility if needed
+    allOrders?: any[]; // The new definitive source for machines
     selectedStore: string;
 }
 
@@ -22,7 +23,7 @@ interface MachineStatus {
     lastUser: string;
 }
 
-export function MachineMonitor({ allRecords, selectedStore }: MachineMonitorProps) {
+export function MachineMonitor({ allRecords, allOrders, selectedStore }: MachineMonitorProps) {
     if (!allRecords || allRecords.length === 0) return null;
 
     const canonicalSelected = getCanonicalStoreName(selectedStore);
@@ -43,15 +44,18 @@ export function MachineMonitor({ allRecords, selectedStore }: MachineMonitorProp
     let activeWashers = 0;
     let activeDryers = 0;
 
+    const targetArray = allOrders && allOrders.length > 0 ? allOrders : allRecords;
+    if (!targetArray || targetArray.length === 0) return null;
+
     const relevantRecords = isAllStores
-        ? allRecords
-        : allRecords.filter(r => getCanonicalStoreName(r.loja) === canonicalSelected);
+        ? targetArray
+        : targetArray.filter((r: any) => getCanonicalStoreName(r.loja) === canonicalSelected);
 
     if (relevantRecords.length === 0) return null;
 
     // Group records by store directly
-    const recordsByStore: Record<string, SaleRecord[]> = {};
-    relevantRecords.forEach(r => {
+    const recordsByStore: Record<string, any[]> = {};
+    relevantRecords.forEach((r: any) => {
         const storeName = r.loja || 'Loja Desconhecida';
         if (!recordsByStore[storeName]) recordsByStore[storeName] = [];
         recordsByStore[storeName].push(r);
@@ -60,12 +64,21 @@ export function MachineMonitor({ allRecords, selectedStore }: MachineMonitorProp
     const runningMachines: { store: string; status: MachineStatus }[] = [];
 
     Object.entries(recordsByStore).forEach(([store, storeRecords]) => {
-        const machineMap = new Map<string, SaleRecord>();
+        const machineMap = new Map<string, any>();
         const canonicalStore = getCanonicalStoreName(store);
 
         storeRecords.forEach(record => {
             let machineName = "Desconhecida";
-            if (record.items && record.items.length > 0) machineName = record.items[0].machine;
+
+            // 1. Try to get it from Orders structure
+            if (record.machine) {
+                machineName = record.machine;
+            }
+            // 2. Try to get it from legacy Sales structure
+            else if (record.items && record.items.length > 0) {
+                machineName = record.items[0].machine;
+            }
+
             machineName = machineName.replace(/Maquina\s*/i, 'Máquina ').trim();
 
             if (machineName === "Desconhecida" && record.produto) {
@@ -101,7 +114,8 @@ export function MachineMonitor({ allRecords, selectedStore }: MachineMonitorProp
         const storeMachines: MachineStatus[] = [];
 
         machineMap.forEach((record, name) => {
-            const duration = getCycleDuration(record.produto);
+            const productOrService = record.service || record.produto || '';
+            const duration = getCycleDuration(productOrService);
             const machineNum = parseInt(name.replace(/\D/g, ''), 10);
             const storeLower = store.toLowerCase();
 

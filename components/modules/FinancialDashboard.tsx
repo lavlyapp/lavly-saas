@@ -20,12 +20,13 @@ interface FinancialDashboardProps {
         logs?: any[];
     };
     allRecords?: any[];
+    allOrders?: any[];
     selectedStore?: string;
 }
 
 type PeriodOption = 'today' | 'yesterday' | 'thisMonth' | 'lastMonth' | 'custom' | 'allTime';
 
-export function FinancialDashboard({ data, allRecords, selectedStore = 'Todas' }: FinancialDashboardProps) {
+export function FinancialDashboard({ data, allRecords, allOrders, selectedStore = 'Todas' }: FinancialDashboardProps) {
     const { role } = useAuth();
 
     // --- State for Filters ---
@@ -664,8 +665,9 @@ export function FinancialDashboard({ data, allRecords, selectedStore = 'Todas' }
                             </tbody>
                         </table>
                     </div>
-                    {/* Machine Monitor */}
-                    <MachineMonitor allRecords={allRecords || data.records} selectedStore={selectedStore} />
+                    <div className="pt-8">
+                        <MachineMonitor allRecords={allRecords || data.records} allOrders={allOrders || data.orders || []} selectedStore={selectedStore} />
+                    </div>
                 </>
             )}
         </div>
