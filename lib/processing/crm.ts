@@ -865,10 +865,8 @@ export function calculateVisitsHeatmap(records: SaleRecord[]): number[][] {
 
 export function getCycleDuration(productName: string): number {
     const p = (productName || '').toLowerCase();
-    if (p.includes('sec')) return 45; // Dry = 45m (or 49m as per user, but let's stick to standard unless specified)
-    // User mentioned 49m in plan? Let's check. Plan says 49.
-    if (p.includes('sec')) return 49;
-    return 33.5; // Wash = 33.5m
+    if (p.includes('sec')) return 49; // Secadora: 49 min
+    return 33; // Lavadora: 33 min
 }
 
 export function getProfile(customerName: string, allRecords: SaleRecord[]): CustomerProfile | null {
