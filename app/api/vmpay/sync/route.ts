@@ -16,9 +16,15 @@ export async function GET(request: Request) {
         // We MUST use the service role key for cron jobs and background syncs
         // because RLS blocking will silently drop the sales but return success
         const { createClient } = await import('@supabase/supabase-js');
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+        if (!supabaseKey) {
+            throw new Error("supabaseKey is required but missing in Environment Variables.");
+        }
+
         const supabaseClient = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!
+            supabaseKey
         );
 
         // 1. Run sync (checks hours, ac states, etc.)
