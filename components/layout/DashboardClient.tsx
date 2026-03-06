@@ -1203,7 +1203,8 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
     }
 
     // 2. Initial Loading State (Fix for blank screen "not loading normally")
-    if (status === 'uploading' && allRecords.length === 0) {
+    const isActivelyLoading = status === 'uploading' || (logs.length > 0 && status !== 'error' && status !== 'success');
+    if (isActivelyLoading && allRecords.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center h-[60vh] w-full bg-neutral-900/50 rounded-3xl border border-neutral-800 animate-pulse">
           <div className="flex flex-col items-center gap-4">
