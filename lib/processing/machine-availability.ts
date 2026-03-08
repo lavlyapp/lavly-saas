@@ -122,14 +122,24 @@ export function calculateMachineAvailability(records: SaleRecord[]): Availabilit
                 const mName = (item.machine || '').toLowerCase();
 
                 let type: 'wash' | 'dry' = 'wash';
-                let duration = WASH_DURATION;
 
+                // Fallback to centralized rules if needed:
+                let duration = 33.5;
                 if (service.includes('sec') || mName.includes('sec')) {
                     type = 'dry';
-                    duration = DRY_DURATION;
-                    uniqueDryMachines.add(machineId);
+                    duration = 49;
+                    if (machineId) uniqueDryMachines.add(machineId);
+                } else if (machineId && machineId.toLowerCase().match(/\d+/)) {
+                    const numMatch = machineId.toLowerCase().match(/\d+/);
+                    if (numMatch && parseInt(numMatch[0], 10) % 2 !== 0) {
+                        type = 'dry';
+                        duration = 49;
+                        uniqueDryMachines.add(machineId);
+                    } else {
+                        uniqueWashMachines.add(machineId);
+                    }
                 } else {
-                    uniqueWashMachines.add(machineId);
+                    if (machineId) uniqueWashMachines.add(machineId);
                 }
 
                 if (machineId) {
@@ -141,6 +151,21 @@ export function calculateMachineAvailability(records: SaleRecord[]): Availabilit
                         durationMinutes: duration
                     });
                 }
+            });
+        } else {
+            // Flat fallback
+            const machineId = "Desconhecida";
+            let type: 'wash' | 'dry' = 'wash';
+            const p = (r.produto || '').toLowerCase();
+            let duration = p.includes('sec') ? 49 : 33.5;
+            if (duration === 49) type = 'dry';
+
+            usages.push({
+                machineId,
+                type,
+                startTime: r.data,
+                endTime: addMinutes(r.data, duration),
+                durationMinutes: duration
             });
         }
     });

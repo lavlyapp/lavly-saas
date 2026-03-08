@@ -45,9 +45,11 @@ export function QueueAnalysis({ data, selectedStore }: QueueAnalysisProps) {
         data.forEach(r => {
             if (!r.data) return;
             try {
-                const dayOfWeek = r.data.getDay();
-                const h = r.data.getHours();
-                const dateKey = `${r.data.getFullYear()}-${r.data.getMonth()}-${r.data.getDate()}`;
+                // Strict BRT localization
+                const brtDate = new Date(r.data.getTime() - (3 * 3600 * 1000));
+                const dayOfWeek = brtDate.getUTCDay();
+                const h = brtDate.getUTCHours();
+                const dateKey = `${brtDate.getUTCFullYear()}-${brtDate.getUTCMonth()}-${brtDate.getUTCDate()}`;
                 const key = `${dateKey}-${h}-${r.cliente || 'anon'}`;
 
                 if (!processedVisits.has(key)) {
