@@ -233,7 +233,7 @@ export function MachineGanttChart({ records }: MachineGanttChartProps) {
                                                     <div className="text-xs text-neutral-300 space-y-0.5">
                                                         <div className="flex justify-between">
                                                             <span>Cliente:</span>
-                                                            <span className="text-white max-w-[80px] truncate">{cycle.client.split(' ')[0]}</span>
+                                                            <span className="text-white max-w-[80px] truncate">{cycle.client?.split(' ')[0] || 'Desconhecido'}</span>
                                                         </div>
                                                         <div className="flex justify-between">
                                                             <span>Início:</span>

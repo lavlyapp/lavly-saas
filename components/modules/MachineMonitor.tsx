@@ -380,7 +380,7 @@ export function MachineMonitor({ allRecords, allOrders, selectedStore }: Machine
 
                                     <div className="pt-2 mt-2 border-t border-dashed border-neutral-800/50">
                                         <p className="text-[10px] text-neutral-500 truncate" title={machine.lastUser}>
-                                            Último: {machine.lastUser.split(' ')[0]}
+                                            Último: {machine.lastUser?.split(' ')[0] || 'N/A'}
                                         </p>
                                         <p className="text-[10px] text-neutral-600 font-mono">
                                             {format(machine.lastStartTime, "HH:mm")}
