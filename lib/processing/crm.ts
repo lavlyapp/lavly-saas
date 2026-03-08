@@ -274,10 +274,9 @@ export function calculateCrmMetrics(records: SaleRecord[], customerRegistry?: Cu
             profileDryCount += dDetails;
 
             // Visit Grouping Logic
-            const lastVisit = visitsList.length > 0 ? visitsList[visitsList.length - 1] : null; // Get last added visit
+            const lastVisit = visitsList.length > 0 ? visitsList[visitsList.length - 1] : null;
 
             // Check if current sale fits in the 180-minute window of the last visit
-            // Window starts at `lastVisit.date` (which is the first sale time of that visit)
             if (lastVisit && differenceInMinutes(r.data, lastVisit.date) <= 180 && differenceInMinutes(r.data, lastVisit.date) >= 0) {
                 lastVisit.items.push(r);
                 lastVisit.totalValue += r.valor;

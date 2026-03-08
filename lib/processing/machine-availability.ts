@@ -236,11 +236,11 @@ export function calculateMachineAvailability(records: SaleRecord[]): Availabilit
             const avgWash = maxWashInHour / numDays;
             const avgDry = maxDryInHour / numDays;
 
-            const washSat = avgWash / totalWash;
-            const drySat = avgDry / totalDry;
+            const washSat = totalWash > 0 ? avgWash / totalWash : 0;
+            const drySat = totalDry > 0 ? avgDry / totalDry : 0;
 
-            // Bottleneck saturation: it's the highest load between wash or dry
-            const saturation = Math.max(washSat, drySat);
+            // Bottleneck saturation: it's the highest load between wash or dry, capped at 1.0 (100%) to prevent impossible mathematical displays on overlapping sales
+            const saturation = Math.min(1.0, Math.max(washSat, drySat));
 
             saturationByHour.push({
                 day: d,
