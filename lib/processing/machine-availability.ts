@@ -147,11 +147,20 @@ export function calculateMachineAvailability(records: SaleRecord[]): Availabilit
     const uniqueDates = new Set<string>();
 
     records.forEach(r => {
-        const dateStr = format(r.data, 'yyyy-MM-dd');
-        if (!uniqueDates.has(dateStr)) {
-            uniqueDates.add(dateStr);
-            const d = getDay(r.data);
-            daysCount[d]++;
+        try {
+            // Using native JS instead of date-fns format() which is extremely slow in loops of 30k+
+            const y = r.data.getFullYear();
+            const m = String(r.data.getMonth() + 1).padStart(2, '0');
+            const d = String(r.data.getDate()).padStart(2, '0');
+            const dateStr = `${y}-${m}-${d}`;
+
+            if (!uniqueDates.has(dateStr)) {
+                uniqueDates.add(dateStr);
+                const dayOfWeek = r.data.getDay();
+                daysCount[dayOfWeek]++;
+            }
+        } catch (e) {
+            // Ignore invalid dates
         }
     });
 

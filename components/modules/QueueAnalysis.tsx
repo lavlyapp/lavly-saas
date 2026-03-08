@@ -44,13 +44,17 @@ export function QueueAnalysis({ data, selectedStore }: QueueAnalysisProps) {
 
         data.forEach(r => {
             if (!r.data) return;
-            const d = getDay(r.data);
-            const h = getHours(r.data);
-            const key = `${r.data.toDateString()}-${h}-${r.cliente}`;
-            if (!processedVisits.has(key)) {
-                matrix[d][h]++;
-                processedVisits.add(key);
-            }
+            try {
+                const dayOfWeek = r.data.getDay();
+                const h = r.data.getHours();
+                const dateKey = `${r.data.getFullYear()}-${r.data.getMonth()}-${r.data.getDate()}`;
+                const key = `${dateKey}-${h}-${r.cliente || 'anon'}`;
+
+                if (!processedVisits.has(key)) {
+                    matrix[dayOfWeek][h]++;
+                    processedVisits.add(key);
+                }
+            } catch (e) { }
         });
         return matrix;
     }, [data]);
