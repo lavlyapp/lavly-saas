@@ -66,7 +66,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         fetchDbStores();
     }, []);
 
-    const fetchDbStores = async () => {
+    async function fetchDbStores() {
         try {
             console.log("SettingsContext: Fetching stores from DB...");
             const { data, error } = await supabase
@@ -94,7 +94,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         } catch (e) {
             console.error("SettingsContext: Failed to fetch stores from DB", e);
         }
-    };
+    }
 
     // Keep LocalStorage in sync for storeSettings
     useEffect(() => {

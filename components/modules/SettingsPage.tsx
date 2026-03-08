@@ -52,8 +52,10 @@ export function SettingsPage() {
     }, [automationSettings]);
 
     useEffect(() => {
-        loadData();
-    }, [user]);
+        if (!isInitialized) {
+            loadData();
+        }
+    }, [user?.id, isInitialized]);
 
     const loadData = async (force = false) => {
         if (!user) {
@@ -61,7 +63,16 @@ export function SettingsPage() {
             return;
         }
         if (isInitialized && !force) return;
+
         setIsLoading(true);
+
+        // Failsafe timeout to prevent infinite loading if Supabase hangs
+        const timeoutId = setTimeout(() => {
+            console.warn("SettingsPage: loadData timed out. Forcing UI unblock.");
+            setIsLoading(false);
+            setIsInitialized(true);
+        }, 10000);
+
         try {
             console.log("SettingsPage: Loading configuration data...");
             if (user) {
@@ -113,7 +124,10 @@ export function SettingsPage() {
             }
         } catch (e: any) {
             console.error("SettingsPage: Critical error in loadData", e);
+            // Ensure we don't trap the user in a loading screen if the DB schema is mismatched
+            setIsInitialized(true);
         } finally {
+            clearTimeout(timeoutId);
             setIsLoading(false);
         }
     };
@@ -150,7 +164,15 @@ export function SettingsPage() {
 
     const handleCepLookup = async (idx: number, cep: string) => {
         const cleanCep = cep.replace(/\D/g, '');
-        handleStoreChange(idx, 'cep', cleanCep);
+
+        // Simple CEP Mask: XXXXX-XXX
+        let maskedCep = cleanCep;
+        if (cleanCep.length > 5) {
+            maskedCep = cleanCep.replace(/^(\d{5})(\d)/, '$1-$2');
+        }
+
+        // Update input visually right away
+        handleStoreChange(idx, 'cep', maskedCep);
 
         if (cleanCep.length === 8) {
             setCepsLoading(prev => ({ ...prev, [idx]: true }));
@@ -166,20 +188,20 @@ export function SettingsPage() {
                         if (newStores[idx]) {
                             newStores[idx] = {
                                 ...newStores[idx],
-                                address: data.logradouro || "",
-                                neighborhood: data.bairro || "",
-                                city: data.localidade || "",
-                                state: data.uf || ""
+                                address: data.logradouro || newStores[idx].address || "",
+                                neighborhood: data.bairro || newStores[idx].neighborhood || "",
+                                city: data.localidade || newStores[idx].city || "",
+                                state: data.uf || newStores[idx].state || ""
                             };
                         }
                         return newStores;
                     });
-                    console.log(`SettingsPage: CEP ${cleanCep} found and applied.`);
+                    console.log(`SettingsPage: ViaCEP applied for ${cleanCep} -> ${data.logradouro}`);
                 } else {
-                    console.warn(`SettingsPage: CEP ${cleanCep} not found.`);
+                    console.warn(`SettingsPage: CEP ${cleanCep} was flagged as non-existent by ViaCEP.`);
                 }
             } catch (e) {
-                console.error("SettingsPage: CEP Lookup failed", e);
+                console.error("SettingsPage: ViaCEP Lookup failed natively", e);
             } finally {
                 setCepsLoading(prev => ({ ...prev, [idx]: false }));
             }
@@ -438,7 +460,16 @@ export function SettingsPage() {
                 </div>
 
                 {isLoading ? (
-                    <div className="py-12 flex justify-center"><RefreshCw className="animate-spin text-neutral-500" /></div>
+                    <div className="py-12 flex flex-col items-center justify-center gap-4">
+                        <RefreshCw className="w-8 h-8 animate-spin text-emerald-500" />
+                        <span className="text-sm text-neutral-500 font-mono">Carregando Lojas...</span>
+                    </div>
+                ) : stores.length === 0 ? (
+                    <div className="py-12 flex flex-col items-center justify-center gap-4 border border-dashed border-neutral-800 rounded-xl bg-neutral-950/30">
+                        <Store className="w-12 h-12 text-neutral-700" />
+                        <p className="text-neutral-500 text-sm">Nenhuma loja cadastrada.</p>
+                        <button onClick={addStore} className="text-emerald-500 hover:underline text-xs">Adicionar a primeira loja</button>
+                    </div>
                 ) : (
                     <div className="space-y-6">
                         {stores.map((store, idx) => (

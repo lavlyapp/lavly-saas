@@ -61,7 +61,7 @@ export function Reports({ data }: ReportsProps) {
 
     // 3. Machine BI: Advanced stats
     const machineBI = useMemo(() => {
-        if (!data?.records) return [];
+        if (!data?.records || data.records.length === 0) return [];
 
         const machineMap = new Map<string, {
             id: string;
@@ -71,22 +71,35 @@ export function Reports({ data }: ReportsProps) {
             cycles: number;
         }>();
 
-        data.records.forEach(r => {
-            r.items?.forEach(item => {
+        // Optimize: we don't need to process 35k records just to show top 5 machines on the frontend.
+        // We take the last 5000 records (most recent) to get a statistically significant snapshot without crashing the browser tab.
+        const recentRecords = data.records.slice(-5000);
+
+        for (let i = 0; i < recentRecords.length; i++) {
+            const r = recentRecords[i];
+            if (!r.items || r.items.length === 0) continue;
+
+            for (let j = 0; j < r.items.length; j++) {
+                const item = r.items[j];
                 const mId = item.machine;
-                if (!mId) return;
+                if (!mId) continue;
 
-                const curr = machineMap.get(mId) || { id: mId, type: '', totalMinutes: 0, totalRevenue: 0, cycles: 0 };
+                let curr = machineMap.get(mId);
+                if (!curr) {
+                    curr = { id: mId, type: '', totalMinutes: 0, totalRevenue: 0, cycles: 0 };
+                    machineMap.set(mId, curr);
+                }
 
-                const isWash = item.service.toLowerCase().includes('lav') || item.machine.toLowerCase().includes('lav');
+                const svcString = (item.service || '').toLowerCase();
+                const machString = (item.machine || '').toLowerCase();
+
+                const isWash = svcString.includes('lav') || machString.includes('lav');
                 curr.type = isWash ? 'Lavadora' : 'Secadora';
                 curr.cycles++;
                 curr.totalRevenue += (item.value || 0);
                 curr.totalMinutes += isWash ? 33.5 : 49;
-
-                machineMap.set(mId, curr);
-            });
-        });
+            }
+        }
 
         return Array.from(machineMap.values()).map(m => ({
             ...m,
@@ -95,7 +108,14 @@ export function Reports({ data }: ReportsProps) {
         })).sort((a, b) => b.revenuePerHour - a.revenuePerHour);
     }, [data?.records]);
 
-    if (!data || !metrics) return null;
+    if (!data || !metrics) {
+        return (
+            <div className="flex flex-col items-center justify-center p-12 bg-neutral-900 border border-neutral-800 rounded-xl text-neutral-500 gap-4">
+                <AlertCircle className="w-12 h-12 text-neutral-600" />
+                <p>Métricas indisponíveis. Tente sincronizar os dados novamente.</p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">

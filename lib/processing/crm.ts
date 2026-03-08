@@ -705,6 +705,18 @@ export function calculatePeriodStats(periodRecords: SaleRecord[], allRecords: Sa
         }
     }
 
+    // --- Pre-process Orders Dictionary O(1) Lookup ---
+    const ordersBySaleId: Record<string, any[]> = {};
+    if (allOrders && allOrders.length > 0) {
+        for (let i = 0; i < allOrders.length; i++) {
+            const o = allOrders[i];
+            if (o.sale_id) {
+                if (!ordersBySaleId[o.sale_id]) ordersBySaleId[o.sale_id] = [];
+                ordersBySaleId[o.sale_id].push(o);
+            }
+        }
+    }
+
     activeCustomersKeys.forEach(name => {
         const sales = periodCustomers[name];
 
@@ -735,11 +747,11 @@ export function calculatePeriodStats(periodRecords: SaleRecord[], allRecords: Sa
         let dCount = 0;
 
         sales.forEach(r => {
-            const saleOrders = allOrders ? allOrders.filter(o => o.sale_id === r.id) : [];
+            const saleOrders = (r.id && ordersBySaleId[r.id]) ? ordersBySaleId[r.id] : [];
 
             if (saleOrders.length > 0) {
                 // Precision: Count exact baskets from the orders table
-                saleOrders.forEach(o => {
+                saleOrders.forEach((o: any) => {
                     const { isWash, isDry } = detectCycleType(o.service, o.machine, r.loja);
                     if (isWash) wCount++;
                     if (isDry) dCount++;

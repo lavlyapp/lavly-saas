@@ -21,63 +21,104 @@ import { TermsOfUse } from "@/components/modules/TermsOfUse";
 import { getCanonicalStoreName } from "@/lib/vmpay-config";
 import { supabase } from "@/lib/supabase";
 import { createClient } from "@supabase/supabase-js";
+import React, { Component, ErrorInfo, ReactNode } from "react";
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean, error: Error | null, errorInfo: ErrorInfo | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("DashboardClient ErrorBoundary caught an error", error, errorInfo);
+    this.setState({ errorInfo });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 m-4 bg-red-950/50 border border-red-500/50 rounded-xl text-white">
+          <h2 className="text-xl font-bold text-red-500 flex items-center gap-2 mb-4">
+            <AlertCircle className="w-6 h-6" />
+            Fatal Component Crash
+          </h2>
+          <div className="bg-black/50 p-4 rounded-lg overflow-auto text-xs font-mono text-neutral-300">
+            <p className="text-red-400 font-bold mb-2">{this.state.error && this.state.error.toString()}</p>
+            <pre className="whitespace-pre-wrap">{this.state.errorInfo?.componentStack}</pre>
+          </div>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null, errorInfo: null })}
+            className="mt-6 px-4 py-2 bg-red-600 hover:bg-red-500 rounded font-bold text-sm"
+          >
+            Tentar Renderizar Novamente
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // Dynamically import CrmDashboard with SSR disabled to prevent hydration errors
 const CrmDashboard = dynamic(
   () => import('@/components/modules/CrmDashboard').then(mod => mod.CrmDashboard),
-  { ssr: false }
+  { ssr: false, loading: () => <div className="p-8 text-neutral-500 animate-pulse text-center flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div> }
 );
 
 // Dynamically import FinancialDashboard with SSR disabled to prevent hydration errors (Recharts)
 const FinancialDashboard = dynamic(
   () => import('@/components/modules/FinancialDashboard').then(mod => mod.FinancialDashboard),
-  { ssr: false }
+  { ssr: false, loading: () => <div className="p-8 text-neutral-500 animate-pulse text-center flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div> }
 );
 
 const ComparativeDashboard = dynamic(
   () => import('@/components/modules/ComparativeDashboard').then(mod => mod.ComparativeDashboard),
-  { ssr: false }
+  { ssr: false, loading: () => <div className="p-8 text-neutral-500 animate-pulse text-center flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div> }
 );
 
 // Dynamically import ChurnAnalysis
 const ChurnAnalysis = dynamic(
   () => import('@/components/modules/ChurnAnalysis').then(mod => mod.ChurnAnalysis),
-  { ssr: false }
+  { ssr: false, loading: () => <div className="p-8 text-neutral-500 animate-pulse text-center flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div> }
 );
 
 const MachineAnalysis = dynamic(
   () => import('@/components/modules/MachineAnalysis').then(mod => mod.MachineAnalysis),
-  { ssr: false }
+  { ssr: false, loading: () => <div className="p-8 text-neutral-500 animate-pulse text-center flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div> }
 );
 
 const Reports = dynamic<any>(
   () => import('@/components/modules/Reports').then(mod => mod.Reports),
-  { ssr: false }
+  { ssr: false, loading: () => <div className="p-8 text-neutral-500 animate-pulse text-center flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div> }
 );
 
 const QueueAnalysis = dynamic(
   () => import('@/components/modules/QueueAnalysis').then(mod => mod.QueueAnalysis),
-  { ssr: false }
+  { ssr: false, loading: () => <div className="p-8 text-neutral-500 animate-pulse text-center flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div> }
 );
 
 const CouponManager = dynamic(
   () => import('@/components/modules/CouponManager').then(mod => mod.CouponManager),
-  { ssr: false }
+  { ssr: false, loading: () => <div className="p-8 text-neutral-500 animate-pulse text-center flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div> }
 );
 
 const SettingsPage = dynamic(
   () => import('@/components/modules/SettingsPage').then(mod => mod.SettingsPage),
-  { ssr: false }
+  { ssr: false, loading: () => <div className="p-8 text-neutral-500 animate-pulse text-center flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div> }
 );
 
 const ActivityLogs = dynamic<any>(
   () => import('@/components/modules/ActivityLogs').then(mod => mod.ActivityLogs),
-  { ssr: false }
+  { ssr: false, loading: () => <div className="p-8 text-neutral-500 animate-pulse text-center flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div> }
 );
 
 const CustomerDemographics = dynamic<any>(
   () => import('@/components/modules/CustomerDemographics').then(mod => mod.CustomerDemographics),
-  { ssr: false }
+  { ssr: false, loading: () => <div className="p-8 text-neutral-500 animate-pulse text-center flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div> }
 );
 
 
@@ -100,7 +141,8 @@ function AppContent({
   handleSyncVMPay,
   handleForceSync,
   renderContent,
-  stableInitialLoad
+  stableInitialLoad,
+  syncProgress
 }: any) {
   const { selectedCustomerName, closeCustomerDetails } = useCustomerContext();
   const { isAuthenticated, isLoading, token } = useAuth();
@@ -196,12 +238,20 @@ function AppContent({
               disabled={status === 'uploading'}
               title="Sincronizar dados de Vendas e Demografia agora"
               className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all relative overflow-hidden",
                 status === 'uploading' ? "bg-neutral-800 text-neutral-400" : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20"
               )}
             >
-              <RefreshCw className={cn("w-4 h-4", status === 'uploading' && "animate-spin")} />
-              {status === 'uploading' ? 'Sincronizando...' : 'Sync VMPay'}
+              {/* Inline Button Progress Fill */}
+              {status === 'uploading' && syncProgress > 0 && (
+                <div
+                  className="absolute inset-y-0 left-0 bg-emerald-500/20 transition-all duration-300"
+                  style={{ width: `${syncProgress}%` }}
+                />
+              )}
+
+              <RefreshCw className={cn("w-4 h-4 relative z-10", status === 'uploading' && "animate-spin")} />
+              <span className="relative z-10">{status === 'uploading' ? 'Sincronizando...' : 'Sync VMPay'}</span>
             </button>
 
             <button
@@ -285,9 +335,11 @@ function AppContent({
             )}
 
             {/* Content Area - Only force remount on tab change to preserve form state (Settings) */}
-            <div key={activeTab}>
-              {renderContent(token)}
-            </div>
+            <ErrorBoundary>
+              <div key={activeTab}>
+                {renderContent(token)}
+              </div>
+            </ErrorBoundary>
           </div>
         </div>
         {/* Debug Logs Section - ALWAYS SHOW IF LOGS EXIST */}
@@ -328,6 +380,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
   const [activeTab, setActiveTab] = useState("financial");
   const [status, setStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
+  const [syncProgress, setSyncProgress] = useState(0); // Progress Bar (0 to 100)
   const [logs, setLogs] = useState<string[]>([]); // Debug Logs
 
   // Data States
@@ -1082,6 +1135,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
 
     try {
       setStatus("uploading");
+      setSyncProgress(0);
       setMessage("Preparando sincronização...");
       setLogs(prev => [...prev, "[VMPay] Verificando sessão segura..."]);
       let token = passedToken;
@@ -1100,9 +1154,16 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
 
       const isFirstSync = allRecords.length === 0;
       const allNewRawRecords: any[] = [];
+      const totalStores = credentials.length;
 
-      for (const cred of credentials) {
-        setMessage(`Sincronizando ${cred.name}...`);
+      for (let i = 0; i < totalStores; i++) {
+        const cred = credentials[i];
+
+        // Update numerical progress bar (starting at 10% just for UI feel, distributing the rest)
+        const progressPercentage = Math.max(10, Math.round(((i) / totalStores) * 100));
+        setSyncProgress(progressPercentage);
+
+        setMessage(`Sincronizando ${cred.name} (${i + 1} de ${totalStores})...`);
         setLogs(prev => [...prev, `[VMPay] Sincronizando ${cred.name} (${cred.cnpj})...`]);
 
         const url = `/api/vmpay/sync?source=manual&cnpj=${cred.cnpj}${isFirstSync ? "&force=true" : ""}`;
@@ -1136,10 +1197,15 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         }
       }
 
+      setSyncProgress(90); // Finished downloading, now re-rendering
+      setMessage("Desenhando Novos Gráficos...");
+
       if (allNewRawRecords.length === 0) {
         setLogs(prev => [...prev, "[VMPay] Nenhuma venda nova encontrada em nenhuma loja."]);
         setStatus("success");
         setMessage("Sincronização concluída (Sem novos dados)");
+        setSyncProgress(100);
+        setTimeout(() => setSyncProgress(0), 3000);
         return;
       }
 
@@ -1155,10 +1221,13 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         setLogs(prev => [...prev, `[Aviso] Falha ao recarregar a tela automaticamente: ${dbErr.message}`]);
       }
 
+      setSyncProgress(100);
       setStatus("success");
       setMessage("Sincronização concluída com sucesso!");
+      setTimeout(() => setSyncProgress(0), 3000);
     } catch (e: any) {
       console.error(e);
+      setSyncProgress(0);
       setStatus("error");
       setMessage(`Erro: ${e.message}`);
       setLogs(prev => [...prev, `[Erro Fatal] ${e.message}`]);
@@ -1178,24 +1247,47 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
     const isActivelyLoading = status === 'uploading' || (logs.length > 0 && status !== 'error' && status !== 'success');
     if (isActivelyLoading && allRecords.length === 0) {
       return (
-        <div className="flex flex-col items-center justify-center h-[60vh] w-full bg-neutral-900/50 rounded-3xl border border-neutral-800 animate-pulse">
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-            <div className="text-center">
-              <h3 className="text-xl font-bold text-white mb-1">Carregando Sistema Lavly...</h3>
-              <p className="text-sm text-neutral-500">{message || "Sincronizando dados com o banco de dados"}</p>
+        <div className="flex flex-col items-center justify-center p-8 h-[60vh] w-full bg-neutral-900/50 rounded-3xl border border-neutral-800 animate-in fade-in duration-500">
+          <div className="flex flex-col items-center gap-6 w-full max-w-md">
+
+            {/* Visual Header */}
+            <div className="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4 shadow-[0_0_30px_rgba(16,185,129,0.3)]" />
+
+            <div className="text-center w-full">
+              <h3 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent mb-2">
+                Conectando ao VMPay...
+              </h3>
+              <p className="text-sm font-medium text-emerald-100/70 mb-6 font-mono tracking-tight">
+                {message || "Sincronizando banco de dados"}
+              </p>
+
+              {/* Sync Progress Bar */}
+              {syncProgress > 0 && (
+                <div className="w-full h-3 bg-neutral-950 border border-neutral-800 rounded-full overflow-hidden shadow-inner mb-2 relative">
+                  <div
+                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500 ease-out flex items-center justify-end pr-2"
+                    style={{ width: `${syncProgress}%` }}
+                  >
+                    <div className="w-6 h-full bg-white/20 -skew-x-12 animate-[shimmer_1s_infinite]" />
+                  </div>
+                </div>
+              )}
+              {syncProgress > 0 && (
+                <p className="text-right text-[10px] text-neutral-500 font-bold tracking-wider">{syncProgress}% CONCLUÍDO</p>
+              )}
             </div>
           </div>
-          <div className="mt-8 max-w-md w-full px-4">
-            <div className="bg-black/40 rounded-xl p-4 border border-white/5 font-mono text-[10px] text-neutral-500 h-24 overflow-y-auto">
-              {logs.slice(-3).map((log, i) => (
-                <div key={i} className="mb-1 truncate opacity-70">
-                  <span className="text-blue-500 mr-2">&gt;</span>{log}
+
+          <div className="mt-8 max-w-md w-full">
+            <div className="bg-black/60 rounded-xl p-4 border border-white/5 font-mono text-[10px] text-emerald-500/50 h-32 overflow-y-auto custom-scrollbar shadow-inner">
+              {logs.slice(-5).map((log, i) => (
+                <div key={i} className="mb-2 truncate">
+                  <span className="text-emerald-500 mr-2 opacity-70">&gt;</span>{log}
                 </div>
               ))}
             </div>
           </div>
-        </div>
+        </div >
       );
     }
 
@@ -1305,7 +1397,8 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
       return <CustomerDemographics records={viewData.records} customers={allCustomers} selectedStore={selectedStore || undefined} orders={viewData.orders} />;
     }
 
-    if (activeTab === 'reports' && viewData) {
+    if (activeTab === 'reports') {
+      if (!viewData?.records) return <div className="p-8 text-neutral-500 text-center">Nenhum dado processado para gerar relatórios.</div>;
       return <Reports data={viewData} />;
     }
 
@@ -1317,7 +1410,17 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
       return <SettingsPage />;
     }
 
-    return null;
+    // Default Fallback inside AppContent if no tab matches or data is missing
+    return (
+      <div className="flex flex-col items-center justify-center p-8 h-[60vh] w-full bg-neutral-900/50 rounded-3xl border border-neutral-800 animate-in fade-in">
+        <h2 className="text-xl font-bold text-neutral-400 mb-2">Painel Indisponível</h2>
+        <p className="text-sm text-neutral-500">
+          {activeTab === 'settings' || activeTab === 'logs' || activeTab === 'marketing'
+            ? "Carregando módulo..."
+            : "Não há dados suficientes para exibir este painel. Verifique se a importação foi concluída ou se a loja possui vendas."}
+        </p>
+      </div>
+    );
   };
 
   if (!mounted) return null;
@@ -1346,6 +1449,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
               handleForceSync={handleForceSync}
               renderContent={renderContent}
               stableInitialLoad={stableInitialLoad}
+              syncProgress={syncProgress}
             />
           </CustomerProvider>
         </SubscriptionProvider>
