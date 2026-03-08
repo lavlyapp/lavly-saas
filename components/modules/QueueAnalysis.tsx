@@ -65,6 +65,11 @@ export function QueueAnalysis({ data, selectedStore }: QueueAnalysisProps) {
         return findFlexibleCustomers(data, metrics.saturationByHour);
     }, [data, metrics.saturationByHour]);
 
+    const globalMaxVisits = useMemo(() => {
+        const flatVisits = visitsHeatmap.flat();
+        return flatVisits.length > 0 ? flatVisits.reduce((a, b) => Math.max(a, b), 0) : 1;
+    }, [visitsHeatmap]);
+
     const peakStats = useMemo(() => {
         const sorted = [...metrics.saturationByHour].sort((a, b) => b.saturation - a.saturation);
         const peak = sorted[0];
@@ -191,8 +196,6 @@ export function QueueAnalysis({ data, selectedStore }: QueueAnalysisProps) {
                                         {activeHours.map(h => <div key={h} className="h-6 flex items-center justify-center font-mono opacity-50">{h}</div>)}
 
                                         {WEEKDAYS.map((day, dIdx) => {
-                                            const flatVisits = visitsHeatmap.flat();
-                                            const maxVisits = flatVisits.length > 0 ? flatVisits.reduce((a, b) => Math.max(a, b), 0) : 1;
                                             return (
                                                 <React.Fragment key={day}>
                                                     <div className="h-8 flex items-center justify-end pr-2 font-medium text-neutral-400">{day}</div>
@@ -201,7 +204,7 @@ export function QueueAnalysis({ data, selectedStore }: QueueAnalysisProps) {
                                                         return (
                                                             <div
                                                                 key={h}
-                                                                className={`h-8 rounded-[2px] border transition-all hover:scale-110 cursor-help flex items-center justify-center text-[8px] sm:text-[9px] ${getVisitsColor(visits, maxVisits || 1)}`}
+                                                                className={`h-8 rounded-[2px] border transition-all hover:scale-110 cursor-help flex items-center justify-center text-[8px] sm:text-[9px] ${getVisitsColor(visits, globalMaxVisits || 1)}`}
                                                             >
                                                                 {visits > 0 && visits}
                                                             </div>
