@@ -66,62 +66,85 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 // Dynamically import CrmDashboard with SSR disabled to prevent hydration errors
 const CrmDashboard = dynamic(
   () => import('@/components/modules/CrmDashboard').then(mod => mod.CrmDashboard),
-  { ssr: false, loading: () => <div className="p-8 text-neutral-500 animate-pulse text-center flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div> }
+  { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
 );
 
 // Dynamically import FinancialDashboard with SSR disabled to prevent hydration errors (Recharts)
 const FinancialDashboard = dynamic(
   () => import('@/components/modules/FinancialDashboard').then(mod => mod.FinancialDashboard),
-  { ssr: false, loading: () => <div className="p-8 text-neutral-500 animate-pulse text-center flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div> }
+  { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
 );
 
 const ComparativeDashboard = dynamic(
   () => import('@/components/modules/ComparativeDashboard').then(mod => mod.ComparativeDashboard),
-  { ssr: false, loading: () => <div className="p-8 text-neutral-500 animate-pulse text-center flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div> }
+  { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
 );
 
 // Dynamically import ChurnAnalysis
 const ChurnAnalysis = dynamic(
   () => import('@/components/modules/ChurnAnalysis').then(mod => mod.ChurnAnalysis),
-  { ssr: false, loading: () => <div className="p-8 text-neutral-500 animate-pulse text-center flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div> }
+  { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
 );
 
 const MachineAnalysis = dynamic(
   () => import('@/components/modules/MachineAnalysis').then(mod => mod.MachineAnalysis),
-  { ssr: false, loading: () => <div className="p-8 text-neutral-500 animate-pulse text-center flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div> }
+  { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
 );
 
 const Reports = dynamic<any>(
   () => import('@/components/modules/Reports').then(mod => mod.Reports),
-  { ssr: false, loading: () => <div className="p-8 text-neutral-500 animate-pulse text-center flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div> }
+  { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
 );
 
 const QueueAnalysis = dynamic(
   () => import('@/components/modules/QueueAnalysis').then(mod => mod.QueueAnalysis),
-  { ssr: false, loading: () => <div className="p-8 text-neutral-500 animate-pulse text-center flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div> }
+  { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
 );
 
 const CouponManager = dynamic(
   () => import('@/components/modules/CouponManager').then(mod => mod.CouponManager),
-  { ssr: false, loading: () => <div className="p-8 text-neutral-500 animate-pulse text-center flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div> }
+  { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
 );
 
 const SettingsPage = dynamic(
   () => import('@/components/modules/SettingsPage').then(mod => mod.SettingsPage),
-  { ssr: false, loading: () => <div className="p-8 text-neutral-500 animate-pulse text-center flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div> }
+  { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
 );
 
 const ActivityLogs = dynamic<any>(
   () => import('@/components/modules/ActivityLogs').then(mod => mod.ActivityLogs),
-  { ssr: false, loading: () => <div className="p-8 text-neutral-500 animate-pulse text-center flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div> }
+  { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
 );
 
 const CustomerDemographics = dynamic<any>(
   () => import('@/components/modules/CustomerDemographics').then(mod => mod.CustomerDemographics),
-  { ssr: false, loading: () => <div className="p-8 text-neutral-500 animate-pulse text-center flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div></div> }
+  { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
 );
 
 
+
+// Define AppContent Props explicitly for the extracted component to maintain type safety
+interface AppContentProps {
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  status: "idle" | "uploading" | "success" | "error";
+  setStatus: (status: "idle" | "uploading" | "success" | "error") => void;
+  message: string;
+  setMessage: (msg: string) => void;
+  logs: string[];
+  allRecords: SaleRecord[];
+  allCustomers: CustomerRecord[];
+  data: any;
+  stores: string[];
+  allOrders: OrderRecord[];
+  selectedStore: string | null;
+  setSelectedStore: (store: string | null) => void;
+  handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
+  handleSyncVMPay: (token: string | null) => Promise<void>;
+  handleForceSync: (token: string | null) => Promise<void>;
+  stableInitialLoad: (token: string | null) => void;
+  syncProgress: number;
+}
 
 function AppContent({
   activeTab,
@@ -132,7 +155,8 @@ function AppContent({
   setMessage,
   logs,
   allRecords,
-  data,
+  allCustomers,
+  data: viewData,
   stores,
   allOrders,
   selectedStore,
@@ -140,10 +164,9 @@ function AppContent({
   handleFileUpload,
   handleSyncVMPay,
   handleForceSync,
-  renderContent,
   stableInitialLoad,
   syncProgress
-}: any) {
+}: AppContentProps) {
   const { selectedCustomerName, closeCustomerDetails } = useCustomerContext();
   const { isAuthenticated, isLoading, token } = useAuth();
   const [showTerms, setShowTerms] = useState(false);
@@ -163,6 +186,195 @@ function AppContent({
     if (!selectedCustomerName || !allRecords) return null;
     return getProfile(selectedCustomerName, allRecords, allOrders);
   }, [selectedCustomerName, allRecords, allOrders]);
+
+  // Content Rendering Logic
+  const renderContent = (token: string | null = null) => {
+    // 1. Strict Mount Check (Hydration Fix)
+    if (!mounted) return null;
+
+    if (activeTab === 'logs') {
+      return <ActivityLogs />;
+    }
+
+    // 2. Initial Loading State (Fix for blank screen "not loading normally")
+    const isActivelyLoading = status === 'uploading' || (logs.length > 0 && status !== 'error' && status !== 'success');
+    if (isActivelyLoading && allRecords.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center p-8 h-[60vh] w-full bg-neutral-900/50 rounded-3xl border border-neutral-800 animate-in fade-in duration-500">
+          <div className="flex flex-col items-center gap-6 w-full max-w-md">
+
+            {/* Visual Header */}
+            <div className="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4 shadow-[0_0_30px_rgba(16,185,129,0.3)]" />
+
+            <div className="text-center w-full">
+              <h3 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent mb-2">
+                Conectando ao VMPay...
+              </h3>
+              <p className="text-sm font-medium text-emerald-100/70 mb-6 font-mono tracking-tight">
+                {message || "Sincronizando banco de dados"}
+              </p>
+
+              {/* Sync Progress Bar */}
+              {syncProgress > 0 && (
+                <div className="w-full h-3 bg-neutral-950 border border-neutral-800 rounded-full overflow-hidden shadow-inner mb-2 relative">
+                  <div
+                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500 ease-out flex items-center justify-end pr-2"
+                    style={{ width: `${syncProgress}%` }}
+                  >
+                    <div className="w-6 h-full bg-white/20 -skew-x-12 animate-[shimmer_1s_infinite]" />
+                  </div>
+                </div>
+              )}
+              {syncProgress > 0 && (
+                <p className="text-right text-[10px] text-neutral-500 font-bold tracking-wider">{syncProgress}% CONCLUÍDO</p>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-8 max-w-md w-full">
+            <div className="bg-black/60 rounded-xl p-4 border border-white/5 font-mono text-[10px] text-emerald-500/50 h-32 overflow-y-auto custom-scrollbar shadow-inner">
+              {logs.slice(-5).map((log, i) => (
+                <div key={i} className="mb-2 truncate">
+                  <span className="text-emerald-500 mr-2 opacity-70">&gt;</span>{log}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div >
+      );
+    }
+
+    // Default or No Data State
+    if (!viewData && status !== 'uploading' && allRecords.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center h-[60vh] w-full border-2 border-dashed border-neutral-800 rounded-3xl bg-neutral-900/50 relative overflow-hidden">
+          <div className="bg-neutral-900 p-8 rounded-full mb-6 border border-neutral-800 shadow-2xl relative z-10">
+            <Upload className="w-12 h-12 text-blue-500" />
+          </div>
+
+          <h2 className="text-3xl font-bold text-neutral-200 mb-2 relative z-10">Importar Planilha VMPay</h2>
+          <p className="text-lg text-neutral-400 max-w-lg text-center mb-8 relative z-10">
+            Selecione o arquivo Excel de uma Loja para começar.<br />
+            <span className="text-sm text-neutral-500">(Você pode carregar múltiplas lojas em sequência)</span>
+          </p>
+
+          <div className="relative z-10 flex gap-4">
+            <div>
+              <input
+                id="file-upload"
+                type="file"
+                onChange={handleFileUpload}
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+              />
+              <label
+                htmlFor="file-upload"
+                className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-bold text-lg shadow-lg shadow-blue-500/25 transition-all cursor-pointer flex items-center gap-3"
+              >
+                <FileUp className="w-6 h-6" />
+                Importar Planilha
+              </label>
+            </div>
+
+            <button
+              onClick={() => handleSyncVMPay(token)}
+              className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full font-bold text-lg shadow-lg shadow-emerald-500/25 transition-all cursor-pointer flex items-center gap-3"
+            >
+              <RefreshCw className={`w-6 h-6 ${(status as string) === 'uploading' ? 'animate-spin' : ''}`} />
+              Sincronizar VMPay
+            </button>
+          </div>
+
+          {/* Instructions Area */}
+          <div className="mt-12 max-w-2xl bg-neutral-900/80 border border-neutral-800 p-6 rounded-2xl relative z-10 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+            <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-blue-400" />
+              Instruções de Importação
+            </h3>
+            <div className="space-y-4 text-sm text-neutral-400">
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 w-6 h-6 bg-blue-600/20 text-blue-400 rounded-full flex items-center justify-center font-bold text-xs ring-1 ring-blue-500/30">1</div>
+                <div className="space-y-1">
+                  <p><strong className="text-white">Onde pegar os dados:</strong> No menu do lado esquerdo do painel VMPay, siga:</p>
+                  <ul className="list-disc ml-4 space-y-1 text-xs">
+                    <li><span className="text-blue-400 font-medium">Painel de Controle &gt; Relatórios &gt; Vendas</span></li>
+                    <li><span className="text-blue-400 font-medium">Painel de Controle &gt; Relatórios &gt; Pedidos</span></li>
+                  </ul>
+                  <p className="text-[10px] mt-1 italic">Escolha o período desejado e exporte em formato Excel ou CSV.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 w-6 h-6 bg-blue-600/20 text-blue-400 rounded-full flex items-center justify-center font-bold text-xs ring-1 ring-blue-500/30">2</div>
+                <p>
+                  <strong className="text-white">Sincronia de Período:</strong> Certifique-se de que ambos os arquivos são relativos ao <span className="text-warning">mesmo período</span> para que o cruzamento de dados seja preciso.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 w-6 h-6 bg-emerald-600/20 text-emerald-400 rounded-full flex items-center justify-center font-bold text-xs ring-1 ring-emerald-500/30">3</div>
+                <p>
+                  <strong className="text-white">Ordem Correta:</strong> Primeiro faça a <span className="text-white underline">importação</span> do arquivo de <span className="text-white underline">Vendas</span>. Depois que o sistema processar, faça a <span className="text-white underline">importação</span> do arquivo de <span className="text-white underline">Pedidos</span>.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 3. Dashboard Rendering (Strictly if Data Exists)
+    if (activeTab === 'financial' && viewData) {
+      return <FinancialDashboard data={viewData} selectedStore={selectedStore || undefined} />;
+    }
+
+    if (activeTab === 'comparative' && viewData) {
+      return <ComparativeDashboard data={viewData} customers={allCustomers} selectedStore={selectedStore || undefined} />;
+    }
+
+    if (activeTab === 'crm' && viewData) {
+      return <CrmDashboard data={viewData} customers={allCustomers} selectedStore={selectedStore || undefined} />;
+    }
+
+    if (activeTab === 'churn' && viewData && viewData.records.length > 0) {
+      return <ChurnAnalysis data={viewData} selectedStore={selectedStore || undefined} />;
+    }
+
+    if (activeTab === 'machines' && viewData) {
+      return <MachineAnalysis data={viewData} selectedStore={selectedStore || undefined} />;
+    }
+
+    if (activeTab === 'queue' && viewData) {
+      return <QueueAnalysis data={viewData.records} selectedStore={selectedStore || undefined} />;
+    }
+
+    if (activeTab === 'demographics' && viewData) {
+      return <CustomerDemographics records={viewData.records} customers={allCustomers} selectedStore={selectedStore || undefined} orders={viewData.orders} />;
+    }
+
+    if (activeTab === 'reports') {
+      if (!viewData?.records) return <div className="p-8 text-neutral-500 text-center">Nenhum dado processado para gerar relatórios.</div>;
+      return <Reports data={viewData} />;
+    }
+
+    if (activeTab === 'marketing') {
+      return <CouponManager />;
+    }
+
+    if (activeTab === 'settings') {
+      return <SettingsPage />;
+    }
+
+    // Default Fallback inside AppContent if no tab matches or data is missing
+    return (
+      <div className="flex flex-col items-center justify-center p-8 h-[60vh] w-full bg-neutral-900/50 rounded-3xl border border-neutral-800 animate-in fade-in">
+        <h2 className="text-xl font-bold text-neutral-400 mb-2">Painel Indisponível</h2>
+        <p className="text-sm text-neutral-500">
+          {activeTab === 'settings' || activeTab === 'logs' || activeTab === 'marketing'
+            ? "Carregando módulo..."
+            : "Não há dados suficientes para exibir este painel. Verifique se a importação foi concluída ou se a loja possui vendas."}
+        </p>
+      </div>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -255,7 +467,7 @@ function AppContent({
             </button>
 
             <button
-              onClick={handleForceSync}
+              onClick={() => handleForceSync(token)}
               disabled={status === 'uploading'}
               title="Baixar todos os milhares de cestos dos últimos 180 dias"
               className={cn(
@@ -363,8 +575,8 @@ function AppContent({
         // We pass 'data.records' if available (filtered view) so the modal shows context of the current period if needed?
         // Actually, for "Last Visits", we usually want GLOBAL history.
         // But the modal expects 'periodRecords' for stats like "Spent in Period".
-        // Let's pass 'data?.records' which represents the currently filtered view (e.g. This Month).
-        periodRecords={data?.records}
+        // Let's pass 'viewData?.records' which represents the currently filtered view (e.g. This Month).
+        periodRecords={viewData?.records}
       />
 
       <TermsOfUse
@@ -1234,196 +1446,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
     }
   }
 
-  // Content Rendering Logic
-  const renderContent = (token: string | null = null) => {
-    // 1. Strict Mount Check (Hydration Fix)
-    if (!mounted) return null;
 
-    if (activeTab === 'logs') {
-      return <ActivityLogs />;
-    }
-
-    // 2. Initial Loading State (Fix for blank screen "not loading normally")
-    const isActivelyLoading = status === 'uploading' || (logs.length > 0 && status !== 'error' && status !== 'success');
-    if (isActivelyLoading && allRecords.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center p-8 h-[60vh] w-full bg-neutral-900/50 rounded-3xl border border-neutral-800 animate-in fade-in duration-500">
-          <div className="flex flex-col items-center gap-6 w-full max-w-md">
-
-            {/* Visual Header */}
-            <div className="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4 shadow-[0_0_30px_rgba(16,185,129,0.3)]" />
-
-            <div className="text-center w-full">
-              <h3 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent mb-2">
-                Conectando ao VMPay...
-              </h3>
-              <p className="text-sm font-medium text-emerald-100/70 mb-6 font-mono tracking-tight">
-                {message || "Sincronizando banco de dados"}
-              </p>
-
-              {/* Sync Progress Bar */}
-              {syncProgress > 0 && (
-                <div className="w-full h-3 bg-neutral-950 border border-neutral-800 rounded-full overflow-hidden shadow-inner mb-2 relative">
-                  <div
-                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500 ease-out flex items-center justify-end pr-2"
-                    style={{ width: `${syncProgress}%` }}
-                  >
-                    <div className="w-6 h-full bg-white/20 -skew-x-12 animate-[shimmer_1s_infinite]" />
-                  </div>
-                </div>
-              )}
-              {syncProgress > 0 && (
-                <p className="text-right text-[10px] text-neutral-500 font-bold tracking-wider">{syncProgress}% CONCLUÍDO</p>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-8 max-w-md w-full">
-            <div className="bg-black/60 rounded-xl p-4 border border-white/5 font-mono text-[10px] text-emerald-500/50 h-32 overflow-y-auto custom-scrollbar shadow-inner">
-              {logs.slice(-5).map((log, i) => (
-                <div key={i} className="mb-2 truncate">
-                  <span className="text-emerald-500 mr-2 opacity-70">&gt;</span>{log}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div >
-      );
-    }
-
-    // Default or No Data State
-    if (!viewData && status !== 'uploading' && allRecords.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center h-[60vh] w-full border-2 border-dashed border-neutral-800 rounded-3xl bg-neutral-900/50 relative overflow-hidden">
-          <div className="bg-neutral-900 p-8 rounded-full mb-6 border border-neutral-800 shadow-2xl relative z-10">
-            <Upload className="w-12 h-12 text-blue-500" />
-          </div>
-
-          <h2 className="text-3xl font-bold text-neutral-200 mb-2 relative z-10">Importar Planilha VMPay</h2>
-          <p className="text-lg text-neutral-400 max-w-lg text-center mb-8 relative z-10">
-            Selecione o arquivo Excel de uma Loja para começar.<br />
-            <span className="text-sm text-neutral-500">(Você pode carregar múltiplas lojas em sequência)</span>
-          </p>
-
-          <div className="relative z-10 flex gap-4">
-            <div>
-              <input
-                id="file-upload"
-                type="file"
-                onChange={handleFileUpload}
-                accept=".xlsx,.xls,.csv"
-                className="hidden"
-              />
-              <label
-                htmlFor="file-upload"
-                className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-bold text-lg shadow-lg shadow-blue-500/25 transition-all cursor-pointer flex items-center gap-3"
-              >
-                <FileUp className="w-6 h-6" />
-                Importar Planilha
-              </label>
-            </div>
-
-            <button
-              onClick={() => handleSyncVMPay(token)}
-              className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full font-bold text-lg shadow-lg shadow-emerald-500/25 transition-all cursor-pointer flex items-center gap-3"
-            >
-              <RefreshCw className={`w-6 h-6 ${(status as string) === 'uploading' ? 'animate-spin' : ''}`} />
-              Sincronizar VMPay
-            </button>
-          </div>
-
-          {/* Instructions Area */}
-          <div className="mt-12 max-w-2xl bg-neutral-900/80 border border-neutral-800 p-6 rounded-2xl relative z-10 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-            <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-blue-400" />
-              Instruções de Importação
-            </h3>
-            <div className="space-y-4 text-sm text-neutral-400">
-              <div className="flex gap-3">
-                <div className="flex-shrink-0 w-6 h-6 bg-blue-600/20 text-blue-400 rounded-full flex items-center justify-center font-bold text-xs ring-1 ring-blue-500/30">1</div>
-                <div className="space-y-1">
-                  <p><strong className="text-white">Onde pegar os dados:</strong> No menu do lado esquerdo do painel VMPay, siga:</p>
-                  <ul className="list-disc ml-4 space-y-1 text-xs">
-                    <li><span className="text-blue-400 font-medium">Painel de Controle &gt; Relatórios &gt; Vendas</span></li>
-                    <li><span className="text-blue-400 font-medium">Painel de Controle &gt; Relatórios &gt; Pedidos</span></li>
-                  </ul>
-                  <p className="text-[10px] mt-1 italic">Escolha o período desejado e exporte em formato Excel ou CSV.</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="flex-shrink-0 w-6 h-6 bg-blue-600/20 text-blue-400 rounded-full flex items-center justify-center font-bold text-xs ring-1 ring-blue-500/30">2</div>
-                <p>
-                  <strong className="text-white">Sincronia de Período:</strong> Certifique-se de que ambos os arquivos são relativos ao <span className="text-warning">mesmo período</span> para que o cruzamento de dados seja preciso.
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <div className="flex-shrink-0 w-6 h-6 bg-emerald-600/20 text-emerald-400 rounded-full flex items-center justify-center font-bold text-xs ring-1 ring-emerald-500/30">3</div>
-                <p>
-                  <strong className="text-white">Ordem Correta:</strong> Primeiro faça a <span className="text-white underline">importação</span> do arquivo de <span className="text-white underline">Vendas</span>. Depois que o sistema processar, faça a <span className="text-white underline">importação</span> do arquivo de <span className="text-white underline">Pedidos</span>.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // 3. Dashboard Rendering (Strictly if Data Exists)
-    if (activeTab === 'financial' && viewData) {
-      return <FinancialDashboard data={viewData} selectedStore={selectedStore || undefined} />;
-    }
-
-    if (activeTab === 'comparative' && viewData) {
-      return <ComparativeDashboard data={viewData} customers={allCustomers} selectedStore={selectedStore || undefined} />;
-    }
-
-    if (activeTab === 'crm' && viewData) {
-      return <CrmDashboard data={viewData} customers={allCustomers} selectedStore={selectedStore || undefined} />;
-    }
-
-    if (activeTab === 'churn' && viewData && viewData.records.length > 0) {
-      return <ChurnAnalysis data={viewData} selectedStore={selectedStore || undefined} />;
-    }
-
-    if (activeTab === 'machines' && viewData) {
-      return <MachineAnalysis data={viewData} selectedStore={selectedStore || undefined} />;
-    }
-
-    if (activeTab === 'queue' && viewData) {
-      return <QueueAnalysis data={viewData.records} selectedStore={selectedStore || undefined} />;
-    }
-
-    if (activeTab === 'demographics' && viewData) {
-      return <CustomerDemographics records={viewData.records} customers={allCustomers} selectedStore={selectedStore || undefined} orders={viewData.orders} />;
-    }
-
-    if (activeTab === 'reports') {
-      if (!viewData?.records) return <div className="p-8 text-neutral-500 text-center">Nenhum dado processado para gerar relatórios.</div>;
-      return <Reports data={viewData} />;
-    }
-
-    if (activeTab === 'marketing') {
-      return <CouponManager />;
-    }
-
-    if (activeTab === 'settings') {
-      return <SettingsPage />;
-    }
-
-    // Default Fallback inside AppContent if no tab matches or data is missing
-    return (
-      <div className="flex flex-col items-center justify-center p-8 h-[60vh] w-full bg-neutral-900/50 rounded-3xl border border-neutral-800 animate-in fade-in">
-        <h2 className="text-xl font-bold text-neutral-400 mb-2">Painel Indisponível</h2>
-        <p className="text-sm text-neutral-500">
-          {activeTab === 'settings' || activeTab === 'logs' || activeTab === 'marketing'
-            ? "Carregando módulo..."
-            : "Não há dados suficientes para exibir este painel. Verifique se a importação foi concluída ou se a loja possui vendas."}
-        </p>
-      </div>
-    );
-  };
-
-  if (!mounted) return null;
 
   return (
     <SettingsProvider>
@@ -1439,6 +1462,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
               setMessage={setMessage}
               logs={logs}
               allRecords={allRecords}
+              allCustomers={allCustomers}
               data={viewData}
               stores={stores}
               allOrders={allOrders}
@@ -1447,7 +1471,6 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
               handleFileUpload={handleFileUpload}
               handleSyncVMPay={handleSyncVMPay}
               handleForceSync={handleForceSync}
-              renderContent={renderContent}
               stableInitialLoad={stableInitialLoad}
               syncProgress={syncProgress}
             />
