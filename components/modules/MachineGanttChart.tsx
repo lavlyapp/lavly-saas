@@ -245,7 +245,7 @@ export function MachineGanttChart({ records }: MachineGanttChartProps) {
                                                         </div>
                                                         <div className="flex justify-between font-medium text-emerald-400 pt-1">
                                                             <span>Valor:</span>
-                                                            <span>{cycle.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                                            <span>{(cycle.value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                                                         </div>
                                                     </div>
                                                     {/* Arrow */}

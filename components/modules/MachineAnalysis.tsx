@@ -178,7 +178,7 @@ export function MachineAnalysis({ data, selectedStore }: MachineAnalysisProps) {
                     <CardContent>
                         <div className="text-2xl font-bold truncate">{topRevenueMachine?.id || '-'}</div>
                         <p className="text-xs text-neutral-500">
-                            {topRevenueMachine?.totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            {(topRevenueMachine?.totalRevenue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             <span className="ml-1 text-green-600 font-medium">
                                 ({((topRevenueMachine?.revenueShare || 0) * 100).toFixed(1)}% do total)
                             </span>
@@ -196,7 +196,7 @@ export function MachineAnalysis({ data, selectedStore }: MachineAnalysisProps) {
                     <CardContent>
                         <div className="text-2xl font-bold truncate">{topCyclesMachine?.id || '-'}</div>
                         <p className="text-xs text-neutral-500">
-                            {topCyclesMachine?.cycles.toLocaleString('pt-BR')} Ciclos
+                            {(topCyclesMachine?.cycles || 0).toLocaleString('pt-BR')} Ciclos
                             <span className="ml-1 text-blue-600 font-medium">
                                 ({((topCyclesMachine?.cycleShare || 0) * 100).toFixed(1)}% do total)
                             </span>

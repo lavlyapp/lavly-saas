@@ -223,14 +223,14 @@ export function QueueAnalysis({ data, selectedStore }: QueueAnalysisProps) {
                                     <div className="p-4 bg-neutral-900/50 rounded-xl border border-neutral-800">
                                         <p className="text-[10px] text-neutral-500 uppercase font-bold tracking-wider mb-1">Faturamento Adicional</p>
                                         <p className="text-xl font-bold text-emerald-400">
-                                            + {metrics.expansionROI?.monthlyRevenueIncrease.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/mês
+                                            + {(metrics.expansionROI?.monthlyRevenueIncrease || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/mês
                                         </p>
                                         <p className="text-[10px] text-neutral-500 mt-1">Estimativa de demanda reprimida</p>
                                     </div>
                                     <div className="p-4 bg-neutral-900/50 rounded-xl border border-neutral-800">
                                         <p className="text-[10px] text-neutral-500 uppercase font-bold tracking-wider mb-1">Payback Estimado</p>
                                         <p className="text-xl font-bold text-white">
-                                            {metrics.expansionROI?.estimatedPaybackMonths?.toFixed(1)} meses
+                                            {metrics.expansionROI?.estimatedPaybackMonths?.toFixed(1) || '0.0'} meses
                                         </p>
                                         <p className="text-[10px] text-neutral-500 mt-1">Retorno do investimento (Set 35k)</p>
                                     </div>
@@ -242,8 +242,8 @@ export function QueueAnalysis({ data, selectedStore }: QueueAnalysisProps) {
                                     </h4>
                                     <ul className="text-[11px] space-y-2 text-neutral-400">
                                         <li>• <b>Demanda Reprimida:</b> Analisamos {metrics.saturationByHour.filter(s => s.saturation > 0.75).length} horários onde a saturação foi superior a 75%.</li>
-                                        <li>• <b>Ciclos Capturados:</b> Estimamos que {metrics.expansionROI?.capturedCyclesPerMonth} ciclos que foram perdidos por falta de máquina seriam absorvidos.</li>
-                                        <li>• <b>Conversão:</b> Baseado no seu ticket médio de {metrics.expansionROI?.avgTicket.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}.</li>
+                                        <li>• <b>Ciclos Capturados:</b> Estimamos que {metrics.expansionROI?.capturedCyclesPerMonth || 0} ciclos que foram perdidos por falta de máquina seriam absorvidos.</li>
+                                        <li>• <b>Conversão:</b> Baseado no seu ticket médio de {(metrics.expansionROI?.avgTicket || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}.</li>
                                     </ul>
                                 </div>
                             </CardContent>
