@@ -502,8 +502,9 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
           .select('*', { count: 'exact', head: true });
 
         if (!countErr && dbSalesCount !== null) {
-          if (cachedSales.length > dbSalesCount + 500) {
-            setLogs(prev => [...prev, `[System] Inconsistência Crítica (Local: ${cachedSales.length} vs Nuvem: ${dbSalesCount}). Destruindo cache fantasma...`]);
+          // If the difference is significant in ANY direction (Ghost items OR missed retroactive items)
+          if (Math.abs(cachedSales.length - dbSalesCount) > 20) {
+            setLogs(prev => [...prev, `[System] Inconsistência Crítica (Local: ${cachedSales.length} vs Nuvem: ${dbSalesCount}). Revalidando base inteira...`]);
             lastCachedDate = null;
             lastCachedOrderDate = null;
             cachedSales = [];
