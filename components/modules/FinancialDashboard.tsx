@@ -70,8 +70,8 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
 
     const [customRange, setCustomRange] = useState(() => {
         const defaultRange = {
-            start: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
-            end: format(endOfMonth(new Date()), 'yyyy-MM-dd')
+            start: format(startOfMonth(new Date(new Date().getTime() - (3 * 3600 * 1000))), 'yyyy-MM-dd'),
+            end: format(endOfMonth(new Date(new Date().getTime() - (3 * 3600 * 1000))), 'yyyy-MM-dd')
         };
 
         if (!data?.records || data.records.length === 0) return defaultRange;
@@ -105,7 +105,8 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
     const filteredRecords = useMemo(() => {
         if (!data?.records) return [];
 
-        const now = new Date();
+        // Force explicit BRT mapping for filters
+        const now = new Date(new Date().getTime() - (3 * 3600 * 1000));
         let interval: { start: Date; end: Date } | null = null;
 
         switch (period) {

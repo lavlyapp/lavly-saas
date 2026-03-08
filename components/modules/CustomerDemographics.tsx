@@ -27,15 +27,16 @@ export function CustomerDemographics({ records, customers, selectedStore, orders
     });
 
     const [customRange, setCustomRange] = useState({
-        start: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
-        end: format(endOfMonth(new Date()), 'yyyy-MM-dd')
+        start: format(startOfMonth(new Date(new Date().getTime() - (3 * 3600 * 1000))), 'yyyy-MM-dd'),
+        end: format(endOfMonth(new Date(new Date().getTime() - (3 * 3600 * 1000))), 'yyyy-MM-dd')
     });
 
     // --- Filter Logic ---
     const filteredRecords = useMemo(() => {
         if (!records) return [];
 
-        const now = new Date();
+        // Explicit BRT Shift to prevent browser timezone leaks
+        const now = new Date(new Date().getTime() - (3 * 3600 * 1000));
         let interval: { start: Date; end: Date } | null = null;
 
         switch (period) {

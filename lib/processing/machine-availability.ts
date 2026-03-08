@@ -55,8 +55,10 @@ export function findFlexibleCustomers(records: SaleRecord[], saturationByHour: A
     });
 
     records.forEach(r => {
-        const d = getDay(r.data);
-        const h = getHours(r.data);
+        // Strict BRT localization
+        const brtDate = new Date(r.data.getTime() - (3 * 3600 * 1000));
+        const d = brtDate.getUTCDay();
+        const h = brtDate.getUTCHours();
         const sat = satMatrix[(d * 24) + h] || 0;
         const isPeak = sat > 0.6; // High or Critical
 
@@ -148,15 +150,16 @@ export function calculateMachineAvailability(records: SaleRecord[]): Availabilit
 
     records.forEach(r => {
         try {
-            // Using native JS instead of date-fns format() which is extremely slow in loops of 30k+
-            const y = r.data.getFullYear();
-            const m = String(r.data.getMonth() + 1).padStart(2, '0');
-            const d = String(r.data.getDate()).padStart(2, '0');
-            const dateStr = `${y}-${m}-${d}`;
+            // Strict BRT localization
+            const brtDate = new Date(r.data.getTime() - (3 * 3600 * 1000));
+            const y = brtDate.getUTCFullYear();
+            const m = String(brtDate.getUTCMonth() + 1).padStart(2, '0');
+            const dStrPiece = String(brtDate.getUTCDate()).padStart(2, '0');
+            const dateStr = `${y}-${m}-${dStrPiece}`;
 
             if (!uniqueDates.has(dateStr)) {
                 uniqueDates.add(dateStr);
-                const dayOfWeek = r.data.getDay();
+                const dayOfWeek = brtDate.getUTCDay();
                 daysCount[dayOfWeek]++;
             }
         } catch (e) {
@@ -171,10 +174,11 @@ export function calculateMachineAvailability(records: SaleRecord[]): Availabilit
     const dryTimeline = new Int16Array(7 * 24 * 60);
 
     usages.forEach(u => {
-        // Find the start index by calculating minutes from the start of the week.
-        const startDay = getDay(u.startTime);
-        const startHour = getHours(u.startTime);
-        const startMin = getMinutes(u.startTime);
+        // Find the start index by calculating minutes from the start of the week using Strict BRT
+        const brtDate = new Date(u.startTime.getTime() - (3 * 3600 * 1000));
+        const startDay = brtDate.getUTCDay();
+        const startHour = brtDate.getUTCHours();
+        const startMin = brtDate.getUTCMinutes();
 
         let startIndex = (startDay * 24 * 60) + (startHour * 60) + startMin;
         const timeline = u.type === 'wash' ? washTimeline : dryTimeline;

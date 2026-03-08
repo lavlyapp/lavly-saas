@@ -458,12 +458,12 @@ async function parseExcel(buffer: ArrayBuffer, defaultStoreName: string): Promis
 
                     if (parsedD && parsedT) {
                         date = new Date(
-                            parsedD.getFullYear(),
-                            parsedD.getMonth(),
-                            parsedD.getDate(),
-                            parsedT.getHours(),
-                            parsedT.getMinutes(),
-                            parsedT.getSeconds()
+                            parsedD.getUTCFullYear(),
+                            parsedD.getUTCMonth(),
+                            parsedD.getUTCDate(),
+                            parsedT.getUTCHours(),
+                            parsedT.getUTCMinutes(),
+                            parsedT.getUTCSeconds()
                         );
                     } else {
                         date = parsedD; // Fallback to just date if time is unparseable
@@ -500,9 +500,9 @@ async function parseExcel(buffer: ArrayBuffer, defaultStoreName: string): Promis
                                 birthDate = parsedBirth;
                                 // Calculate Age
                                 const today = new Date();
-                                let ageCalc = today.getFullYear() - parsedBirth.getFullYear();
-                                const m = today.getMonth() - parsedBirth.getMonth();
-                                if (m < 0 || (m === 0 && today.getDate() < parsedBirth.getDate())) {
+                                let ageCalc = today.getUTCFullYear() - parsedBirth.getUTCFullYear();
+                                const m = today.getUTCMonth() - parsedBirth.getUTCMonth();
+                                if (m < 0 || (m === 0 && today.getUTCDate() < parsedBirth.getUTCDate())) {
                                     ageCalc--;
                                 }
                                 if (ageCalc > 0 && ageCalc < 120) age = ageCalc;
@@ -542,9 +542,9 @@ async function parseExcel(buffer: ArrayBuffer, defaultStoreName: string): Promis
                                 birthDate = parsedBirth;
                                 // Calculate Age
                                 const today = new Date();
-                                let ageCalc = today.getFullYear() - parsedBirth.getFullYear();
-                                const m = today.getMonth() - parsedBirth.getMonth();
-                                if (m < 0 || (m === 0 && today.getDate() < parsedBirth.getDate())) {
+                                let ageCalc = today.getUTCFullYear() - parsedBirth.getUTCFullYear();
+                                const m = today.getUTCMonth() - parsedBirth.getUTCMonth();
+                                if (m < 0 || (m === 0 && today.getUTCDate() < parsedBirth.getUTCDate())) {
                                     ageCalc--;
                                 }
                                 if (ageCalc > 0 && ageCalc < 120) age = ageCalc;

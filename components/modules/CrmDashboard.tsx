@@ -35,7 +35,8 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
     const { getStoreAddress } = useSettings();
     // --- Optimized Date Initialization ---
     const { initialPeriod, initialRange } = useMemo(() => {
-        const now = new Date();
+        // Explicit BRT Shift to calculate months reliably
+        const now = new Date(new Date().getTime() - (3 * 3600 * 1000));
         const startOfCurrentMonthTs = startOfMonth(now).getTime();
         const endOfCurrentMonthTs = endOfMonth(now).getTime();
 
@@ -105,7 +106,8 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
     const filteredRecords = useMemo(() => {
         if (!data?.records) return [];
 
-        const now = new Date();
+        // Force explicit BRT mapping for filters
+        const now = new Date(new Date().getTime() - (3 * 3600 * 1000));
         let interval: { start: Date; end: Date };
 
         switch (period) {

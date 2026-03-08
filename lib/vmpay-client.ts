@@ -68,12 +68,12 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
             let currentStart = new Date(startDate);
             while (currentStart < endDate) {
                 const chunkEnd = new Date(currentStart);
-                chunkEnd.setDate(currentStart.getDate() + 30);
+                chunkEnd.setUTCDate(currentStart.getUTCDate() + 30);
 
                 const actualEnd = chunkEnd > endDate ? endDate : chunkEnd;
                 chunks.push({ start: new Date(currentStart), end: new Date(actualEnd) });
 
-                currentStart.setDate(currentStart.getDate() + 30);
+                currentStart.setUTCDate(currentStart.getUTCDate() + 30);
             }
 
             for (const chunk of chunks) {
@@ -191,11 +191,11 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                             const bd = new Date(sale.dtaNascimento);
                             if (!isNaN(bd.getTime())) {
                                 birthDate = bd;
-                                // Calculate Age
+                                // Calculate Age using strict UTC
                                 const today = new Date();
-                                let ageCalc = today.getFullYear() - bd.getFullYear();
-                                const m = today.getMonth() - bd.getMonth();
-                                if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) {
+                                let ageCalc = today.getUTCFullYear() - bd.getUTCFullYear();
+                                const m = today.getUTCMonth() - bd.getUTCMonth();
+                                if (m < 0 || (m === 0 && today.getUTCDate() < bd.getUTCDate())) {
                                     ageCalc--;
                                 }
                                 if (ageCalc > 0 && ageCalc < 120) age = ageCalc;

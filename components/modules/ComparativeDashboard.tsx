@@ -260,17 +260,18 @@ export function ComparativeDashboard({ data, customers, selectedStore = 'Todas' 
             const date = new Date(r.data);
             const val = r.valor || 0;
 
-            const dayOfWeek = getDay(date); // 0 = Sunday, 1 = Monday...
+            const brtDate = new Date(date.getTime() - (3 * 3600 * 1000));
+            const dayOfWeek = brtDate.getUTCDay(); // 0 = Sunday, 1 = Monday...
             // @ts-ignore
-            const dayName = format(date, 'EEEE', { locale: ptBR }); // Not used in this snippet, but kept as per instruction
-            const weekStr = safeFormatWeek(date); // Not used for indexing, but kept as per instruction
+            const dayName = format(brtDate, 'EEEE', { locale: ptBR }); // Not used in this snippet, but kept as per instruction
+            const weekStr = safeFormatWeek(brtDate); // Not used for indexing, but kept as per instruction
 
             dayOfWeekTotals[dayOfWeek] += val;
             dayOfWeekCounts[dayOfWeek]++;
 
             // Manual calculation for week of month (numeric)
-            const startWeek = getISOWeek(startOfMonth(date));
-            const currentWeek = getISOWeek(date);
+            const startWeek = getISOWeek(startOfMonth(brtDate));
+            const currentWeek = getISOWeek(brtDate);
             let week = currentWeek - startWeek + 1;
             if (week < 1) week = 1; // Fallback for year crossover
 
@@ -278,7 +279,7 @@ export function ComparativeDashboard({ data, customers, selectedStore = 'Todas' 
                 weekOfMonthTotals[week] += val;
             }
 
-            uniqueMonths.add(format(date, 'yyyy-MM'));
+            uniqueMonths.add(format(brtDate, 'yyyy-MM'));
         });
 
         const numMonths = uniqueMonths.size || 1;

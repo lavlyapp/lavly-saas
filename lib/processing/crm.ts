@@ -347,8 +347,9 @@ export function calculateCrmMetrics(records: SaleRecord[], customerRegistry?: Cu
 
         // Use visitsList for preferences? Or raw sales? Usually raw sales for "When do they buy".
         sales.forEach(s => {
-            const dayName = DAYS_MAP[getDay(s.data)];
-            const hour = getHours(s.data);
+            const brtDate = new Date(s.data.getTime() - (3 * 3600 * 1000));
+            const dayName = DAYS_MAP[brtDate.getUTCDay()];
+            const hour = brtDate.getUTCHours();
             let shift = 'Madrugada';
             if (hour >= 6 && hour < 12) shift = 'Manhã';
             else if (hour >= 12 && hour < 18) shift = 'Tarde';
@@ -380,7 +381,8 @@ export function calculateCrmMetrics(records: SaleRecord[], customerRegistry?: Cu
             .sort((a, b) => b.date.getTime() - a.date.getTime())
             .slice(0, 5)
             .map(v => {
-                const hour = getHours(v.date);
+                const brtDate = new Date(v.date.getTime() - (3 * 3600 * 1000));
+                const hour = brtDate.getUTCHours();
                 let shift = 'Madrugada';
                 if (hour >= 6 && hour < 12) shift = 'Manhã';
                 else if (hour >= 12 && hour < 18) shift = 'Tarde';
@@ -407,8 +409,8 @@ export function calculateCrmMetrics(records: SaleRecord[], customerRegistry?: Cu
         if (recency > Math.max(averageInterval * 2, 30)) churnRisk = 'high';
         else if (recency > Math.max(averageInterval * 1.5, 15)) churnRisk = 'medium';
 
-        const nextPredictedVisit = new Date(lastVisitDate);
-        nextPredictedVisit.setDate(nextPredictedVisit.getDate() + Math.ceil(averageInterval));
+        let nextPredictedVisit = new Date(lastVisitDate);
+        nextPredictedVisit = new Date(nextPredictedVisit.getTime() + (Math.ceil(averageInterval) * 24 * 3600 * 1000));
 
 
         // ... (existing code)
@@ -865,8 +867,9 @@ export function calculateOccupancyHeatmap(records: SaleRecord[]): number[][] {
     // 2. Populate Matrix
     records.forEach(r => {
         if (!r.data) return;
-        const d = getDay(r.data);
-        const h = getHours(r.data);
+        const brtDate = new Date(r.data.getTime() - (3 * 3600 * 1000));
+        const d = brtDate.getUTCDay();
+        const h = brtDate.getUTCHours();
         // Ensure within bounds (just in case)
         if (matrix[d] && matrix[d][h] !== undefined) {
             matrix[d][h]++;
@@ -882,8 +885,9 @@ export function calculateVisitsHeatmap(records: SaleRecord[]): number[][] {
 
     records.forEach(r => {
         if (!r.data) return;
-        const d = getDay(r.data);
-        const h = getHours(r.data);
+        const brtDate = new Date(r.data.getTime() - (3 * 3600 * 1000));
+        const d = brtDate.getUTCDay();
+        const h = brtDate.getUTCHours();
         const dayStr = r.data.toISOString().split('T')[0];
         const visitKey = `${dayStr}-${h}-${r.cliente}`;
 
