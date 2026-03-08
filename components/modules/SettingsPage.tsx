@@ -1,5 +1,6 @@
 import { useSettings, AutomationSettingsMap } from "@/components/context/SettingsContext";
 import { Settings, MapPin, Key, Save, CheckCircle, Store, Clock, RefreshCw, Trash2, Plus, User, Eye, EyeOff } from "lucide-react";
+import { STATIC_VMPAY_CREDENTIALS } from "@/lib/vmpay-config";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { logActivity } from "@/lib/logger";
@@ -100,7 +101,7 @@ export function SettingsPage() {
 
                 if (storesErr) throw storesErr;
 
-                if (storeData) {
+                if (storeData && storeData.length > 0) {
                     setStores(storeData.map(s => ({
                         id: s.id,
                         cnpj: s.cnpj || "",
@@ -118,6 +119,17 @@ export function SettingsPage() {
                         state: s.state || "",
                         latitude: s.latitude,
                         longitude: s.longitude
+                    })));
+                } else {
+                    console.log("SettingsPage: Bank is empty. Auto-seeding Static Fallback Stores.");
+                    // Fallback to static credentials so the user isn't stuck with an empty form
+                    setStores(STATIC_VMPAY_CREDENTIALS.map(s => ({
+                        cnpj: s.cnpj || "",
+                        name: s.name || "Sem Nome",
+                        api_key: s.apiKey || "",
+                        open_time: s.openTime || "07:00:00",
+                        close_time: s.closeTime || "23:00:00",
+                        is_active: s.is_active !== false,
                     })));
                 }
                 setIsInitialized(true);
