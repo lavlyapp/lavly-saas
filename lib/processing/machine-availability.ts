@@ -48,11 +48,17 @@ export function findFlexibleCustomers(records: SaleRecord[], saturationByHour: A
         visits: { d: number, h: number, isPeak: boolean }[];
     }>();
 
+    // O(1) lookups for saturation
+    const satMatrix = new Float32Array(7 * 24);
+    saturationByHour.forEach(s => {
+        satMatrix[(s.day * 24) + s.hour] = s.saturation;
+    });
+
     records.forEach(r => {
         const d = getDay(r.data);
         const h = getHours(r.data);
-        const stat = saturationByHour.find(s => s.day === d && s.hour === h);
-        const isPeak = (stat?.saturation || 0) > 0.6; // High or Critical
+        const sat = satMatrix[(d * 24) + h] || 0;
+        const isPeak = sat > 0.6; // High or Critical
 
         const existing = customerMap.get(r.cliente) || { name: r.cliente, phone: r.telefone || '', visits: [] };
         existing.visits.push({ d, h, isPeak });
@@ -156,21 +162,19 @@ export function calculateMachineAvailability(records: SaleRecord[]): Availabilit
     const dryTimeline = new Int16Array(7 * 24 * 60);
 
     usages.forEach(u => {
-        let current = new Date(u.startTime);
-        const endMs = u.endTime.getTime();
+        // Find the start index by calculating minutes from the start of the week.
+        const startDay = getDay(u.startTime);
+        const startHour = getHours(u.startTime);
+        const startMin = getMinutes(u.startTime);
+
+        let startIndex = (startDay * 24 * 60) + (startHour * 60) + startMin;
         const timeline = u.type === 'wash' ? washTimeline : dryTimeline;
 
-        while (current.getTime() < endMs) {
-            const d = getDay(current);
-            const h = getHours(current);
-            const m = getMinutes(current);
-
-            const index = (d * 24 * 60) + (h * 60) + m;
-            if (index < timeline.length) {
-                timeline[index]++;
-            }
-
-            current = addMinutes(current, 1);
+        // Fast arithmetic loop instead of Date object manipulation
+        for (let i = 0; i < u.durationMinutes; i++) {
+            // wrap around the week (7 * 24 * 60 = 10080)
+            const index = (startIndex + i) % 10080;
+            timeline[index]++;
         }
     });
 
