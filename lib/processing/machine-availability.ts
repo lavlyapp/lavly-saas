@@ -114,7 +114,11 @@ export function calculateMachineAvailability(records: SaleRecord[]): Availabilit
     const uniqueWashMachines = new Set<string>();
     const uniqueDryMachines = new Set<string>();
 
-    records.forEach(r => {
+    // Performance Optimization: Calculating minute-by-minute timeline for 35k records causes O(N*M) explosions
+    // resulting in > 5 million array index mutations (browser freeze). We restrict to a reasonable recent snapshot.
+    const optimalRecords = records.length > 15000 ? records.slice(-15000) : records;
+
+    optimalRecords.forEach(r => {
         if (r.items && r.items.length > 0) {
             r.items.forEach(item => {
                 const machineId = item.machine;
@@ -181,7 +185,7 @@ export function calculateMachineAvailability(records: SaleRecord[]): Availabilit
     const daysCount = new Array(7).fill(0);
     const uniqueDates = new Set<string>();
 
-    records.forEach(r => {
+    optimalRecords.forEach(r => {
         try {
             // Strict BRT localization
             const brtDate = new Date(r.data.getTime() - (3 * 3600 * 1000));
