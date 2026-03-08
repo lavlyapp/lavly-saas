@@ -138,13 +138,16 @@ export function MachineGanttChart({ records }: MachineGanttChartProps) {
                             value={selectedDate}
                             onChange={(e) => setSelectedDate(e.target.value)}
                         >
-                            {availableDates.map(date => {
-                                const d = new Date(date);
+                            {availableDates.map(dateStr => {
+                                // Important: 'dateStr' is 'yyyy-MM-dd'. new Date("2026-03-08") assumes UTC midnight.
+                                // In BRT (UTC-3), it becomes Mar 07 21:00, showing the wrong day!
+                                // Append T12:00:00 to force midday local time and guarantee the correct day extraction.
+                                const d = new Date(`${dateStr}T12:00:00`);
                                 const dayStr = format(d, "dd/MM");
                                 const weekStr = format(d, "EEE");
                                 const weekCap = weekStr.charAt(0).toUpperCase() + weekStr.slice(1);
                                 return (
-                                    <option key={date} value={date} className="bg-neutral-900">
+                                    <option key={dateStr} value={dateStr} className="bg-neutral-900">
                                         {`${dayStr} - ${weekCap}`}
                                     </option>
                                 );
