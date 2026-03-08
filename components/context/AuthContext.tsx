@@ -55,7 +55,7 @@ export function AuthProvider({ children, initialSession, initialRole }: { childr
                     setIsLoading(false);
                 }
             });
-        } else if (initialSession?.user && !role) {
+        } else if (initialSession?.user && !initialRole) {
             console.log("[Auth] have session but no role, fetching profile...");
             fetchProfile(initialSession.user.id);
         } else {
@@ -76,7 +76,7 @@ export function AuthProvider({ children, initialSession, initialRole }: { childr
         });
 
         return () => subscription.unsubscribe();
-    }, [initialSession, role]);
+    }, [initialSession, initialRole]);
 
     // --- Failsafe Cleanup ---
     useEffect(() => {
