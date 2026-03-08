@@ -599,7 +599,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         const fetchAllCustomers = async () => {
           let hasMore = true;
           let i = 0;
-          const pageSize = 5000;
+          const pageSize = 1000;
           const all = [];
           while (hasMore) {
             const { data, error } = await rawSupabase.from('customers').select('id, cpf, name, phone, email, gender, registration_date').range(i * pageSize, (i + 1) * pageSize - 1);
