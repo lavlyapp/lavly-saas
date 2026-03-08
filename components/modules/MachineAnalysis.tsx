@@ -24,7 +24,8 @@ export function MachineAnalysis({ data, selectedStore }: MachineAnalysisProps) {
     const filteredOrders = useMemo(() => {
         if (!data?.orders) return [];
 
-        const now = new Date();
+        // Ensure the filter brackets strictly use BRT, dodging browser drifts
+        const now = new Date(new Date().getTime() - (3 * 3600 * 1000));
         let interval: { start: Date; end: Date };
 
         switch (period) {

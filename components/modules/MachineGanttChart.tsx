@@ -44,7 +44,7 @@ export function MachineGanttChart({ records }: MachineGanttChartProps) {
 
                     if (!machines[machineName]) machines[machineName] = [];
                     const duration = getCycleDuration(item.service || r.produto);
-                    const startTs = item.startTime ? new Date(item.startTime) : r.data;
+                    const startTs = item.startTime ? new Date(item.startTime) : (item.data ? new Date(item.data) : r.data);
                     const endTs = addMinutes(startTs, duration);
 
                     machines[machineName].push({
