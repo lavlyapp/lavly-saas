@@ -45,12 +45,9 @@ async function fetchMachines(apiKey: string): Promise<EquipmentMap> {
 }
 
 function toLocalVMPayDateString(date: Date): string {
-    // VMPay Server operates in UTC-3 (BRT). It ignores 'Z' and assumes the string is LOCAL BRT time.
-    // Our 'date' argument is a perfect absolute UTC Date object. 
-    // To generate a string that visually says '11:00' when the UTC time is '14:00Z', we explicitly subtract 3 hours.
-    const VMPAY_BRT_OFFSET_MS = 3 * 60 * 60 * 1000;
-    const shiftedToBRT = new Date(date.getTime() - VMPAY_BRT_OFFSET_MS);
-    return shiftedToBRT.toISOString().replace('Z', '');
+    // UPDATED: VMPay API previously required BRT strings, but now operates in naked UTC strings.
+    // We pass the exact UTC representation of the Date object without the 'Z'.
+    return date.toISOString().replace('Z', '');
 }
 
 export async function syncVMPaySales(startDate: Date, endDate: Date, specificCred?: VMPayCredential): Promise<SaleRecord[]> {
@@ -139,14 +136,12 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                             produto = "SECAGEM";
                         }
 
-                        // Timezone Handling:
-                        // The VMPay API sometimes sends UTC 'Z', and sometimes sends no offset (meaning BRT).
-                        // Instead of hacking the string, we let the native Date constructor parse it.
-                        // If there is no 'Z' and no offset, JS assumes local time (which on our server/browser is BRT).
+                        // Timezone Handling (UPDATED):
+                        // VMPay now returns naked strings representing UTC time (e.g., "2026-03-08T15:54:12").
+                        // We must explicitly append 'Z' so our JS Date parses it correctly as UTC.
                         let dateStr = sale.data;
                         if (dateStr && !dateStr.includes('Z') && !/[-+]\d{2}:\d{2}$/.test(dateStr)) {
-                            // If completely naked string (e.g. 2026-03-08T13:50:00), force BRT explicitly so it's consistent
-                            dateStr += "-03:00";
+                            dateStr += "Z";
                         }
 
                         const safeDate = new Date(dateStr);

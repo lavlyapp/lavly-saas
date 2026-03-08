@@ -662,18 +662,9 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
       }
 
       // Hydrate & Normalize for UI MUST run to populate the screen
-      // Timezone fix: Supabase gives us strings like "2026-03-08T15:35:00+00:00".
-      // But we know those numbers are actually LOCAL BRT time from VMPay.
-      // We must strip the +00:00 or Z before passing to new Date() so the browser doesn't subtract 3 hours again!
-      const parseLocalTime = (dStr: string) => {
-        if (!dStr) return new Date();
-        const cleanStr = dStr.replace(/Z$/, '').replace(/[-+]\d{2}:\d{2}$/, '');
-        return new Date(cleanStr);
-      };
-
       const hydratedSales = finalRawSales.map((s: any) => ({
         ...s,
-        data: parseLocalTime(s.data),
+        data: s.data ? new Date(s.data) : new Date(),
         loja: getCanonicalStoreName(s.loja),
         produto: s.produto || s.service || '',
         formaPagamento: s.formaPagamento || s.forma_pagamento || "Outros",
@@ -686,7 +677,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
 
       const hydratedOrders = finalRawOrders.map((o: any) => ({
         ...o,
-        data: parseLocalTime(o.data),
+        data: o.data ? new Date(o.data) : new Date(),
         loja: getCanonicalStoreName(o.loja),
         customerId: o.customerId || o.customer_id
       }));
@@ -697,7 +688,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         email: c.email || '',
         phone: c.phone || c.telefone || '',
         gender: c.gender || c.genero || 'U',
-        registrationDate: c.registrationDate || c.registration_date ? parseLocalTime(c.registrationDate || c.registration_date) : undefined
+        registrationDate: c.registrationDate || c.registration_date ? new Date(c.registrationDate || c.registration_date) : undefined
       }));
 
       // Update State definitively so the UI un-freezes
