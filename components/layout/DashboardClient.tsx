@@ -189,17 +189,7 @@ function AppContent({
 
           {/* Quick Actions */}
           <div className="flex gap-2">
-            <button
-              onClick={() => handleSyncVMPay(token)}
-              disabled={status === 'uploading'}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
-                status === 'uploading' ? "bg-neutral-800 text-neutral-400" : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20"
-              )}
-            >
-              <RefreshCw className={cn("w-4 h-4", status === 'uploading' && "animate-spin")} />
-              {status === 'uploading' ? 'Sincronizando...' : 'Sync VMPay'}
-            </button>
+
 
             <button
               onClick={handleForceSync}

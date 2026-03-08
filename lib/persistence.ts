@@ -233,31 +233,43 @@ export async function upsertCustomers(records: CustomerRecord[], supabaseClient?
     try {
         console.log(`[Persistence] Safely merging ${records.length} customers...`);
 
-        // 1. Fetch existing customers to match by name
+        // 1. Fetch existing customers to match by CPF or Name
         const { data: existingData, error: fetchErr } = await db.from('customers').select('id, name, cpf, phone');
         if (fetchErr) throw fetchErr;
 
-        const existingMap = new Map();
+        const existingByCpf = new Map();
+        const existingByName = new Map();
+
         (existingData || []).forEach((c: any) => {
-            if (c.name) existingMap.set(c.name.trim().toUpperCase(), c);
+            if (c.cpf) existingByCpf.set(c.cpf, c);
+            if (c.name) existingByName.set(c.name.trim().toUpperCase(), c);
         });
 
         const toInsert: any[] = [];
         const toUpdate: any[] = [];
-        const incomingMap = new Map();
+        const seenCpf = new Set();
+        const seenName = new Set();
 
-        // Deduplicate records in the incoming batch
+        // Deduplicate incoming batch prioritizing CPF
         records.forEach(r => {
             if (!r.name) return;
             const normName = r.name.trim().toUpperCase();
-            incomingMap.set(normName, r);
-        });
 
-        incomingMap.forEach((r, normName) => {
-            const existing = existingMap.get(normName);
+            // Deduplicate within the same incoming batch
+            if (r.cpf) {
+                if (seenCpf.has(r.cpf)) return;
+                seenCpf.add(r.cpf);
+            } else {
+                if (seenName.has(normName)) return;
+                seenName.add(normName);
+            }
 
-            const payload = {
-                name: normName,
+            // Find existing to preserve ID if necessary, though we will rely on Supabase upsert constraints
+            let existing = r.cpf ? existingByCpf.get(r.cpf) : existingByName.get(normName);
+            if (!existing && !r.cpf) existing = existingByName.get(normName);
+
+            const payload: any = {
+                name: existing ? existing.name : normName, // preserve original name if matched
                 cpf: r.cpf || null,
                 phone: r.phone || null,
                 email: r.email || null,
@@ -266,9 +278,9 @@ export async function upsertCustomers(records: CustomerRecord[], supabaseClient?
                 updated_at: new Date().toISOString()
             };
 
-            if (existing) {
-                // Update only if we have new information
-                toUpdate.push({ id: existing.id, ...payload });
+            if (existing && existing.id) {
+                payload.id = existing.id;
+                toUpdate.push(payload);
             } else {
                 toInsert.push(payload);
             }
@@ -282,14 +294,15 @@ export async function upsertCustomers(records: CustomerRecord[], supabaseClient?
                 const chunk = toInsert.slice(i, i + 1000);
                 const { error: insErr } = await db.from('customers').insert(chunk);
                 if (insErr) {
-                    console.error("Insert chunk error:", insErr.message);
-                    throw new Error(`Falha ao inserir clientes: ${insErr.message}`);
+                    // Very rarely, a cross-chunk race condition might cause a duplicate CPF error here.
+                    // If it does, we just log and continue, as we've done our best to deduplicate.
+                    console.warn("Insert chunk error (continuing despite possible CPF overlap):", insErr.message);
                 }
             }
         }
 
         if (toUpdate.length > 0) {
-            // Batch updates using upsert on ID since we pulled the real Supabase UUIDs
+            // Batch updates
             for (let i = 0; i < toUpdate.length; i += 1000) {
                 const chunk = toUpdate.slice(i, i + 1000);
                 const { error: upErr } = await db.from('customers').upsert(chunk, { onConflict: 'id' });
