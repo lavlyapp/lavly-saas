@@ -23,9 +23,14 @@ export function MachineGanttChart({ records }: MachineGanttChartProps) {
         if (!selectedDate) return [];
 
         // Filter for selected date
-        const dailyRecords = records.filter(r =>
-            format(r.data, 'yyyy-MM-dd') === selectedDate
-        );
+        // Important: r.data is UTC. We need to shift it to BRT (local time of the machines)
+        // so sales from 00:00 to 02:59 BRT don't get pushed to the 'next' UTC day string by mistake,
+        // or vice versa depending on the browser's local timezone.
+        // Fast BRT matching string:
+        const dailyRecords = records.filter(r => {
+            const dStr = new Date(r.data.getTime() - (3 * 60 * 60 * 1000)).toISOString().split('T')[0];
+            return dStr === selectedDate;
+        });
 
         // Grouping
         const machines: Record<string, { start: Date; end: Date; type: 'wash' | 'dry'; client: string; value: number }[]> = {};
@@ -95,16 +100,21 @@ export function MachineGanttChart({ records }: MachineGanttChartProps) {
 
     // Available Dates for Dropdown
     const availableDates = useMemo(() => {
-        const dates = new Set(records.map(r => format(r.data, 'yyyy-MM-dd')));
+        const dates = new Set(records.map(r => {
+            return new Date(r.data.getTime() - (3 * 60 * 60 * 1000)).toISOString().split('T')[0];
+        }));
         return Array.from(dates).sort().reverse();
     }, [records]);
 
-    // Helper to calculate position
+    // Helper to calculate position (Percentage of day)
     const getPosition = (date: Date) => {
-        const start = startOfDay(date);
-        const totalMinutes = 24 * 60;
-        const diffMinutes = (date.getTime() - start.getTime()) / (1000 * 60);
-        return (diffMinutes / totalMinutes) * 100;
+        // Real BRT hour directly from the UTC timestamp
+        const brtDate = new Date(date.getTime() - (3 * 60 * 60 * 1000));
+        const hours = brtDate.getUTCHours();
+        const minutes = brtDate.getUTCMinutes();
+
+        const totalMinutes = (hours * 60) + minutes;
+        return (totalMinutes / (24 * 60)) * 100;
     };
 
     const getWidth = (start: Date, end: Date) => {
@@ -240,11 +250,15 @@ export function MachineGanttChart({ records }: MachineGanttChartProps) {
                                                         </div>
                                                         <div className="flex justify-between">
                                                             <span>Início:</span>
-                                                            <span className="text-white">{format(cycle.start, 'HH:mm')}</span>
+                                                            <span className="text-white">
+                                                                {`${new Date(cycle.start.getTime() - (3 * 3600 * 1000)).getUTCHours().toString().padStart(2, '0')}:${new Date(cycle.start.getTime() - (3 * 3600 * 1000)).getUTCMinutes().toString().padStart(2, '0')}`}
+                                                            </span>
                                                         </div>
                                                         <div className="flex justify-between">
                                                             <span>Fim:</span>
-                                                            <span className="text-white">{format(cycle.end, 'HH:mm')}</span>
+                                                            <span className="text-white">
+                                                                {`${new Date(cycle.end.getTime() - (3 * 3600 * 1000)).getUTCHours().toString().padStart(2, '0')}:${new Date(cycle.end.getTime() - (3 * 3600 * 1000)).getUTCMinutes().toString().padStart(2, '0')}`}
+                                                            </span>
                                                         </div>
                                                         <div className="flex justify-between font-medium text-emerald-400 pt-1">
                                                             <span>Valor:</span>
