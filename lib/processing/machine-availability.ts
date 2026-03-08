@@ -160,13 +160,21 @@ export function calculateMachineAvailability(records: SaleRecord[]): Availabilit
             let duration = p.includes('sec') ? 49 : 33.5;
             if (duration === 49) type = 'dry';
 
-            usages.push({
-                machineId,
-                type,
-                startTime: r.data,
-                endTime: addMinutes(r.data, duration),
-                durationMinutes: duration
-            });
+            // ESTABLISH QUANTITY FROM VALOR (e.g., R$ 36 = 2 cycles)
+            let count = 1;
+            if (r.valor && r.valor >= 15) {
+                count = Math.max(1, Math.round(r.valor / 18.0));
+            }
+
+            for (let i = 0; i < count; i++) {
+                usages.push({
+                    machineId: `${machineId}_${i + 1}`,
+                    type,
+                    startTime: r.data,
+                    endTime: addMinutes(r.data, duration),
+                    durationMinutes: duration
+                });
+            }
         }
     });
 
@@ -216,7 +224,7 @@ export function calculateMachineAvailability(records: SaleRecord[]): Availabilit
         }
     });
 
-    const saturationByHour: { day: number, hour: number, saturation: number, count: number }[] = [];
+    const rawStats: { d: number, h: number, avgWash: number, avgDry: number }[] = [];
 
     for (let d = 0; d < 7; d++) {
         const numDays = Math.max(daysCount[d], 1);
@@ -233,23 +241,40 @@ export function calculateMachineAvailability(records: SaleRecord[]): Availabilit
                 if (dc > maxDryInHour) maxDryInHour = dc;
             }
 
-            const avgWash = maxWashInHour / numDays;
-            const avgDry = maxDryInHour / numDays;
-
-            const washSat = totalWash > 0 ? avgWash / totalWash : 0;
-            const drySat = totalDry > 0 ? avgDry / totalDry : 0;
-
-            // Bottleneck saturation: it's the highest load between wash or dry, capped at 1.0 (100%) to prevent impossible mathematical displays on overlapping sales
-            const saturation = Math.min(1.0, Math.max(washSat, drySat));
-
-            saturationByHour.push({
-                day: d,
-                hour: h,
-                saturation,
-                count: Math.round(avgWash + avgDry)
+            rawStats.push({
+                d,
+                h,
+                avgWash: maxWashInHour / numDays,
+                avgDry: maxDryInHour / numDays
             });
         }
     }
+
+    // Auto-infer physical machine capacity from empirical maximum continuous history peaks 
+    // to protect against "Desconhecida" generic VMPay setups flattening sets to 1
+    const globalMaxWash = Math.max(...rawStats.map(s => s.avgWash), 1);
+    const globalMaxDry = Math.max(...rawStats.map(s => s.avgDry), 1);
+
+    // Explicit list takes precedence, but if hardware map lacks definitions, capacity defaults to maximum busiest hour structural layout
+    const effectiveTotalWash = Math.max(uniqueWashMachines.size > 1 ? uniqueWashMachines.size : 1, Math.ceil(globalMaxWash));
+    const effectiveTotalDry = Math.max(uniqueDryMachines.size > 1 ? uniqueDryMachines.size : 1, Math.ceil(globalMaxDry));
+
+    const saturationByHour: { day: number, hour: number, saturation: number, count: number }[] = [];
+
+    rawStats.forEach(s => {
+        const washSat = s.avgWash / effectiveTotalWash;
+        const drySat = s.avgDry / effectiveTotalDry;
+
+        // Bottleneck saturation: it's the highest load between wash or dry, capped at 1.0 (100%)
+        const saturation = Math.min(1.0, Math.max(washSat, drySat));
+
+        saturationByHour.push({
+            day: s.d,
+            hour: s.h,
+            saturation,
+            count: Math.round(s.avgWash + s.avgDry)
+        });
+    });
 
     const recommendations: string[] = [];
     const peakHours = saturationByHour
