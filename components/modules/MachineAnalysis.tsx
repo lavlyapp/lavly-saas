@@ -72,8 +72,20 @@ export function MachineAnalysis({ data, selectedStore }: MachineAnalysisProps) {
             const machineId = item.machine;
             if (!machineId) return;
 
-            const isWash = (item.service || '').toLowerCase().includes('lav') || machineId.toLowerCase().includes('lav') || machineId.toLowerCase().includes('inferior');
-            const isDry = (item.service || '').toLowerCase().includes('sec') || machineId.toLowerCase().includes('sec') || machineId.toLowerCase().includes('superior');
+            let isWash = (item.service || '').toLowerCase().includes('lav') || machineId.toLowerCase().includes('lav') || machineId.toLowerCase().includes('inferior');
+            let isDry = (item.service || '').toLowerCase().includes('sec') || machineId.toLowerCase().includes('sec') || machineId.toLowerCase().includes('superior');
+
+            if (!isWash && !isDry) {
+                const numMatch = machineId.match(/\d+/);
+                if (numMatch) {
+                    const num = parseInt(numMatch[0], 10);
+                    if (num % 2 !== 0) isDry = true;
+                    else isWash = true;
+                } else {
+                    isWash = true; // Fallback
+                }
+            }
+
             const type = isWash ? 'Lavadora' : (isDry ? 'Secadora' : 'Outro');
 
             const current = machineMap.get(machineId) || {

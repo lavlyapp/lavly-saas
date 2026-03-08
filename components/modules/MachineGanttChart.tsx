@@ -43,7 +43,7 @@ export function MachineGanttChart({ records }: MachineGanttChartProps) {
                     if (machineName === "Desconhecida") return;
 
                     if (!machines[machineName]) machines[machineName] = [];
-                    const duration = getCycleDuration(item.service || r.produto);
+                    const duration = getCycleDuration(item.service || r.produto, machineName);
                     const startTs = item.startTime ? new Date(item.startTime) : (item.data ? new Date(item.data) : r.data);
                     const endTs = addMinutes(startTs, duration);
 
@@ -61,7 +61,7 @@ export function MachineGanttChart({ records }: MachineGanttChartProps) {
                 if (machineName === "Desconhecida") return; // Keep skipping if no machine specified
                 if (!machines[machineName]) machines[machineName] = [];
 
-                const duration = getCycleDuration(r.produto);
+                const duration = getCycleDuration(r.produto, machineName);
                 const end = addMinutes(r.data, duration);
 
                 machines[machineName].push({

@@ -903,10 +903,28 @@ export function calculateVisitsHeatmap(records: SaleRecord[]): number[][] {
     return matrix;
 }
 
-export function getCycleDuration(productName: string): number {
+export function getCycleDuration(productName: string, machineName?: string): number {
     const p = (productName || '').toLowerCase();
+    const m = (machineName || '').toLowerCase();
+
+    // Explicit hardware overrides
+    if (m.includes('sec') || m.includes('superior')) return 49;
+    if (m.includes('lav') || m.includes('inferior')) return 33.5;
+
+    // Service name overrides
     if (p.includes('sec')) return 49; // Secadora: 49 min
-    return 33; // Lavadora: 33 min
+
+    // Numeric Inference for ambiguous stacked setups (e.g., Cascavel: 5900, 5901)
+    // Often even numbers are Washers, odd numbers are Dryers.
+    const numMatch = m.match(/\d+/);
+    if (numMatch) {
+        const num = parseInt(numMatch[0], 10);
+        if (num % 2 !== 0) {
+            return 49; // Odd -> Secadora
+        }
+    }
+
+    return 33.5; // Default: Lavadora
 }
 
 export function getProfile(customerName: string, allRecords: SaleRecord[], allOrders?: any[]): CustomerProfile | null {
