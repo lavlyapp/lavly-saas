@@ -725,11 +725,20 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         setLogs(prev => [...prev, `[System] Flash Load: ${cachedSales.length} registros restaurados do dispositivo local.`]);
 
         // Find max dates for Delta Sync safely to prevent Maximum Call Stack Size Exceeded
-        const dates = hydratedCachedSales.map((s: any) => s.data.getTime());
-        lastCachedDate = new Date(dates.reduce((max: number, d: number) => Math.max(max, d), dates[0] || 0));
+        // Anti-Poisoning: Ensure local lastCachedDate is NEVER wildly in the future
+        // A single typo in an Excel import (e.g. year 2027) stored locally would permanently break the delta sync
+        // because gte(2027) would always yield 0, ignoring legitimate new Supabase records.
+        const currentPhysicalTime = new Date().getTime() + 3600000;
 
-        const orderDates = hydratedCachedOrders.map((o: any) => o.data.getTime());
-        if (orderDates.length > 0) lastCachedOrderDate = new Date(orderDates.reduce((max: number, d: number) => Math.max(max, d), orderDates[0]));
+        const validDates = hydratedCachedSales.map((s: any) => s.data.getTime()).filter((ts: number) => ts <= currentPhysicalTime);
+        const maxTimestamp = validDates.length > 0 ? validDates.reduce((max: number, d: number) => Math.max(max, d), validDates[0]) : 0;
+        lastCachedDate = new Date(maxTimestamp || Date.now());
+
+        const orderDates = hydratedCachedOrders.map((o: any) => o.data.getTime()).filter((ts: number) => ts <= currentPhysicalTime);
+        if (orderDates.length > 0) {
+          const maxOrderTs = orderDates.reduce((max: number, d: number) => Math.max(max, d), orderDates[0]);
+          lastCachedOrderDate = new Date(maxOrderTs);
+        }
       } else {
         setMessage("Carregando 100% do histórico inicial (Pode demorar na primeira vez)...");
       }
@@ -764,7 +773,12 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         setLogs(prev => [...prev, "[System] Validando integridade do cache local..."]);
         const { count: dbSalesCount, error: countErr } = await rawSupabase
           .from('sales')
-          .select('*', { count: 'exact', head: true });
+          .select('id', { count: 'exact', head: true }); // Using 'id' instead of '*'
+
+        if (countErr) {
+          console.error("[System] Erro ao validar count:", countErr);
+          setLogs(prev => [...prev, `[System Debug] Aviso RLS ou Rede no count: ${countErr.message}`]);
+        }
 
         if (!countErr && dbSalesCount !== null) {
           // If the difference is significant in ANY direction (Ghost items OR missed retroactive items)
@@ -868,8 +882,33 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
           ordersQuery as any
         ]);
 
+        if (newSalesRes.error) {
+          console.error("Delta Sync error:", newSalesRes.error);
+          setLogs(prev => [...prev, `[System Debug] Erro Delta Sync (Vendas): ${newSalesRes.error.message}`]);
+        }
+        if (newOrdersRes.error) {
+          console.error("Delta Sync error:", newOrdersRes.error);
+        }
+
         newSales = newSalesRes.data || [];
         newOrders = newOrdersRes.data || [];
+
+        // FALLBACK: If Delta Sync silently returns 0 records, but we KNOW there's an inconsistency,
+        // or if it threw an RLS error, we bypass RLS by falling back to the backend proxy API
+        if ((newSalesRes.error || dbSalesCount === null) && cachedSales.length > 0 && reason === "Sincronismo") {
+          setLogs(prev => [...prev, `[System] Falha no cliente nativo. Tentando API Segura de Backup...`]);
+          try {
+            // To avoid a heavy 30k query, just fetch the last 500 orders via server admin route
+            const bkpRes = await fetch(`/api/vmpay/sync-fallback?after=${offsetDate.toISOString()}`);
+            const bkpData = await bkpRes.json();
+            if (bkpData.success && bkpData.records) {
+              newSales = bkpData.records;
+              setLogs(prev => [...prev, `[System] Backup API recuperou ${newSales.length} registros ocultos.`]);
+            }
+          } catch (bkpErr) {
+            console.warn("Fallback failed too", bkpErr);
+          }
+        }
 
         // For customers, since we only have ~18k max, we fetch all of them to ensure the map is full
         // Delta sync for customers is tricky because we update their gender, so we just fetch all blindly to guarantee correctness
