@@ -28,15 +28,15 @@ export function AppSidebar({ activeTab, onTabChange, collapsed, onToggle }: AppS
         { id: 'churn', label: 'Análise de Churn', icon: UserX, requiredPlan: 'silver', roles: ['owner', 'attendant'] }, // Silver+ (Moved from Bronze)
         { id: 'machines', label: 'Máquinas', icon: WashingMachine, requiredPlan: 'silver', roles: ['owner'] }, // Silver+
         { id: 'queue', label: 'Teoria das Filas', icon: Clock, requiredPlan: 'silver', roles: ['owner'] }, // Silver+
-        { id: 'reports', label: 'Relatórios', icon: FileText, requiredPlan: 'bronze', roles: ['owner', 'superadmin'] },
-        { id: 'logs', label: 'Logs do Sistema', icon: ShieldCheck, requiredPlan: 'bronze', roles: ['owner', 'superadmin'] },
-        { id: 'settings', label: 'Configurações', icon: Settings, disabled: false, requiredPlan: 'silver', roles: ['owner', 'superadmin'] },
+        { id: 'reports', label: 'Relatórios', icon: FileText, requiredPlan: 'bronze', roles: ['owner', 'admin'] },
+        { id: 'logs', label: 'Logs do Sistema', icon: ShieldCheck, requiredPlan: 'bronze', roles: ['owner', 'admin'] },
+        { id: 'settings', label: 'Configurações', icon: Settings, disabled: false, requiredPlan: 'silver', roles: ['owner', 'admin'] },
     ];
 
     // Simple permission check for menu visibility
     const isVisible = (required: string, itemRoles: string[]) => {
-        if (!role || !itemRoles.includes(role)) return false;
-        if (role === 'superadmin') return true; // Superadmin sees everything
+        if (!role || (!itemRoles.includes(role) && role !== 'admin')) return false;
+        if (role === 'admin') return true; // Admin sees everything
         if (required === 'bronze') return true; // Everyone else sees bronze features
         if (required === 'silver') return plan === 'silver' || plan === 'gold';
         if (required === 'gold') return plan === 'gold';
