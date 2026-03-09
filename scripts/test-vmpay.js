@@ -1,42 +1,29 @@
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+require('dotenv').config({ path: '.env.local' });
+require('ts-node').register({ transpileOnly: true, compilerOptions: { module: "commonjs" } });
 
-// We extract parsing of the env var simulating what vmpay-config does
-const storesEnv = process.env.VMPAY_STORES || '';
-const stores = storesEnv.split(';').filter(Boolean).map(s => {
-    const [name, apiKey, cnpj] = s.split('|');
-    return { name, apiKey, cnpj };
-});
+const { syncVMPaySales } = require('./lib/vmpay-client.ts');
+const { getVMPayCredentials } = require('./lib/vmpay-config.ts');
 
-if (stores.length === 0) {
-    console.log("No stores configured in VMPAY_STORES");
-    process.exit(1);
-}
-
-const cred = stores[0];
-console.log(`Testing with store: ${cred.name}`);
-
-const url = `https://api.vmpay.com.br/v2/clientes?pagina=0&quantidade=20`;
-
-async function run() {
-    const res = await fetch(url, {
-        headers: { 'x-api-key': cred.apiKey }
-    });
-
-    if (!res.ok) {
-        console.log("Error:", res.status, await res.text());
+async function test() {
+    const creds = await getVMPayCredentials();
+    const jw = creds.find(c => c.name.includes('JOSE WALTER'));
+    if (!jw) {
+        console.log('Store not found in config');
         return;
     }
 
-    const data = await res.json();
-    console.log("Raw Response Array Length:", data.length);
-    if (data.length > 0) {
-        // Find one with gender/sexo
-        let found = data.find(c => c.genero || c.sexo);
-        if (!found) found = data[0];
+    const now = new Date();
+    const tenDaysAgo = new Date(now.getTime() - 10 * 24 * 3600 * 1000);
 
-        console.log("Sample Customer Object:", JSON.stringify(found, null, 2));
+    console.log(`[TEST] Fetching VMPay data for ${jw.name}`);
+    console.log(`[TEST] Date range: ${tenDaysAgo.toISOString()} to ${now.toISOString()}`);
+
+    const sales = await syncVMPaySales(tenDaysAgo, now, jw);
+    console.log(`[TEST] Result: ${sales.length} sales fetched.`);
+
+    if (sales.length > 0) {
+        console.log(`[TEST] Most recent sale date:`, sales[0].data);
     }
 }
 
-run();
+test().catch(console.error);
