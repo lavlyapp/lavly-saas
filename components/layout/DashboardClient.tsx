@@ -769,11 +769,13 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
       // --- AUTO-HEALING CACHE BUSTER ---
       // If the local database has significantly more records than the true cloud database,
       // it means the user's browser is hoarding deleted ghost duplicates. We must wipe it.
+      let dbSalesCount: number | null = null;
       if (cachedSales.length > 0) {
         setLogs(prev => [...prev, "[System] Validando integridade do cache local..."]);
-        const { count: dbSalesCount, error: countErr } = await rawSupabase
+        const { count, error: countErr } = await rawSupabase
           .from('sales')
           .select('id', { count: 'exact', head: true }); // Using 'id' instead of '*'
+        dbSalesCount = count;
 
         if (countErr) {
           console.error("[System] Erro ao validar count:", countErr);
