@@ -13,6 +13,8 @@ interface AuthContextType {
     isAuthenticated: boolean;
     isLoading: boolean;
     login: (email: string, password: string) => Promise<{ error: any }>;
+    loginWithMagicLink: (email: string) => Promise<{ error: any }>;
+    loginWithGoogle: () => Promise<{ error: any }>;
     logout: () => Promise<void>;
 }
 
@@ -95,6 +97,26 @@ export function AuthProvider({ children, initialSession, initialRole }: { childr
         return { error };
     };
 
+    const loginWithMagicLink = async (email: string) => {
+        const { error } = await supabase.auth.signInWithOtp({
+            email,
+            options: {
+                emailRedirectTo: `${window.location.origin}/dashboard`,
+            },
+        });
+        return { error };
+    };
+
+    const loginWithGoogle = async () => {
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: `${window.location.origin}/dashboard`
+            }
+        });
+        return { error };
+    };
+
     const logout = async () => {
         await supabase.auth.signOut();
     };
@@ -107,6 +129,8 @@ export function AuthProvider({ children, initialSession, initialRole }: { childr
             isAuthenticated: !!user,
             isLoading,
             login,
+            loginWithMagicLink,
+            loginWithGoogle,
             logout
         }}>
             {children}
