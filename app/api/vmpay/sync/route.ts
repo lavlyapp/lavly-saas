@@ -22,9 +22,16 @@ export async function GET(request: Request) {
             throw new Error("supabaseKey is required but missing in Environment Variables.");
         }
 
+        const authHeader = request.headers.get('authorization');
+
         const supabaseClient = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            supabaseKey
+            supabaseKey,
+            {
+                global: {
+                    headers: authHeader ? { Authorization: authHeader } : {}
+                }
+            }
         );
 
         // 1. Run sync (checks hours, ac states, etc.)
