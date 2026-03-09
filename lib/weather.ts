@@ -31,8 +31,9 @@ export async function getCoordinatesFromAddress(address: string, city?: string, 
             };
         }
 
-        // Fallback: try just address and city if full query failed
-        if (city && queryText.includes(state || '')) {
+        // Fallback: try just address and city if full query failed (and we originally included state)
+        if (city && state) {
+            console.warn(`Geocoding full query failed. Retrying without state for: ${address}, ${city}`);
             return getCoordinatesFromAddress(address, city);
         }
 

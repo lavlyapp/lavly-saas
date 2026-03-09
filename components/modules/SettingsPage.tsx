@@ -208,15 +208,15 @@ export function SettingsPage() {
                         if (newStores[idx]) {
                             newStores[idx] = {
                                 ...newStores[idx],
-                                address: data.logradouro || newStores[idx].address || "",
-                                neighborhood: data.bairro || newStores[idx].neighborhood || "",
-                                city: data.localidade || newStores[idx].city || "",
-                                state: data.uf || newStores[idx].state || ""
+                                address: data.logradouro !== undefined && data.logradouro !== "" ? data.logradouro : newStores[idx].address || "",
+                                neighborhood: data.bairro !== undefined && data.bairro !== "" ? data.bairro : newStores[idx].neighborhood || "",
+                                city: data.localidade !== undefined && data.localidade !== "" ? data.localidade : newStores[idx].city || "",
+                                state: data.uf !== undefined && data.uf !== "" ? data.uf : newStores[idx].state || ""
                             };
                         }
                         return newStores;
                     });
-                    console.log(`SettingsPage: ViaCEP applied for ${cleanCep} -> ${data.logradouro}`);
+                    console.log(`SettingsPage: ViaCEP applied for ${cleanCep} -> logradouro: ${data.logradouro}`);
                 } else {
                     console.warn(`SettingsPage: CEP ${cleanCep} was flagged as non-existent by ViaCEP.`);
                 }
@@ -281,7 +281,8 @@ export function SettingsPage() {
             if (stores.length > 0) {
                 const { getCoordinatesFromAddress } = await import("@/lib/weather");
 
-                const storesPayload = await Promise.all(stores.map(async (store) => {
+                const storesPayload = [];
+                for (const store of stores) {
                     let lat = store.latitude;
                     let lon = store.longitude;
 
@@ -293,9 +294,11 @@ export function SettingsPage() {
                             lat = coords.lat;
                             lon = coords.lon;
                         }
+                        // Respect Nominatim rate limits (1 req/sec)
+                        await new Promise(resolve => setTimeout(resolve, 1100));
                     }
 
-                    return {
+                    storesPayload.push({
                         id: store.id || undefined,
                         cnpj: store.cnpj.replace(/\D/g, ''),
                         name: store.name || "Sem Nome",
@@ -313,8 +316,8 @@ export function SettingsPage() {
                         latitude: lat,
                         longitude: lon,
                         updated_at: new Date().toISOString()
-                    };
-                }));
+                    });
+                }
 
                 console.log(`SettingsPage: Upserting ${storesPayload.length} stores...`);
                 const upsertRes = await fetch('/api/stores', {
