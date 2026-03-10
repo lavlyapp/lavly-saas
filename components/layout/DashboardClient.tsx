@@ -21,6 +21,7 @@ import { TermsOfUse } from "@/components/modules/TermsOfUse";
 import { getCanonicalStoreName } from "@/lib/vmpay-config";
 import { supabase } from "@/lib/supabase";
 import { createClient } from "@supabase/supabase-js";
+import { OnboardingCnpj } from "@/components/modules/OnboardingCnpj";
 import React, { Component, ErrorInfo, ReactNode } from "react";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean, error: Error | null, errorInfo: ErrorInfo | null }> {
@@ -599,6 +600,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
   const [allRecords, setAllRecords] = useState<SaleRecord[]>([]);
   const [allOrders, setAllOrders] = useState<OrderRecord[]>([]);
   const [allCustomers, setAllCustomers] = useState<CustomerRecord[]>([]);
+  const [needsOnboardingStores, setNeedsOnboardingStores] = useState<{ name: string }[]>([]);
 
   // Filter States
   const [dbStores, setDbStores] = useState<string[]>([]);
@@ -673,6 +675,15 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
       const activeStores = await getVMPayCredentials();
       const configuredNames = activeStores.map(s => getCanonicalStoreName(s.name));
       setDbStores(configuredNames);
+
+      // Check if any of these active stores are missing a CNPJ
+      const missingCnpjStores = activeStores.filter(s => !s.cnpj || s.cnpj.trim() === "");
+      if (missingCnpjStores.length > 0) {
+        setNeedsOnboardingStores(missingCnpjStores.map(s => ({ name: s.name })));
+        setStatus("idle");
+        isInitializing.current = false;
+        return; // Halt data loading until CNPJs are provided
+      }
 
       // 2. Load from Local Cache (IndexedDB)
       const { get, set, clear } = await import('idb-keyval');
@@ -1488,6 +1499,19 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
   }
 
 
+
+  if (needsOnboardingStores.length > 0) {
+    return (
+      <OnboardingCnpj
+        stores={needsOnboardingStores}
+        onComplete={async () => {
+          setNeedsOnboardingStores([]);
+          const currentToken = (await supabase.auth.getSession()).data.session?.access_token || null;
+          await reloadAllData("Onboarding Complete", currentToken);
+        }}
+      />
+    );
+  }
 
   return (
     <SettingsProvider>
