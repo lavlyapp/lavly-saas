@@ -153,7 +153,7 @@ export async function getVMPayMasterAccount(userId: string): Promise<VMPayMaster
  * Fetches all active store credentials from the database.
  * Falls back to static credentials if the database is not configured or empty.
  */
-export async function getVMPayCredentials(): Promise<VMPayCredential[]> {
+export async function getVMPayCredentials(customSupabaseClient?: any): Promise<VMPayCredential[]> {
     const withTimeout = async (promise: Promise<any>, timeoutMs: number) => {
         let timeoutId: any;
         const timeoutPromise = new Promise((_, reject) => {
@@ -163,9 +163,10 @@ export async function getVMPayCredentials(): Promise<VMPayCredential[]> {
     };
 
     try {
+        const client = customSupabaseClient || supabase;
         console.log("[VMPay Config] Fetching stores with 15s timeout...");
         const { data, error } = await withTimeout(
-            supabase
+            client
                 .from('stores')
                 .select(`
                     id, name, cnpj, api_key, open_time, close_time, 

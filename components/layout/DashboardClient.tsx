@@ -670,9 +670,16 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
     setStatus("uploading");
 
     try {
-      // 1. Load active stores and config
+      // 1. Create Authenticated Client
+      const authenticatedClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        { global: { headers: { Authorization: `Bearer ${authToken || ''}` } } }
+      );
+
+      // 2. Load active stores and config
       const { getVMPayCredentials, getCanonicalStoreName } = await import("@/lib/vmpay-config");
-      const activeStores = await getVMPayCredentials();
+      const activeStores = await getVMPayCredentials(authenticatedClient);
       const configuredNames = activeStores.map(s => getCanonicalStoreName(s.name));
       setDbStores(configuredNames);
 

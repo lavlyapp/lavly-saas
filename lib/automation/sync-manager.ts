@@ -184,7 +184,7 @@ export async function runGlobalSync(isManual: boolean = false, force: boolean = 
     await checkAndTurnOffAll();
 
     // 2. Process stores
-    const allCredentials = await getVMPayCredentials();
+    const allCredentials = await getVMPayCredentials(supabaseClient);
     const credentials = cnpj
         ? allCredentials.filter(c => c.cnpj === cnpj)
         : allCredentials;
