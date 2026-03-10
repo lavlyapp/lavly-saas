@@ -4,11 +4,14 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 // Usamos a chave de serviço para garantir que a atualização funcione 
 // durante o processo de onboarding, onde o RLS poderia bloquear dependendo da config.
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
     try {
+        const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+        const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
         const body = await req.json();
         const { storesData } = body;
         // Expected format: storesData = [{ name: 'Store A', cnpj: '123' }, ...]

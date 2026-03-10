@@ -6,11 +6,14 @@ const VMPAY_API_BASE_URL = process.env.NEXT_PUBLIC_VMPAY_API_BASE_URL || "https:
 
 // We need the service role key to bypass RLS and create users
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
     try {
+        const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+        const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
         const body = await req.json();
         const { email, apiKey, role = 'owner' } = body;
 
