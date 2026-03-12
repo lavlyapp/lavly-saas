@@ -807,7 +807,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
           // we SHOULD NOT WIPE, because the local cache will be filtered in-memory anyway by getCanonicalStoreName 
           // and wiping would force a 36k re-download that RLS will block anyway.
           
-          if (dbSalesCount > cachedSales.length + 50 || (dbSalesCount === 0 && cachedSales.length > 100)) {
+          if (cachedSales.length > dbSalesCount + 100 || (dbSalesCount === 0 && cachedSales.length > 100)) {
             setLogs(prev => [...prev, `[System] Inconsistência Crítica (Local: ${cachedSales.length} vs Nuvem (RLS): ${dbSalesCount}). Revalidando base inteira...`]);
             lastCachedDate = null;
             lastCachedOrderDate = null;
