@@ -785,41 +785,66 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
       );
 
       // --- AUTO-HEALING CACHE BUSTER ---
-      // If the local database has significantly more records than the true cloud database,
-      // it means the user's browser is hoarding deleted ghost duplicates. We must wipe it.
-      let dbSalesCount: number | null = null;
+      // Se a diferença de vendas entre o cache local e o banco na nuvem for maior que 75 
+      // para QUALQUER loja específica, consideramos o cache corrompido e forçamos o recarregamento.
       if (cachedSales.length > 0) {
-        setLogs(prev => [...prev, "[System] Validando integridade do cache local..."]);
-        const { count, error: countErr } = await rawSupabase
-          .from('sales')
-          .select('id', { count: 'exact', head: true }); // Using 'id' instead of '*'
-        dbSalesCount = count;
+        setLogs(prev => [...prev, "[System] Validando integridade do cache local por loja..."]);
+        
+        let cachePoisoned = false;
+        
+        // Conta as vendas locais agrupadas por loja
+        const localCounts: Record<string, number> = {};
+        cachedSales.forEach((s: any) => {
+          const lojaNorm = getCanonicalStoreName(s.loja);
+          localCounts[lojaNorm] = (localCounts[lojaNorm] || 0) + 1;
+        });
 
-        if (countErr) {
-          console.error("[System] Erro ao validar count:", countErr);
-          setLogs(prev => [...prev, `[System Debug] Aviso RLS ou Rede no count: ${countErr.message}`]);
+        // Para evitar dezenas de queries e timeout, agrupamos as lojas locais
+        // e fazemos consultas em paralelo apenas para as lojas ativas
+        const storesToCheck = Object.keys(localCounts);
+        
+        if (dbStores.length > 0) {
+           const countPromises = dbStores.map(async (lojaName) => {
+              const { count, error } = await rawSupabase
+                .from('sales')
+                .select('id', { count: 'exact', head: true })
+                .ilike('loja', `%${lojaName}%`);
+              
+              if (!error && count !== null) {
+                 const localCount = localCounts[lojaName] || 0;
+                 if (localCount > count + 75 || (count === 0 && localCount > 75)) {
+                    setLogs(prev => [...prev, `[System] Inconsistência Crítica na loja ${lojaName} (Local: ${localCount} vs Nuvem: ${count}).`]);
+                    cachePoisoned = true;
+                 }
+              }
+           });
+           
+           await Promise.all(countPromises);
+        } else {
+           // Fallback se não tiver lojas configuradas (ex: admin global)
+           const { count, error: countErr } = await rawSupabase
+            .from('sales')
+            .select('id', { count: 'exact', head: true }); 
+            
+           if (!countErr && count !== null) {
+              if (cachedSales.length > count + 75 || (count === 0 && cachedSales.length > 75)) {
+                 cachePoisoned = true;
+              }
+           }
         }
 
-        if (!countErr && dbSalesCount !== null) {
-          // If the cloud explicitly has MORE records than local (by a large margin), 
-          // or if local is completely corrupted (Cloud has 0, local has 30k), we wipe.
-          // Warning: If Local has 36k (legacy admin) and Cloud has 5k (new Proprietário RLS),
-          // we SHOULD NOT WIPE, because the local cache will be filtered in-memory anyway by getCanonicalStoreName 
-          // and wiping would force a 36k re-download that RLS will block anyway.
-          
-          if (cachedSales.length > dbSalesCount + 100 || (dbSalesCount === 0 && cachedSales.length > 100)) {
-            setLogs(prev => [...prev, `[System] Inconsistência Crítica (Local: ${cachedSales.length} vs Nuvem (RLS): ${dbSalesCount}). Revalidando base inteira...`]);
-            lastCachedDate = null;
-            lastCachedOrderDate = null;
-            cachedSales = [];
-            cachedOrders = [];
-            cachedCustomers = [];
-            await clear();
-            setAllRecords([]);
-            setAllOrders([]);
-          } else {
-            setLogs(prev => [...prev, `[System] Cache validado (Nuvem visível via RLS possui ${dbSalesCount} vendas).`]);
-          }
+        if (cachePoisoned) {
+          setLogs(prev => [...prev, "[System] Revalidando base inteira devido a exclusões na nuvem..."]);
+          lastCachedDate = null;
+          lastCachedOrderDate = null;
+          cachedSales = [];
+          cachedOrders = [];
+          cachedCustomers = [];
+          await clear();
+          setAllRecords([]);
+          setAllOrders([]);
+        } else {
+          setLogs(prev => [...prev, "[System] Cache validado (Diferenças toleráveis)."]);
         }
       }
       // -----------------------------------
@@ -920,7 +945,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
 
         // FALLBACK: If Delta Sync silently returns 0 records, but we KNOW there's an inconsistency,
         // or if it threw an RLS error, we bypass RLS by falling back to the backend proxy API
-        if ((newSalesRes.error || dbSalesCount === null) && cachedSales.length > 0 && reason === "Sincronismo") {
+        if (newSalesRes.error && cachedSales.length > 0 && reason === "Sincronismo") {
           setLogs(prev => [...prev, `[System] Falha no cliente nativo. Tentando API Segura de Backup...`]);
           try {
             // To avoid a heavy 30k query, just fetch the last 500 orders via server admin route
