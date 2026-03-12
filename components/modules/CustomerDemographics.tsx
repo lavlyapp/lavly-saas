@@ -86,8 +86,8 @@ export function CustomerDemographics({ records, customers, selectedStore, orders
     const profiles = metrics.profiles;
 
 
-    // 1. Protection for Non-Gold Users
-    if (!canAccess('whatsapp')) { // 'whatsapp' is the Gold flag for now, or we can check plan directly
+    // 1. Protection for Non-Ouro Users
+    if (!canAccess('whatsapp')) { // 'whatsapp' is the Ouro flag for now, or we can check plan directly
         return (
             <div className="relative p-6 bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden min-h-[400px] flex flex-col items-center justify-center text-center">
                 <div className="absolute inset-0 bg-gradient-to-br from-amber-900/10 to-transparent pointer-events-none" />
@@ -99,11 +99,11 @@ export function CustomerDemographics({ records, customers, selectedStore, orders
                     Desbloqueie inteligência demográfica avançada. Saiba gênero, idade e hábitos de consumo detalhados do seu público.
                 </p>
                 <button
-                    onClick={() => window.alert('Upgrade para Gold necessário!')}
+                    onClick={() => window.alert('Upgrade para Ouro necessário!')}
                     className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-white font-bold rounded-lg shadow-lg shadow-amber-900/20 transition-all transform hover:scale-105"
                 >
                     <Sparkles className="w-4 h-4" />
-                    Desbloquear Análise Demográfica (Gold)
+                    Desbloquear Análise Demográfica (Ouro)
                 </button>
             </div>
         );

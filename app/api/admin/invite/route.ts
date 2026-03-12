@@ -15,8 +15,9 @@ export async function POST(req: Request) {
         const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
         const body = await req.json();
-        const { email, apiKey, role = 'owner' } = body;
+        const { email, apiKey, role = 'proprietario', maxStores = 1 } = body;
 
+        console.log(`[Admin Invite] Starting invite for: ${email} with maxStores: ${maxStores}`);
         if (!email || !apiKey) {
             return NextResponse.json({ error: 'Email and API Key are required' }, { status: 400 });
         }
@@ -70,7 +71,8 @@ export async function POST(req: Request) {
             }
         });
 
-        const assignedStoresArray = Array.from(uniqueStoreNames);
+        // Limit assigned stores to the purchased amount
+        const assignedStoresArray = Array.from(uniqueStoreNames).slice(0, Number(maxStores));
 
         if (assignedStoresArray.length === 0) {
             return NextResponse.json(
@@ -122,6 +124,7 @@ export async function POST(req: Request) {
             .upsert({
                 id: userId,
                 role: role,
+                max_stores: Number(maxStores),
                 assigned_stores: assignedStoresArray,
                 vmpay_api_key: apiKey,
                 updated_at: new Date().toISOString()

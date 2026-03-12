@@ -20,17 +20,17 @@ export function AppSidebar({ activeTab, onTabChange, collapsed, onToggle }: AppS
     const { role, logout } = useAuth();
 
     const menuItems = [
-        { id: 'financial', label: 'Financeiro', icon: LayoutDashboard, requiredPlan: 'bronze', roles: ['owner', 'attendant'] },
-        { id: 'comparative', label: 'Fin. Comparativo (12M)', icon: BarChart2, requiredPlan: 'silver', roles: ['owner'] }, // New Comparative Dashboard
-        { id: 'crm', label: 'CRM & Clientes', icon: Users, requiredPlan: 'silver', roles: ['owner'] }, // Silver+
-        { id: 'demographics', label: 'Quem é o Cliente?', icon: Fingerprint, requiredPlan: 'bronze', roles: ['owner'] }, // Visible to all (Bronze+), blocked inside
-        { id: 'marketing', label: 'Cupons & Marketing', icon: Tag, requiredPlan: 'silver', roles: ['owner'] }, // New
-        { id: 'churn', label: 'Análise de Churn', icon: UserX, requiredPlan: 'silver', roles: ['owner', 'attendant'] }, // Silver+ (Moved from Bronze)
-        { id: 'machines', label: 'Máquinas', icon: WashingMachine, requiredPlan: 'silver', roles: ['owner'] }, // Silver+
-        { id: 'queue', label: 'Teoria das Filas', icon: Clock, requiredPlan: 'silver', roles: ['owner'] }, // Silver+
-        { id: 'reports', label: 'Relatórios', icon: FileText, requiredPlan: 'bronze', roles: ['owner', 'admin'] },
-        { id: 'logs', label: 'Logs do Sistema', icon: ShieldCheck, requiredPlan: 'bronze', roles: ['owner', 'admin'] },
-        { id: 'settings', label: 'Configurações', icon: Settings, disabled: false, requiredPlan: 'silver', roles: ['owner', 'admin'] },
+        { id: 'financial', label: 'Financeiro', icon: LayoutDashboard, requiredPlan: 'bronze', roles: ['proprietario', 'atendente'] },
+        { id: 'comparative', label: 'Fin. Comparativo (12M)', icon: BarChart2, requiredPlan: 'prata', roles: ['proprietario'] }, // New Comparative Dashboard
+        { id: 'crm', label: 'CRM & Clientes', icon: Users, requiredPlan: 'prata', roles: ['proprietario'] }, // Silver+
+        { id: 'demographics', label: 'Quem é o Cliente?', icon: Fingerprint, requiredPlan: 'bronze', roles: ['proprietario'] }, // Visible to all (Bronze+), blocked inside
+        { id: 'marketing', label: 'Cupons & Marketing', icon: Tag, requiredPlan: 'prata', roles: ['proprietario'] }, // New
+        { id: 'churn', label: 'Análise de Churn', icon: UserX, requiredPlan: 'prata', roles: ['proprietario', 'atendente'] }, // Silver+ (Moved from Bronze)
+        { id: 'machines', label: 'Máquinas', icon: WashingMachine, requiredPlan: 'prata', roles: ['proprietario'] }, // Silver+
+        { id: 'queue', label: 'Teoria das Filas', icon: Clock, requiredPlan: 'prata', roles: ['proprietario'] }, // Silver+
+        { id: 'reports', label: 'Relatórios', icon: FileText, requiredPlan: 'bronze', roles: ['proprietario', 'admin'] },
+        { id: 'logs', label: 'Logs do Sistema', icon: ShieldCheck, requiredPlan: 'bronze', roles: ['proprietario', 'admin'] },
+        { id: 'settings', label: 'Configurações', icon: Settings, disabled: false, requiredPlan: 'prata', roles: ['proprietario', 'admin'] },
     ];
 
     // Simple permission check for menu visibility
@@ -38,8 +38,8 @@ export function AppSidebar({ activeTab, onTabChange, collapsed, onToggle }: AppS
         if (!role || (!itemRoles.includes(role) && role !== 'admin')) return false;
         if (role === 'admin') return true; // Admin sees everything
         if (required === 'bronze') return true; // Everyone else sees bronze features
-        if (required === 'silver') return plan === 'silver' || plan === 'gold';
-        if (required === 'gold') return plan === 'gold';
+        if (required === 'prata') return plan === 'prata' || plan === 'ouro';
+        if (required === 'ouro') return plan === 'ouro';
         return false;
     };
 

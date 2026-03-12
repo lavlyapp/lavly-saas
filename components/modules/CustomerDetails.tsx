@@ -115,11 +115,11 @@ export function CustomerDetails({ isOpen, onClose, profile, periodRecords }: Cus
                                         </a>
                                     ) : (
                                         <button
-                                            onClick={() => window.alert('Upgrade para o plano Gold necessário para automação de WhatsApp!')}
+                                            onClick={() => window.alert('Upgrade para o plano Ouro necessário para automação de WhatsApp!')}
                                             className="flex items-center gap-1 px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500 text-amber-500 hover:text-white text-[10px] font-bold rounded-full transition-all border border-amber-500/30"
                                         >
                                             <Sparkles className="w-3 h-3" />
-                                            Gold
+                                            Ouro
                                         </button>
                                     )
                                 )}

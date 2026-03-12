@@ -247,9 +247,9 @@ export function Reports({ data }: ReportsProps) {
                                                         </a>
                                                     ) : (
                                                         <button
-                                                            onClick={() => window.alert('Upgrade para o plano Gold necessário para automação de WhatsApp!')}
+                                                            onClick={() => window.alert('Upgrade para o plano Ouro necessário para automação de WhatsApp!')}
                                                             className="inline-flex p-2 bg-amber-500/20 text-amber-500 rounded-lg hover:bg-amber-500 hover:text-white transition-all border border-amber-500/30"
-                                                            title="Assinar Gold"
+                                                            title="Assinar Ouro"
                                                         >
                                                             <Lock className="w-4 h-4" />
                                                         </button>

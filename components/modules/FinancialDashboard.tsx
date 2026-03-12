@@ -37,7 +37,7 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
     // --- State for Filters ---
     // --- Smart Date Initialization (Lazy State) ---
     const [period, setPeriod] = useState<PeriodOption>(() => {
-        if (role === 'attendant') return 'today';
+        if (role === 'atendente') return 'today';
         if (!data?.records || data.records.length === 0) return 'thisMonth';
 
         // DEBUG: Check first record
@@ -430,7 +430,7 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                     <Filter className="w-4 h-4" />
                     <span className="text-sm font-medium">Período</span>
                 </div>
-                {((role === 'attendant' ? ['today', 'yesterday'] : ['today', 'yesterday', 'thisMonth', 'lastMonth', 'allTime', 'custom']) as PeriodOption[]).map((opt) => (
+                {((role === 'atendente' ? ['today', 'yesterday'] : ['today', 'yesterday', 'thisMonth', 'lastMonth', 'allTime', 'custom']) as PeriodOption[]).map((opt) => (
                     <button key={opt} onClick={() => setPeriod(opt as PeriodOption)} className={`px-4 py-2 text-sm rounded-lg transition-colors ${period === opt ? 'bg-indigo-600 text-white font-medium shadow-lg shadow-indigo-500/20' : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800'}`}>
                         {opt === 'today' && 'Hoje'}
                         {opt === 'yesterday' && 'Ontem'}
@@ -477,7 +477,7 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                 </div>
 
                 {/* 2. Transações */}
-                {role !== 'attendant' && (
+                {role !== 'atendente' && (
                     <>
                         <div className="bg-neutral-900/50 p-6 rounded-xl border border-neutral-800 flex flex-col justify-between">
                             <div className="flex items-center gap-3 text-neutral-500 mb-2">
@@ -525,7 +525,7 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                 </div>
 
                 {/* 5. Clientes */}
-                {role !== 'attendant' && (
+                {role !== 'atendente' && (
                     <>
                         <div className="bg-neutral-900/50 p-6 rounded-xl border border-neutral-800 flex flex-col justify-between">
                             <div className="flex items-center gap-3 text-neutral-500 mb-2">
@@ -565,14 +565,14 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                 )}
             </div>
 
-            {role !== 'attendant' && (
+            {role !== 'atendente' && (
                 <>
                     {/* Main Chart Area - Full Width */}
                     <div className="grid grid-cols-1 gap-6">
                         {/* Revenue Chart */}
                         <div className="w-full bg-neutral-900/50 p-6 rounded-xl border border-neutral-800 h-[400px]">
                             <h3 className="font-semibold text-neutral-300 mb-6">{isMultiStoreView ? 'Vendas por Loja' : 'Receita Diária'}</h3>
-                            <ResponsiveContainer width="100%" height="90%">
+                            <ResponsiveContainer width="100%" height={300}>
                                 <BarChart data={isMultiStoreView ? storeData : dailyData}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
                                     <XAxis dataKey={isMultiStoreView ? "name" : "date"} stroke="#666" fontSize={12} tickLine={false} axisLine={false} />

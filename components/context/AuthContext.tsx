@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { supabase } from "@/lib/supabase";
 import { User } from "@supabase/supabase-js";
 
-export type Role = "admin" | "owner" | "attendant";
+export type Role = "admin" | "proprietario" | "atendente";
 
 interface AuthContextType {
     user: User | null;
@@ -38,8 +38,7 @@ export function AuthProvider({ children, initialSession, initialRole }: { childr
                 if (data) {
                     setRole(data.role as Role);
                 } else if (error) {
-                    console.error("[Auth] Error fetching profile:", error);
-                    setRole("owner");
+                    setRole("proprietario");
                 }
             } finally {
                 setIsLoading(false);

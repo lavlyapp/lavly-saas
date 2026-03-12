@@ -801,9 +801,14 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
         }
 
         if (!countErr && dbSalesCount !== null) {
-          // If the difference is significant in ANY direction (Ghost items OR missed retroactive items)
-          if (Math.abs(cachedSales.length - dbSalesCount) > 20) {
-            setLogs(prev => [...prev, `[System] Inconsistência Crítica (Local: ${cachedSales.length} vs Nuvem: ${dbSalesCount}). Revalidando base inteira...`]);
+          // If the cloud explicitly has MORE records than local (by a large margin), 
+          // or if local is completely corrupted (Cloud has 0, local has 30k), we wipe.
+          // Warning: If Local has 36k (legacy admin) and Cloud has 5k (new Proprietário RLS),
+          // we SHOULD NOT WIPE, because the local cache will be filtered in-memory anyway by getCanonicalStoreName 
+          // and wiping would force a 36k re-download that RLS will block anyway.
+          
+          if (dbSalesCount > cachedSales.length + 50 || (dbSalesCount === 0 && cachedSales.length > 100)) {
+            setLogs(prev => [...prev, `[System] Inconsistência Crítica (Local: ${cachedSales.length} vs Nuvem (RLS): ${dbSalesCount}). Revalidando base inteira...`]);
             lastCachedDate = null;
             lastCachedOrderDate = null;
             cachedSales = [];
@@ -813,7 +818,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
             setAllRecords([]);
             setAllOrders([]);
           } else {
-            setLogs(prev => [...prev, `[System] Cache validado (Nuvem possui ${dbSalesCount} vendas).`]);
+            setLogs(prev => [...prev, `[System] Cache validado (Nuvem visível via RLS possui ${dbSalesCount} vendas).`]);
           }
         }
       }

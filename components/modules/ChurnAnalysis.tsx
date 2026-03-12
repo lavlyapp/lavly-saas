@@ -99,7 +99,7 @@ export function ChurnAnalysis({ data, selectedStore }: ChurnAnalysisProps) {
 
 
 
-    const [activeTab, setActiveTab] = useState<'actions' | 'predictive' | 'legacy'>(role === 'attendant' ? 'predictive' : 'actions');
+    const [activeTab, setActiveTab] = useState<'actions' | 'predictive' | 'legacy'>(role === 'atendente' ? 'predictive' : 'actions');
 
 
     // Predictive Groups
@@ -199,7 +199,7 @@ export function ChurnAnalysis({ data, selectedStore }: ChurnAnalysisProps) {
     return (
         <div className="flex flex-col h-full space-y-6">
             {/* Tabs */}
-            {role !== 'attendant' && (
+            {role !== 'atendente' && (
                 <div className="flex items-center gap-1 p-1 bg-neutral-900 rounded-lg border border-neutral-800 w-fit">
                     <button
                         onClick={() => setActiveTab('actions')}

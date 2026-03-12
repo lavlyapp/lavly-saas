@@ -34,7 +34,7 @@ export default async function Page() {
                 .single();
 
             if (error) console.error("[Server-Page] Error fetching profile:", error.message);
-            initialRole = profile?.role || 'owner';
+            initialRole = profile?.role || 'proprietario';
             console.log(`[Server-Page] Role resolved: ${initialRole}`);
         } catch (err) {
             console.error("[Server-Page] Critical catch fetching profile:", err);

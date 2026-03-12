@@ -1,7 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-
-export type PlanType = 'bronze' | 'silver' | 'gold';
-
+export type PlanType = 'bronze' | 'prata' | 'ouro';
 interface SubscriptionContextType {
     plan: PlanType;
     setPlan: (plan: PlanType) => void;
@@ -11,23 +9,34 @@ interface SubscriptionContextType {
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
 export function SubscriptionProvider({ children }: { children: React.ReactNode }) {
-    // Default to 'gold' for development/demo, or load from profile in real app
-    const [plan, setPlan] = useState<PlanType>('gold');
+    // Default to 'ouro' for development/demo, or load from profile in real app
+    const [plan, setPlan] = useState<PlanType>('ouro');
 
     // Persist plan selection for demo purposes
     useEffect(() => {
-        const savedPlan = localStorage.getItem('vmpay_demo_plan') as PlanType;
-        if (savedPlan && ['bronze', 'silver', 'gold'].includes(savedPlan)) {
+        const savedPlan = localStorage.getItem('lavly_plan') as PlanType;
+        if (savedPlan && ['bronze', 'prata', 'ouro'].includes(savedPlan)) {
             setPlan(savedPlan);
         }
     }, []);
 
     const updatePlan = (newPlan: PlanType) => {
         setPlan(newPlan);
-        localStorage.setItem('vmpay_demo_plan', newPlan);
+        localStorage.setItem('lavly_plan', newPlan);
     };
 
     const canAccess = (feature: string): boolean => {
+        const hasAccess = (targetPlan: PlanType) => {
+            if (targetPlan === 'bronze') return true; // All plans have bronze features
+            if (targetPlan === 'prata') {
+                return plan === 'prata' || plan === 'ouro';
+            }
+            if (targetPlan === 'ouro') {
+                return plan === 'ouro';
+            }
+            return false;
+        };
+
         switch (feature) {
             case 'financial':
             case 'reports':
@@ -39,10 +48,10 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
             case 'churn_list':
             case 'crm':
             case 'customer_details':
-                return plan === 'silver' || plan === 'gold';
+                return hasAccess('prata');
 
             case 'whatsapp':
-                return plan === 'gold';
+                return hasAccess('ouro');
 
             default:
                 return false;

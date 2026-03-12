@@ -294,11 +294,11 @@ export function CrmCustomerBlock({ periodStats, totalCustomers, onSelectSegment 
                                                         </button>
                                                     ) : (
                                                         <button
-                                                            onClick={() => window.alert('Upgrade para o plano Gold necessário para automação de WhatsApp!')}
+                                                            onClick={() => window.alert('Upgrade para o plano Ouro necessário para automação de WhatsApp!')}
                                                             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500 text-amber-500 hover:text-white text-xs font-bold rounded-lg transition-colors border border-amber-500/30"
                                                         >
                                                             <Sparkles className="w-3 h-3" />
-                                                            Assinar Gold
+                                                            Assinar Ouro
                                                         </button>
                                                     )
                                                 ) : (
