@@ -13,9 +13,11 @@ interface AppSidebarProps {
     onTabChange: (tab: string) => void;
     collapsed: boolean;
     onToggle: () => void;
+    isMobileOpen?: boolean;
+    onMobileClose?: () => void;
 }
 
-export function AppSidebar({ activeTab, onTabChange, collapsed, onToggle }: AppSidebarProps) {
+export function AppSidebar({ activeTab, onTabChange, collapsed, onToggle, isMobileOpen, onMobileClose }: AppSidebarProps) {
     const { plan, setPlan } = useSubscription();
     const { role, logout } = useAuth();
 
@@ -44,26 +46,43 @@ export function AppSidebar({ activeTab, onTabChange, collapsed, onToggle }: AppS
     };
 
     return (
-        <div className={cn(
-            "flex flex-col h-screen bg-neutral-950 border-r border-neutral-900 transition-all duration-300",
-            collapsed ? "w-20" : "w-64"
-        )}>
-            <div className="p-6 flex items-center justify-between">
-                {!collapsed && (
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20">
-                            L
+        <>
+            {/* Mobile Overlay */}
+            {isMobileOpen && (
+                <div 
+                    className="fixed inset-0 bg-black/60 z-40 md:hidden" 
+                    onClick={onMobileClose}
+                />
+            )}
+            <div className={cn(
+                "flex flex-col h-screen bg-neutral-950 border-r border-neutral-900 transition-all duration-300 z-50",
+                "fixed inset-y-0 left-0 md:relative",
+                isMobileOpen ? "translate-x-0 w-64" : "-translate-x-full md:translate-x-0",
+                collapsed ? "md:w-20" : "md:w-64"
+            )}>
+                <div className="p-6 flex items-center justify-between">
+                    {(!collapsed || isMobileOpen) && (
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20">
+                                L
+                            </div>
+                            <span className="font-bold text-white text-xl tracking-tight">Lavly</span>
                         </div>
-                        <span className="font-bold text-white text-xl tracking-tight">Lavly</span>
-                    </div>
-                )}
-                <button
-                    onClick={onToggle}
-                    className="p-2 rounded-lg hover:bg-neutral-900 text-neutral-400 transition-colors"
-                >
-                    {collapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
-                </button>
-            </div>
+                    )}
+                    <button
+                        onClick={isMobileOpen ? onMobileClose : onToggle}
+                        className="p-2 rounded-lg hover:bg-neutral-900 text-neutral-400 transition-colors hidden md:block"
+                    >
+                        {collapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+                    </button>
+                    {/* Botão fechar apenas no mobile */}
+                    <button
+                        onClick={onMobileClose}
+                        className="p-2 rounded-lg hover:bg-neutral-900 text-neutral-400 transition-colors md:hidden"
+                    >
+                        <ChevronLeft className="w-5 h-5" />
+                    </button>
+                </div>
 
             <nav className="flex-1 px-4 space-y-2 mt-4">
                 {menuItems.filter(item => isVisible(item.requiredPlan, item.roles)).map((item) => (
@@ -108,5 +127,6 @@ export function AppSidebar({ activeTab, onTabChange, collapsed, onToggle }: AppS
                 </button>
             </div>
         </div>
+        </>
     );
 }

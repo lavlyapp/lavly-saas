@@ -461,7 +461,7 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
             </div>
 
             {/* KPI Cards - Grid 7 items (4 cols) */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
                 {/* 1. Faturamento (Hero - Span 2) */}
                 {/* 1. Faturamento (Hero - Highlighted Style) */}
@@ -570,7 +570,7 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                     {/* Main Chart Area - Full Width */}
                     <div className="grid grid-cols-1 gap-6">
                         {/* Revenue Chart */}
-                        <div className="w-full bg-neutral-900/50 p-6 rounded-xl border border-neutral-800 h-[400px]">
+                        <div className="w-full bg-neutral-900/50 p-4 sm:p-6 rounded-xl border border-neutral-800 h-[300px] sm:h-[400px]">
                             <h3 className="font-semibold text-neutral-300 mb-6">{isMultiStoreView ? 'Vendas por Loja' : 'Receita Diária'}</h3>
                             <ResponsiveContainer width="100%" height={300}>
                                 <BarChart data={isMultiStoreView ? storeData : dailyData}>
@@ -617,7 +617,8 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                         <div className="p-4 border-b border-neutral-800 bg-neutral-900/50 flex justify-between items-center">
                             <h3 className="font-semibold text-neutral-300">Resumo por Forma de Pagamento</h3>
                         </div>
-                        <table className="w-full text-left text-sm">
+                        <div className="overflow-x-auto w-full">
+                        <table className="w-full min-w-[500px] text-left text-sm">
                             <thead className="bg-neutral-950/50 text-neutral-400 font-medium">
                                 <tr>
                                     <th className="p-4">Método</th>
@@ -676,6 +677,7 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                                 </tr>
                             </tbody>
                         </table>
+                        </div>
                     </div>
                     <div className="pt-8">
                         <MachineMonitor allRecords={allRecords || data.records} allOrders={allOrders || data.orders || []} selectedStore={selectedStore} />

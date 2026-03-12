@@ -328,7 +328,7 @@ export function ComparativeDashboard({ data, customers, selectedStore = 'Todas' 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
                 {/* Revenue Line/Bar */}
-                <div className="bg-neutral-900/50 p-6 rounded-xl border border-neutral-800 h-[400px] flex flex-col">
+                <div className="bg-neutral-900/50 p-4 sm:p-6 rounded-xl border border-neutral-800 h-[300px] sm:h-[400px] flex flex-col">
                     <h3 className="font-semibold text-neutral-300 mb-6">Faturamento Mensal</h3>
                     <div className="flex-1 min-h-0">
                         <ResponsiveContainer width="100%" height="100%">
@@ -347,7 +347,7 @@ export function ComparativeDashboard({ data, customers, selectedStore = 'Todas' 
                 </div>
 
                 {/* Customers & Ticket (Composed Line/Bar) */}
-                <div className="bg-neutral-900/50 p-6 rounded-xl border border-neutral-800 h-[400px] flex flex-col">
+                <div className="bg-neutral-900/50 p-4 sm:p-6 rounded-xl border border-neutral-800 h-[300px] sm:h-[400px] flex flex-col">
                     <h3 className="font-semibold text-neutral-300 mb-6">Clientes Únicos vs Ticket Médio</h3>
                     <div className="flex-1 min-h-0">
                         <ResponsiveContainer width="100%" height="100%">
@@ -380,8 +380,8 @@ export function ComparativeDashboard({ data, customers, selectedStore = 'Todas' 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
                 {/* Washes vs Dries */}
-                <div className="bg-neutral-900/50 p-6 rounded-xl border border-neutral-800 h-[350px] flex flex-col">
-                    <h3 className="font-semibold text-neutral-300 mb-6">Volume de Serviços (Lavagem vs Secagem)</h3>
+                <div className="bg-neutral-900/50 p-4 sm:p-6 rounded-xl border border-neutral-800 h-[300px] sm:h-[350px] flex flex-col">
+                    <h3 className="font-semibold text-neutral-300 mb-6 text-sm sm:text-base">Volume de Serviços (Lavagem vs Secagem)</h3>
                     <div className="flex-1 min-h-0">
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={monthlyStats} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -408,8 +408,8 @@ export function ComparativeDashboard({ data, customers, selectedStore = 'Todas' 
                 </div>
 
                 {/* Gender Demographics over Time */}
-                <div className="bg-neutral-900/50 p-6 rounded-xl border border-neutral-800 h-[350px] flex flex-col">
-                    <h3 className="font-semibold text-neutral-300 mb-6">Evolução do Público (% Homens vs Mulheres)</h3>
+                <div className="bg-neutral-900/50 p-4 sm:p-6 rounded-xl border border-neutral-800 h-[300px] sm:h-[350px] flex flex-col">
+                    <h3 className="font-semibold text-neutral-300 mb-6 text-sm sm:text-base">Evolução do Público (% Homens vs Mulheres)</h3>
                     <div className="flex-1 min-h-0">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={monthlyStats} stackOffset="expand" margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
@@ -432,7 +432,7 @@ export function ComparativeDashboard({ data, customers, selectedStore = 'Todas' 
             {/* Grid 3: Best Days and Weeks */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Best Days */}
-                <div className="bg-neutral-900/50 p-6 rounded-xl border border-neutral-800 h-[350px] flex flex-col">
+                <div className="bg-neutral-900/50 p-4 sm:p-6 rounded-xl border border-neutral-800 h-[300px] sm:h-[350px] flex flex-col">
                     <h3 className="font-semibold text-neutral-300 mb-1">Média de Faturamento por Dia da Semana</h3>
                     <p className="text-xs text-neutral-500 mb-6">Considera todo o período filtrado.</p>
                     <div className="flex-1 min-h-0">
@@ -452,7 +452,7 @@ export function ComparativeDashboard({ data, customers, selectedStore = 'Todas' 
                 </div>
 
                 {/* Best Weeks */}
-                <div className="bg-neutral-900/50 p-6 rounded-xl border border-neutral-800 h-[350px] flex flex-col">
+                <div className="bg-neutral-900/50 p-4 sm:p-6 rounded-xl border border-neutral-800 h-[300px] sm:h-[350px] flex flex-col">
                     <h3 className="font-semibold text-neutral-300 mb-1">Faturamento por Semana do Mês</h3>
                     <p className="text-xs text-neutral-500 mb-6">Média de desempenho por semana.</p>
                     <div className="flex-1 min-h-0">

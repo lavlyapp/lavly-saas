@@ -406,6 +406,7 @@ function AppContent({
 
   // --- Adicionado estado local AQUI dento do Provider (onde o AppSidebar é renderizado) ---
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen bg-neutral-950 font-sans text-neutral-100">
@@ -416,32 +417,42 @@ function AppContent({
         onTabChange={setActiveTab}
         collapsed={isSidebarCollapsed}
         onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        isMobileOpen={isMobileMenuOpen}
+        onMobileClose={() => setIsMobileMenuOpen(false)}
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden">
+      <main className="flex-1 flex flex-col h-screen overflow-hidden overflow-y-auto w-full max-w-[100vw]">
 
         {/* Top Header */}
-        <header className="border-b border-neutral-800 bg-neutral-950/50 backdrop-blur-md p-6 flex justify-between items-center z-10">
-          <div className="flex items-center gap-6">
-            <div>
-              <h2 className="text-2xl font-bold bg-white bg-clip-text text-transparent">
-                {activeTab === 'financial' && 'Visão Financeira'}
-                {activeTab === 'comparative' && 'Financeiro Comparativo'}
-                {activeTab === 'crm' && 'Gestão de Clientes'}
-                {activeTab === 'churn' && 'Análise de Churn & Retenção'}
-                {activeTab === 'machines' && 'Parque de Máquinas'}
-                {activeTab === 'logs' && 'Auditoria de Sistema'}
-              </h2>
-              <p className="text-sm text-neutral-500">
-                {allRecords.length > 0
-                  ? `${allRecords.length} vendas totais | ${stores.length} lojas`
-                  : 'Aguardando importação...'}
-              </p>
+        <header className="border-b border-neutral-800 bg-neutral-950/50 backdrop-blur-md p-4 md:p-6 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 z-10 sticky top-0">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full xl:w-auto">
+            <div className="flex items-center gap-3 w-full sm:w-auto overflow-hidden">
+              <button
+                className="md:hidden p-2 -ml-2 rounded-lg hover:bg-neutral-800 text-neutral-400 shrink-0"
+                onClick={() => setIsMobileMenuOpen(true)}
+              >
+                <Menu className="w-6 h-6" />
+              </button>
+              <div className="min-w-0">
+                <h2 className="text-xl md:text-2xl font-bold bg-white bg-clip-text text-transparent truncate">
+                  {activeTab === 'financial' && 'Visão Financeira'}
+                  {activeTab === 'comparative' && 'Financeiro Comparativo'}
+                  {activeTab === 'crm' && 'Gestão de Clientes'}
+                  {activeTab === 'churn' && 'Análise de Churn & Retenção'}
+                  {activeTab === 'machines' && 'Parque de Máquinas'}
+                  {activeTab === 'logs' && 'Auditoria de Sistema'}
+                </h2>
+                <p className="text-xs md:text-sm text-neutral-500 truncate">
+                  {allRecords.length > 0
+                    ? `${allRecords.length} vendas | ${stores.length} lojas`
+                    : 'Aguardando importação...'}
+                </p>
+              </div>
             </div>
 
             {/* STORE SELECTOR */}
-            <div className="ml-4">
+            <div className="w-full sm:w-auto shrink-0 z-50">
               <StoreSelector
                 stores={stores}
                 selectedStore={selectedStore}
@@ -451,7 +462,7 @@ function AppContent({
           </div>
 
           {/* Quick Actions */}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 w-full xl:w-auto overflow-x-auto pb-2 xl:pb-0 scrollbar-hide">
 
 
             <button

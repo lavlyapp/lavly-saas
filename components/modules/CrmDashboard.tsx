@@ -537,8 +537,8 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
                             <p className="text-sm text-neutral-500">Baseado no volume total de gastos (Vitalício)</p>
                         </div>
 
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-sm">
+                        <div className="overflow-x-auto w-full">
+                            <table className="w-full min-w-[800px] text-left text-sm">
                                 <thead className="bg-neutral-950 text-neutral-400 uppercase font-medium">
                                     <tr>
                                         <th className="px-6 py-4">Ranking</th>
@@ -634,8 +634,8 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
                         </div>
 
                         {/* Content Table */}
-                        <div className="flex-1 overflow-auto p-0">
-                            <table className="w-full text-left text-sm">
+                        <div className="flex-1 overflow-auto p-0 w-full">
+                            <table className="w-full min-w-[800px] text-left text-sm">
                                 <thead className="bg-neutral-950 text-neutral-400 uppercase font-medium sticky top-0 z-10 shadow-sm border-b border-neutral-800">
                                     <tr>
                                         <th className="px-6 py-4">Cliente / Info</th>
