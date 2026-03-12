@@ -176,6 +176,7 @@ function AppContent({
   const { isAuthenticated, isLoading, token } = useAuth();
   const [showTerms, setShowTerms] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isLogsCollapsed, setIsLogsCollapsed] = useState(false);
   const hasLoaded = useRef(false);
 
   useEffect(() => {
