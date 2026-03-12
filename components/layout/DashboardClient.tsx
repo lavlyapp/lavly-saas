@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Upload, FileUp, CheckCircle, AlertCircle, Building2, Filter, RefreshCw, FileText, Users } from "lucide-react";
+import {
+  FileUp, Calendar, AlertCircle, RefreshCw, LogOut,
+  Moon, Sun, MapPin, Briefcase, FileText, Download, CheckCircle, Upload, Menu,
+  ChevronDown, ChevronUp // Added toggle icons
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { StoreSelector } from "@/components/layout/StoreSelector";
@@ -560,13 +564,24 @@ function AppContent({
         </div>
         {/* Debug Logs Section - ALWAYS SHOW IF LOGS EXIST */}
         {logs.length > 0 && (
-          <div className="mt-8 p-4 bg-neutral-900 border border-neutral-800 rounded-lg overflow-hidden">
-            <h3 className="text-sm font-bold text-neutral-400 mb-2">Debug LOG do Sistema</h3>
-            <div className="h-48 overflow-y-auto font-mono text-xs text-neutral-500 bg-black p-2 rounded">
-              {logs.map((log: string, i: number) => (
-                <div key={i}>{log}</div>
-              ))}
+          <div className="mt-8 p-4 bg-neutral-900 border border-neutral-800 rounded-lg overflow-hidden transition-all duration-300">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-bold text-neutral-400">Debug LOG do Sistema</h3>
+              <button
+                onClick={() => setIsLogsCollapsed(!isLogsCollapsed)}
+                className="p-1 rounded hover:bg-neutral-800 text-neutral-500 hover:text-neutral-300 transition-colors"
+                title={isLogsCollapsed ? "Expandir Logs" : "Recolher Logs"}
+              >
+                {isLogsCollapsed ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
             </div>
+            {!isLogsCollapsed && (
+              <div className="h-48 overflow-y-auto font-mono text-xs text-neutral-500 bg-black p-2 rounded">
+                {logs.map((log: string, i: number) => (
+                  <div key={i}>{log}</div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </main>
