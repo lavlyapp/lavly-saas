@@ -399,6 +399,9 @@ function AppContent({
     return <LoginForm />;
   }
 
+  // --- Adicionado estado local AQUI dento do Provider (onde o AppSidebar é renderizado) ---
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
   return (
     <div className="flex min-h-screen bg-neutral-950 font-sans text-neutral-100">
 
@@ -406,8 +409,8 @@ function AppContent({
       <AppSidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        collapsed={false}
-        onToggle={() => { }}
+        collapsed={isSidebarCollapsed}
+        onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
       />
 
       {/* Main Content Area */}
@@ -591,6 +594,7 @@ function AppContent({
 
 export default function DashboardClient({ initialSession, initialRole }: { initialSession?: any, initialRole?: any }) {
   const [activeTab, setActiveTab] = useState("financial");
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [status, setStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
   const [syncProgress, setSyncProgress] = useState(0); // Progress Bar (0 to 100)

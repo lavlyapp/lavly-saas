@@ -52,9 +52,9 @@ export function AppSidebar({ activeTab, onTabChange, collapsed, onToggle }: AppS
                 {!collapsed && (
                     <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20">
-                            V
+                            L
                         </div>
-                        <span className="font-bold text-white text-xl tracking-tight">VMPay</span>
+                        <span className="font-bold text-white text-xl tracking-tight">Lavly</span>
                     </div>
                 )}
                 <button
