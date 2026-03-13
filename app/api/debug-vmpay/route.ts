@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { VMPAY_API_BASE_URL } from '@/lib/vmpay-config';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +9,7 @@ export async function GET(request: Request) {
         const apiKey = searchParams.get('key');
         if (!apiKey) return NextResponse.json({ error: "Missing key" }, { status: 400 });
 
-        const url = `https://pagamento.vmpay.com.br/api/vendas?pagina=0&quantidade=10`;
+        const url = `${VMPAY_API_BASE_URL}/vendas?pagina=0&quantidade=10`;
 
         const res = await fetch(url, {
             headers: { 'x-api-key': apiKey },
