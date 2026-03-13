@@ -25,21 +25,23 @@ export default async function Page() {
     console.log(`[Server-Page] Session detected: ${!!session?.user}`);
 
     let initialRole = null;
+    let initialExpiresAt = null;
     if (session?.user) {
         try {
             const { data: profile, error } = await supabase
                 .from('profiles')
-                .select('role')
+                .select('role, expires_at')
                 .eq('id', session.user.id)
                 .single();
 
             if (error) console.error("[Server-Page] Error fetching profile:", error.message);
             initialRole = profile?.role || 'proprietario';
-            console.log(`[Server-Page] Role resolved: ${initialRole}`);
+            initialExpiresAt = profile?.expires_at || null;
+            console.log(`[Server-Page] Role resolved: ${initialRole}, ExpiresAt: ${initialExpiresAt}`);
         } catch (err) {
             console.error("[Server-Page] Critical catch fetching profile:", err);
         }
     }
 
-    return <DashboardClient initialSession={session} initialRole={initialRole} />;
+    return <DashboardClient initialSession={session} initialRole={initialRole} initialExpiresAt={initialExpiresAt} />;
 }

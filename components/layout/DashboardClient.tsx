@@ -27,6 +27,7 @@ import { supabase } from "@/lib/supabase";
 import { createClient } from "@supabase/supabase-js";
 import { OnboardingCnpj } from "@/components/modules/OnboardingCnpj";
 import React, { Component, ErrorInfo, ReactNode } from "react";
+import { LavlyAdminDashboard } from "@/components/modules/LavlyAdminDashboard";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean, error: Error | null, errorInfo: ErrorInfo | null }> {
   constructor(props: { children: ReactNode }) {
@@ -173,7 +174,7 @@ function AppContent({
   syncProgress
 }: AppContentProps) {
   const { selectedCustomerName, closeCustomerDetails } = useCustomerContext();
-  const { isAuthenticated, isLoading, token } = useAuth();
+  const { isAuthenticated, isLoading, token, isExpired } = useAuth();
   const [showTerms, setShowTerms] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [isLogsCollapsed, setIsLogsCollapsed] = useState(false);
@@ -197,6 +198,10 @@ function AppContent({
   const renderContent = (token: string | null = null) => {
     // 1. Strict Mount Check (Hydration Fix)
     if (!mounted) return null;
+
+    if (activeTab === 'admin') {
+      return <LavlyAdminDashboard />;
+    }
 
     if (activeTab === 'logs') {
       return <ActivityLogs />;
@@ -566,12 +571,27 @@ function AppContent({
               </div>
             )}
 
-            {/* Content Area - Only force remount on tab change to preserve form state (Settings) */}
-            <ErrorBoundary>
-              <div key={activeTab}>
-                {renderContent(token)}
+            {/* Content Area - Check for expiration first */}
+            {isExpired ? (
+              <div className="flex flex-col items-center justify-center p-12 h-[60vh] w-full bg-neutral-900/80 rounded-3xl border border-red-500/30 text-center animate-in zoom-in-95 duration-500">
+                <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mb-6">
+                  <AlertCircle className="w-10 h-10 text-red-500" />
+                </div>
+                <h2 className="text-3xl font-bold text-white mb-4 tracking-tight">Assinatura Expirada</h2>
+                <p className="text-lg text-neutral-400 max-w-lg mx-auto mb-8">
+                  Para continuar acessando os serviços de inteligência e os relatórios do Lavly SaaS, por favor renove sua licença com a administração.
+                </p>
+                <div className="text-sm font-mono text-neutral-500 bg-black/40 px-4 py-2 rounded-lg border border-neutral-800">
+                  Acesso Restrito Temporariamente
+                </div>
               </div>
-            </ErrorBoundary>
+            ) : (
+              <ErrorBoundary>
+                <div key={activeTab}>
+                  {renderContent(token)}
+                </div>
+              </ErrorBoundary>
+            )}
           </div>
         </div>
         {/* Debug Logs Section - ALWAYS SHOW IF LOGS EXIST */}
@@ -619,7 +639,7 @@ function AppContent({
   );
 }
 
-export default function DashboardClient({ initialSession, initialRole }: { initialSession?: any, initialRole?: any }) {
+export default function DashboardClient({ initialSession, initialRole, initialExpiresAt }: { initialSession?: any, initialRole?: any, initialExpiresAt?: string | null }) {
   const [activeTab, setActiveTab] = useState("financial");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [status, setStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
@@ -1583,7 +1603,7 @@ export default function DashboardClient({ initialSession, initialRole }: { initi
 
   return (
     <SettingsProvider>
-      <AuthProvider initialSession={initialSession} initialRole={initialRole}>
+      <AuthProvider initialSession={initialSession} initialRole={initialRole} initialExpiresAt={initialExpiresAt}>
         <SubscriptionProvider>
           <CustomerProvider>
             <AppContent

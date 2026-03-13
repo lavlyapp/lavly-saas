@@ -9,6 +9,8 @@ export type Role = "admin" | "proprietario" | "atendente";
 interface AuthContextType {
     user: User | null;
     role: Role | null;
+    expiresAt: string | null;
+    isExpired: boolean;
     token: string | null;
     isAuthenticated: boolean;
     isLoading: boolean;
@@ -20,9 +22,10 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children, initialSession, initialRole }: { children: ReactNode, initialSession?: any, initialRole?: Role | null }) {
+export function AuthProvider({ children, initialSession, initialRole, initialExpiresAt }: { children: ReactNode, initialSession?: any, initialRole?: Role | null, initialExpiresAt?: string | null }) {
     const [user, setUser] = useState<User | null>(initialSession?.user ?? null);
     const [role, setRole] = useState<Role | null>(initialRole ?? null);
+    const [expiresAt, setExpiresAt] = useState<string | null>(initialExpiresAt ?? null);
     const [token, setToken] = useState<string | null>(initialSession?.access_token ?? null);
     const [isLoading, setIsLoading] = useState(!initialSession || (initialSession.user && !initialRole));
 
@@ -31,14 +34,16 @@ export function AuthProvider({ children, initialSession, initialRole }: { childr
             try {
                 const { data, error } = await supabase
                     .from('profiles')
-                    .select('role')
+                    .select('role, expires_at')
                     .eq('id', userId)
                     .single();
 
                 if (data) {
                     setRole(data.role as Role);
+                    setExpiresAt(data.expires_at);
                 } else if (error) {
                     setRole("proprietario");
+                    setExpiresAt(null);
                 }
             } finally {
                 setIsLoading(false);
@@ -120,10 +125,14 @@ export function AuthProvider({ children, initialSession, initialRole }: { childr
         await supabase.auth.signOut();
     };
 
+    const isExpired = expiresAt ? new Date() > new Date(expiresAt) : false;
+
     return (
         <AuthContext.Provider value={{
             user,
             role,
+            expiresAt,
+            isExpired,
             token,
             isAuthenticated: !!user,
             isLoading,

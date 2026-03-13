@@ -32,6 +32,7 @@ export function AppSidebar({ activeTab, onTabChange, collapsed, onToggle, isMobi
         { id: 'queue', label: 'Teoria das Filas', icon: Clock, requiredPlan: 'prata', roles: ['proprietario'] }, // Silver+
         { id: 'reports', label: 'Relatórios', icon: FileText, requiredPlan: 'bronze', roles: ['proprietario', 'admin'] },
         { id: 'logs', label: 'Logs do Sistema', icon: ShieldCheck, requiredPlan: 'bronze', roles: ['proprietario', 'admin'] },
+        { id: 'admin', label: 'Lavly SaaS Admin', icon: LayoutDashboard, requiredPlan: 'bronze', roles: ['admin'] },
         { id: 'settings', label: 'Configurações', icon: Settings, disabled: false, requiredPlan: 'prata', roles: ['proprietario', 'admin'] },
     ];
 
