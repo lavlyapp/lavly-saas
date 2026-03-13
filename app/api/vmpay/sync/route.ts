@@ -30,9 +30,19 @@ export async function GET(request: Request) {
             supabaseKey
         );
 
-        // 1. Run sync (checks hours, ac states, etc.)
-        // Pass the authenticated client so sync-manager can use it for RLS-protected updates
-        const newSales = await runGlobalSync(isManual, force, supabaseClient, cnpj);
+        const debugLogs: string[] = [];
+        const originalLog = console.log;
+        const originalError = console.error;
+        console.log = (...args) => { debugLogs.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')); originalLog(...args); };
+        console.error = (...args) => { debugLogs.push('ERROR: ' + args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')); originalError(...args); };
+
+        let newSales: any[] = [];
+        try {
+           newSales = await runGlobalSync(isManual, force, supabaseClient, cnpj);
+        } finally {
+           console.log = originalLog;
+           console.error = originalError;
+        }
 
         // 2. Sync customers - REMOVED for performance, as requested
 
@@ -45,10 +55,11 @@ export async function GET(request: Request) {
         return NextResponse.json({
             success: true,
             records: newSales,
+            debug: debugLogs,
             message: `Sync completed. ${newSales.length} new sales processed.`
         });
     } catch (error: any) {
         console.error("[API] Sync Error:", error);
-        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+        return NextResponse.json({ success: false, error: error.message, stack: error.stack }, { status: 500 });
     }
 }
