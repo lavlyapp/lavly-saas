@@ -29,7 +29,14 @@ export async function GET(request: Request) {
 
         const supabaseClient = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            supabaseKey
+            supabaseKey,
+            {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false,
+                    detectSessionInUrl: false
+                }
+            }
         );
 
         const debugLogs: string[] = [];

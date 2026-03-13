@@ -121,6 +121,7 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
         // --- PERSISTENCE ---
         if (sales.length > 0) {
             const { upsertSales } = await import("../persistence");
+            // FORCE the explicitly passed DB client (Service Key) into persistence
             const persistenceRes = await upsertSales(sales, db);
             if (persistenceRes && !persistenceRes.success) {
                 // Return descriptive error immediately so Vercel logs and frontend surfaces it
