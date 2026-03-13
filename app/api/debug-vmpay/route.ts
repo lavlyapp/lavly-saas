@@ -9,7 +9,13 @@ export async function GET(request: Request) {
         const apiKey = searchParams.get('key');
         if (!apiKey) return NextResponse.json({ error: "Missing key" }, { status: 400 });
 
-        const url = `${VMPAY_API_BASE_URL}/vendas?pagina=0&quantidade=10`;
+        const endDate = new Date();
+        const startDate = new Date(endDate.getTime() - 3 * 24 * 60 * 60 * 1000);
+        
+        const startStr = startDate.toISOString().replace('Z', '');
+        const endStr = endDate.toISOString().replace('Z', '');
+        
+        const url = `${VMPAY_API_BASE_URL}/vendas?dataInicio=${startStr}&dataTermino=${endStr}&somenteSucesso=true&pagina=0&quantidade=10`;
 
         const res = await fetch(url, {
             headers: { 'x-api-key': apiKey },
