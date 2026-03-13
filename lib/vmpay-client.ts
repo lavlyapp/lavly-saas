@@ -44,12 +44,13 @@ async function fetchMachines(apiKey: string): Promise<EquipmentMap> {
     return map;
 }
 
+import { formatInTimeZone } from 'date-fns-tz';
+
 function toLocalVMPayDateString(date: Date): string {
     // UPDATED: VMPay API expects incoming strings to represent BRT time WITHOUT timezone offsets (naked string).
-    // Because our 'date' object is fundamentally UTC, we MUST manually subtract 3 hours (BRT offset)
-    // so that when we strip the 'Z', the remaining string correctly matches Brazil's local time.
-    const brtDate = new Date(date.getTime() - 3 * 60 * 60 * 1000);
-    return brtDate.toISOString().replace('Z', '');
+    // By using date-fns-tz, we guarantee that the resulting string is the exact local time in Brazil
+    // regardless of the server's UTC configuration, eliminating the manual 3-hour blind spot bug.
+    return formatInTimeZone(date, 'America/Sao_Paulo', "yyyy-MM-dd'T'HH:mm:ss");
 }
 
 export async function syncVMPaySales(startDate: Date, endDate: Date, specificCred?: VMPayCredential): Promise<SaleRecord[]> {
