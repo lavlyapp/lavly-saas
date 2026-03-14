@@ -327,8 +327,11 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
 
         const grouped: Record<string, number> = {};
         filteredRecords.forEach((r: any) => {
-            const d = r.data instanceof Date ? r.data : new Date(r.data);
-            const dateKey = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+            // Must use native DB UTC string to align with VMPay
+            const dbDateStr = typeof r.data === 'string' ? r.data.substring(0, 10) : new Date(r.data).toISOString().substring(0, 10);
+            const [y, m, d] = dbDateStr.split('-');
+            const dateKey = `${d}/${m}/${y}`;
+            
             grouped[dateKey] = (grouped[dateKey] || 0) + r.valor;
         });
 
