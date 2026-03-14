@@ -105,48 +105,45 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
     const filteredRecords = useMemo(() => {
         if (!data?.records) return [];
 
-        // Force explicit BRT mapping for filters
         const now = new Date(new Date().getTime() - (3 * 3600 * 1000));
-        let interval: { start: Date; end: Date } | null = null;
-
-        switch (period) {
-            case 'today':
-                interval = { start: startOfDay(now), end: endOfDay(now) };
-                break;
-            case 'yesterday':
-                const yesterday = subDays(now, 1);
-                interval = { start: startOfDay(yesterday), end: endOfDay(yesterday) };
-                break;
-            case 'thisMonth':
-                interval = { start: startOfMonth(now), end: endOfMonth(now) };
-                break;
-            case 'lastMonth':
-                const lastMonth = subMonths(now, 1);
-                interval = { start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) };
-                break;
-            case 'custom':
-                interval = {
-                    start: startOfDay(new Date(customRange.start)),
-                    end: endOfDay(new Date(customRange.end))
-                };
-                break;
-            case 'allTime':
-                interval = null; // No filter
-                break;
-            default:
-                interval = { start: startOfMonth(now), end: endOfMonth(now) };
+        const todayStr = now.toISOString().substring(0, 10);
+        
+        const yest = new Date(now.getTime() - (24 * 3600 * 1000));
+        const yesterdayStr = yest.toISOString().substring(0, 10);
+        
+        let targetMonthStr = todayStr.substring(0, 7);
+        let lastMonthStr = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().substring(0, 7);
+        
+        // Ensure accurate zero-padded dates
+        if (period === 'lastMonth') {
+            const m = now.getMonth(); // 0-indexed. If Jan (0), last month is Dec (11)
+            const y = m === 0 ? now.getFullYear() - 1 : now.getFullYear();
+            const paddedM = m === 0 ? '12' : String(m).padStart(2, '0');
+            lastMonthStr = `${y}-${paddedM}`;
         }
-
-        if (!interval) return data.records;
 
         return data.records.filter((r: any) => {
             if (!r.data) return false;
-            const recordDate = r.data instanceof Date ? r.data : new Date(r.data);
+            // The DB saves dates with +00:00 exactly as they should be presented visually
+            // e.g. "2026-03-14T02:00:00+00:00". We just slice the YYYY-MM-DD.
+            const dbDateStr = typeof r.data === 'string' ? r.data.substring(0, 10) : r.data.toISOString().substring(0, 10);
 
-            // If the record is from today/yesterday, we need to be careful with UTC
-            // Brazil is UTC-3. We consider "Today" to include late UTC sales from yesterday
-            // and exclude early UTC sales from tomorrow.
-            return recordDate >= interval!.start && recordDate <= interval!.end;
+            switch (period) {
+                case 'today':
+                    return dbDateStr === todayStr;
+                case 'yesterday':
+                    return dbDateStr === yesterdayStr;
+                case 'thisMonth':
+                    return dbDateStr.startsWith(targetMonthStr);
+                case 'lastMonth':
+                    return dbDateStr.startsWith(lastMonthStr);
+                case 'custom':
+                    return dbDateStr >= customRange.start && dbDateStr <= customRange.end;
+                case 'allTime':
+                    return true;
+                default:
+                    return dbDateStr.startsWith(targetMonthStr);
+            }
         });
     }, [data?.records, period, customRange]);
 
