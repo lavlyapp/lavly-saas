@@ -1226,6 +1226,28 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         const isMultiStore = uniqueStoreCount > 1;
 
         // --- PRE-COMPUTATION OPTIMIZATION ---
+        cachedSales.forEach(sale => {
+          let dateKey = "";
+          try {
+            // Because the database gives us the correct local BRT time as UTC via Supabase's timestamptz conversion,
+            // Javascript's 'new Date()' parses it cleanly into a local time object.
+            const recordDate = sale.data instanceof Date ? sale.data : new Date(sale.data);
+            dateKey = recordDate.toLocaleDateString('pt-BR');
+          } catch (e) {
+            console.error(e);
+          }
+
+          if (dateKey === todayStr) {
+            dateKey = ptToday;
+          } else if (dateKey === yesterdayStr) {
+            dateKey = ptYesterday;
+          }
+
+          if (dateKey) {
+            if (!salesByDate[dateKey]) salesByDate[dateKey] = [];
+            salesByDate[dateKey].push(sale);
+          }
+        });
         salesByDay.forEach(daySales => {
           daySales.forEach(sale => {
             sale._time = sale.data.getTime();

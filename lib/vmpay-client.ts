@@ -47,10 +47,12 @@ async function fetchMachines(apiKey: string): Promise<EquipmentMap> {
 import { formatInTimeZone } from 'date-fns-tz';
 
 function toLocalVMPayDateString(date: Date): string {
-    // UPDATED: VMPay API expects incoming strings to represent BRT time WITHOUT timezone offsets (naked string).
-    // By using date-fns-tz, we guarantee that the resulting string is the exact local time in Brazil
-    // regardless of the server's UTC configuration, eliminating the manual 3-hour blind spot bug.
-    return formatInTimeZone(date, 'America/Sao_Paulo', "yyyy-MM-dd'T'HH:mm:ss");
+    // VMPay Server operates in UTC-3 (BRT). It ignores 'Z' and assumes the string is LOCAL BRT time.
+    // Our 'date' argument is a perfect absolute UTC Date object. 
+    // To generate a string that visually says '00:00' when the UTC time is '03:00Z', we explicitly subtract 3 hours.
+    const VMPAY_BRT_OFFSET_MS = 3 * 60 * 60 * 1000;
+    const shiftedToBRT = new Date(date.getTime() - VMPAY_BRT_OFFSET_MS);
+    return shiftedToBRT.toISOString().replace('Z', '');
 }
 
 export async function syncVMPaySales(startDate: Date, endDate: Date, specificCred?: VMPayCredential): Promise<SaleRecord[]> {
@@ -139,19 +141,11 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                             produto = "SECAGEM";
                         }
 
-                        // Timezone Handling: VMPay dashboard native analytics (user's print) groups by 
-                        // UTC String representation without timezone offset. It considers a sale at "21:30" 
-                        // to be 21:30 UTC. If we shift it to BRT (-3h) the sale falls into "Yesterday" (18:30).
-                        // To match the VMPay external dashboard exactly as the user requested, we must coerce to UTC.
+                        // Parse as local time. VMPay format is usually "YYYY-MM-DDTHH:mm:ss"
                         let dateStr = sale.data;
-                        if (dateStr) {
-                            if (dateStr.endsWith('Z')) {
-                                dateStr = dateStr.slice(0, -1);
-                            }
-                            const hasOffset = /[-+]\d{2}:\d{2}$/.test(dateStr);
-                            if (!hasOffset) {
-                                dateStr += "Z";
-                            }
+                        if (dateStr && !dateStr.includes('-') && !dateStr.endsWith('Z') && (dateStr.match(/:/g) || []).length >= 2) {
+                            // Only append if it looks like a datetime string without offset
+                            dateStr += "-03:00";
                         }
 
                         const safeDate = new Date(dateStr);
