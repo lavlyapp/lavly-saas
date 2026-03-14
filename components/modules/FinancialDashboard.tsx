@@ -101,14 +101,17 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
     // const [hasAutoSelected, setHasAutoSelected] = useState(false);
 
 
-    // --- Filter Logic ---
     const filteredRecords = useMemo(() => {
         if (!data?.records) return [];
 
-        const now = new Date(new Date().getTime() - (3 * 3600 * 1000));
-        const todayStr = now.toISOString().substring(0, 10);
-        
+        // VMPay's native analytics group by UTC. To match perfectly, we mimic this behavior
+        // by extracting the exact string equivalent of today in UTC.
+        // Even if local BRT says it's 21:30 "Today", VMPay says it's 00:30 "Tomorrow". 
+        // We follow VMPay.
+        const now = new Date();
         const yest = new Date(now.getTime() - (24 * 3600 * 1000));
+        
+        const todayStr = now.toISOString().substring(0, 10);
         const yesterdayStr = yest.toISOString().substring(0, 10);
         
         let targetMonthStr = todayStr.substring(0, 7);
@@ -124,25 +127,19 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
 
         return data.records.filter((r: any) => {
             if (!r.data) return false;
-            // The DB saves dates with +00:00 exactly as they should be presented visually
-            // e.g. "2026-03-14T02:00:00+00:00". We just slice the YYYY-MM-DD.
+            
+            // The DB saves dates in valid UTC timestamptz. We slice the YYYY-MM-DD off the UTC ISOString!
+            // This strictly locks the sale to the day VMPay originally assigned it to.
             const dbDateStr = typeof r.data === 'string' ? r.data.substring(0, 10) : r.data.toISOString().substring(0, 10);
 
             switch (period) {
-                case 'today':
-                    return dbDateStr === todayStr;
-                case 'yesterday':
-                    return dbDateStr === yesterdayStr;
-                case 'thisMonth':
-                    return dbDateStr.startsWith(targetMonthStr);
-                case 'lastMonth':
-                    return dbDateStr.startsWith(lastMonthStr);
-                case 'custom':
-                    return dbDateStr >= customRange.start && dbDateStr <= customRange.end;
-                case 'allTime':
-                    return true;
-                default:
-                    return dbDateStr.startsWith(targetMonthStr);
+                case 'today': return dbDateStr === todayStr;
+                case 'yesterday': return dbDateStr === yesterdayStr;
+                case 'thisMonth': return dbDateStr.startsWith(targetMonthStr);
+                case 'lastMonth': return dbDateStr.startsWith(lastMonthStr);
+                case 'custom': return dbDateStr >= customRange.start && dbDateStr <= customRange.end;
+                case 'allTime': return true;
+                default: return dbDateStr.startsWith(targetMonthStr);
             }
         });
     }, [data?.records, period, customRange]);
@@ -152,43 +149,36 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
         if (!data?.orders) return [];
 
         const now = new Date();
-        let interval: { start: Date; end: Date } | null = null;
-
-        switch (period) {
-            case 'today':
-                interval = { start: startOfDay(now), end: endOfDay(now) };
-                break;
-            case 'yesterday':
-                const yesterday = subDays(now, 1);
-                interval = { start: startOfDay(yesterday), end: endOfDay(yesterday) };
-                break;
-            case 'thisMonth':
-                interval = { start: startOfMonth(now), end: endOfMonth(now) };
-                break;
-            case 'lastMonth':
-                const lastMonth = subMonths(now, 1);
-                interval = { start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) };
-                break;
-            case 'custom':
-                interval = {
-                    start: startOfDay(new Date(customRange.start)),
-                    end: endOfDay(new Date(customRange.end))
-                };
-                break;
-            case 'allTime':
-                interval = null;
-                break;
-            default:
-                interval = { start: startOfMonth(now), end: endOfMonth(now) };
+        const yest = new Date(now.getTime() - (24 * 3600 * 1000));
+        
+        const todayStr = now.toISOString().substring(0, 10);
+        const yesterdayStr = yest.toISOString().substring(0, 10);
+        
+        let targetMonthStr = todayStr.substring(0, 7);
+        let lastMonthStr = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().substring(0, 7);
+        
+        if (period === 'lastMonth') {
+            const m = now.getMonth();
+            const y = m === 0 ? now.getFullYear() - 1 : now.getFullYear();
+            const paddedM = m === 0 ? '12' : String(m).padStart(2, '0');
+            lastMonthStr = `${y}-${paddedM}`;
         }
 
-        if (!interval) return data.orders;
+        return data.orders.filter((r: any) => {
+            if (!r.created_at) return false;
+            
+            // Match the strict string extraction to exactly replicate VMPay's UTC-bound metrics
+            const dbDateStr = typeof r.created_at === 'string' ? r.created_at.substring(0, 10) : r.created_at.toISOString().substring(0, 10);
 
-        return data.orders.filter((o: any) => {
-            if (!o.data) return false;
-            // OPTIMIZATION: Assume o.data is already a Date or handle it safely
-            const recordDate = o.data instanceof Date ? o.data : new Date(o.data);
-            return recordDate >= interval!.start && recordDate <= interval!.end;
+            switch (period) {
+                case 'today': return dbDateStr === todayStr;
+                case 'yesterday': return dbDateStr === yesterdayStr;
+                case 'thisMonth': return dbDateStr.startsWith(targetMonthStr);
+                case 'lastMonth': return dbDateStr.startsWith(lastMonthStr);
+                case 'custom': return dbDateStr >= customRange.start && dbDateStr <= customRange.end;
+                case 'allTime': return true;
+                default: return dbDateStr.startsWith(targetMonthStr);
+            }
         });
     }, [data?.orders, period, customRange]);
 

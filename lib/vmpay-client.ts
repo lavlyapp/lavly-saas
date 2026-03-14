@@ -46,15 +46,6 @@ async function fetchMachines(apiKey: string): Promise<EquipmentMap> {
 
 import { formatInTimeZone } from 'date-fns-tz';
 
-function toLocalVMPayDateString(date: Date): string {
-    // VMPay Server operates in UTC-3 (BRT). It ignores 'Z' and assumes the string is LOCAL BRT time.
-    // Our 'date' argument is a perfect absolute UTC Date object. 
-    // To generate a string that visually says '00:00' when the UTC time is '03:00Z', we explicitly subtract 3 hours.
-    const VMPAY_BRT_OFFSET_MS = 3 * 60 * 60 * 1000;
-    const shiftedToBRT = new Date(date.getTime() - VMPAY_BRT_OFFSET_MS);
-    return shiftedToBRT.toISOString().replace('Z', '');
-}
-
 export async function syncVMPaySales(startDate: Date, endDate: Date, specificCred?: VMPayCredential): Promise<SaleRecord[]> {
     const salesMap = new Map<string, SaleRecord>(); // Dedup by CNPJ + ID
 
@@ -85,8 +76,8 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                 let page = 0;
                 const size = 1000; // API max
 
-                const startStr = toLocalVMPayDateString(chunk.start);
-                const endStr = toLocalVMPayDateString(chunk.end);
+                const startStr = chunk.start.toISOString();
+                const endStr = chunk.end.toISOString();
 
                 console.log(`[VMPay Client] Syncing ${cred.name} chunk: ${startStr} to ${endStr}`);
 
@@ -141,13 +132,11 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                             produto = "SECAGEM";
                         }
 
-                        // Parse as local time. VMPay format is usually "YYYY-MM-DDTHH:mm:ss"
+                        // Fix Timezone: API natively returns UTC timestamps but often omits the 'Z' suffix
                         let dateStr = sale.data;
-                        if (dateStr && !dateStr.includes('-') && !dateStr.endsWith('Z') && (dateStr.match(/:/g) || []).length >= 2) {
-                            // Only append if it looks like a datetime string without offset
-                            dateStr += "-03:00";
+                        if (dateStr && typeof dateStr === 'string' && !dateStr.endsWith('Z')) {
+                            dateStr += 'Z';
                         }
-
                         const safeDate = new Date(dateStr);
 
                         // Parse ALL items
