@@ -16,7 +16,10 @@ export async function upsertSales(records: SaleRecord[], supabaseClient?: any) {
         // 1. Prepare Sales for DB (Snake Case)
         const salesToUpsert = records.map(r => ({
             id: r.id,
-            data: r.data.toISOString(),
+            // r.data is currently a Date object, but its internal value was parsed with 'Z'
+            // We strip any JS local timezone noise by grabbing the ISO string and chopping off the Z
+            // to store a "Naked" local timestamp in Supabase
+            data: r.data.toISOString().replace('Z', ''),
             loja: getCanonicalStoreName(r.loja),
             cliente: r.cliente,
             customer_id: r.customerId,
