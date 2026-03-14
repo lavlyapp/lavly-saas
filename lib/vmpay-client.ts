@@ -139,12 +139,19 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                             produto = "SECAGEM";
                         }
 
-                        // Timezone Handling (UPDATED):
-                        // VMPay now returns naked strings representing UTC time (e.g., "2026-03-08T15:54:12").
-                        // We must explicitly append 'Z' so our JS Date parses it correctly as UTC.
+                        // Fix Timezone: VMPay API returns BRT (UTC-3) timestamps but drops the offset (e.g. 13:50 instead of 13:50-03:00)
+                        // This causes local afternoon sales to be parsed as UTC afternoon sales, moving them 3 hours into the past!
+                        // Appending '-03:00' forces Javascript engines to correctly respect the local Brazilian nature of the timestamp.
                         let dateStr = sale.data;
-                        if (dateStr && !dateStr.includes('Z') && !/[-+]\d{2}:\d{2}$/.test(dateStr)) {
-                            dateStr += "Z";
+                        if (dateStr) {
+                            if (dateStr.endsWith('Z')) {
+                                dateStr = dateStr.slice(0, -1);
+                            }
+                            // Check if it already has an offset like -03:00 or +00:00
+                            const hasOffset = /[-+]\d{2}:\d{2}$/.test(dateStr);
+                            if (!hasOffset) {
+                                dateStr += "-03:00";
+                            }
                         }
 
                         const safeDate = new Date(dateStr);
