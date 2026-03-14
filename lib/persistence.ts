@@ -35,13 +35,13 @@ export async function upsertSales(records: SaleRecord[], supabaseClient?: any) {
         console.log(`[Persistence] Upserting ${salesToUpsert.length} sales records...`);
         
         // --- DIAGNOSTIC: Check who we are before upserting ---
-        const { data: dbIdentity, error: idErr } = await db.rpc('get_my_claims_or_role').catch(() => ({ data: null, error: null }));
-        if (idErr) {
+        const rpcResult = await db.rpc('get_my_claims_or_role');
+        if (rpcResult.error) {
              // Fallback if rpc doesn't exist just read current setting
-             const { data: roleData } = await db.from('store_access_view').select('*').limit(1).catch(() => ({data: null}));
-             console.log(`[Persistence DIAGNOSTIC] identity fallback ping: ${roleData ? 'ok' : 'fail'}`);
+             const roleResult = await db.from('store_access_view').select('*').limit(1);
+             console.log(`[Persistence DIAGNOSTIC] identity fallback ping: ${roleResult.data ? 'ok' : 'fail'}`);
         } else {
-             console.log(`[Persistence DIAGNOSTIC] DB Executing As:`, dbIdentity);
+             console.log(`[Persistence DIAGNOSTIC] DB Executing As:`, rpcResult.data);
         }
 
         const { error: salesError } = await db
