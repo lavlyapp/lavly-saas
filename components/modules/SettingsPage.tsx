@@ -25,6 +25,13 @@ export interface StoreCredential {
     state?: string;
     latitude?: number;
     longitude?: number;
+
+    // Campos Tuya Smart (Automação AC)
+    tuya_client_id?: string;
+    tuya_client_secret?: string;
+    tuya_device_id?: string;
+    tuya_scene_on_id?: string;
+    tuya_scene_off_id?: string;
 }
 
 export function SettingsPage() {
@@ -117,7 +124,12 @@ export function SettingsPage() {
                         city: s.city || "",
                         state: s.state || "",
                         latitude: s.latitude,
-                        longitude: s.longitude
+                        longitude: s.longitude,
+                        tuya_client_id: s.tuya_client_id || "",
+                        tuya_client_secret: s.tuya_client_secret || "",
+                        tuya_device_id: s.tuya_device_id || "",
+                        tuya_scene_on_id: s.tuya_scene_on_id || "",
+                        tuya_scene_off_id: s.tuya_scene_off_id || ""
                     })));
                 } else {
                     console.log("SettingsPage: Bank is empty. Auto-seeding Static Fallback Stores.");
@@ -178,7 +190,12 @@ export function SettingsPage() {
             city: "",
             state: "",
             latitude: undefined,
-            longitude: undefined
+            longitude: undefined,
+            tuya_client_id: "",
+            tuya_client_secret: "",
+            tuya_device_id: "",
+            tuya_scene_on_id: "",
+            tuya_scene_off_id: ""
         }]);
     };
 
@@ -315,6 +332,11 @@ export function SettingsPage() {
                         state: store.state || "",
                         latitude: lat,
                         longitude: lon,
+                        tuya_client_id: store.tuya_client_id || null,
+                        tuya_client_secret: store.tuya_client_secret || null,
+                        tuya_device_id: store.tuya_device_id || null,
+                        tuya_scene_on_id: store.tuya_scene_on_id || null,
+                        tuya_scene_off_id: store.tuya_scene_off_id || null,
                         updated_at: new Date().toISOString()
                     });
                 }
@@ -397,18 +419,18 @@ export function SettingsPage() {
         });
     };
 
-    const testTuyaConnection = async (storeName: string) => {
-        const settings = localAutomation[storeName];
-        if (!settings || !settings.tuyaAccessId || !settings.tuyaAccessSecret || !settings.tuyaDeviceId) {
-            alert('Preencha as credenciais da Tuya primeiro.');
+    const testTuyaConnection = async (idx: number) => {
+        const store = stores[idx];
+        if (!store || !store.tuya_client_id || !store.tuya_client_secret || !store.tuya_device_id) {
+            alert('Preencha as credenciais da Tuya (Client ID, Secret e Device ID) primeiro.');
             return;
         }
 
         try {
-            const res = await fetch(`/api/tuya?action=status&deviceId=${settings.tuyaDeviceId}`, {
+            const res = await fetch(`/api/tuya?action=status&deviceId=${store.tuya_device_id}`, {
                 headers: {
-                    'x-tuya-id': settings.tuyaAccessId,
-                    'x-tuya-secret': settings.tuyaAccessSecret
+                    'x-tuya-id': store.tuya_client_id,
+                    'x-tuya-secret': store.tuya_client_secret
                 }
             });
             const data = await res.json();
@@ -659,6 +681,75 @@ export function SettingsPage() {
                                                 maxLength={2}
                                                 value={store.state || ''}
                                                 onChange={(e) => handleStoreChange(idx, 'state', e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Tuya Integration Section */}
+                                <div className="pt-4 border-t border-neutral-800 space-y-4">
+                                    <div className="flex items-center justify-between text-blue-400">
+                                        <div className="flex items-center gap-2">
+                                            <Key className="w-3 h-3" />
+                                            <span className="text-[10px] font-bold uppercase tracking-wider">Integração Tuya Smart (Automação AC)</span>
+                                        </div>
+                                        <button onClick={() => testTuyaConnection(idx)} className="px-3 py-1 bg-neutral-800 text-[10px] font-bold text-neutral-400 rounded-lg hover:bg-neutral-700 transition-all shadow-sm">
+                                            Testar Conexão Tuya
+                                        </button>
+                                    </div>
+
+                                    <div className="grid md:grid-cols-3 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-neutral-500 uppercase">Access ID (Client ID)</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-blue-500 outline-none"
+                                                placeholder="Tuya Access ID"
+                                                value={store.tuya_client_id || ''}
+                                                onChange={(e) => handleStoreChange(idx, 'tuya_client_id', e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-neutral-500 uppercase">Access Secret</label>
+                                            <input
+                                                type="password"
+                                                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-blue-500 outline-none"
+                                                placeholder="Tuya Access Secret"
+                                                value={store.tuya_client_secret || ''}
+                                                onChange={(e) => handleStoreChange(idx, 'tuya_client_secret', e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-neutral-500 uppercase">Hub / Device ID</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-blue-500 outline-none"
+                                                placeholder="Device ID do Controle IR"
+                                                value={store.tuya_device_id || ''}
+                                                onChange={(e) => handleStoreChange(idx, 'tuya_device_id', e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-neutral-500 uppercase">ID da Cena: Ligar Refrigeração</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-blue-500 outline-none"
+                                                placeholder="Ex: hwyd3210..."
+                                                value={store.tuya_scene_on_id || ''}
+                                                onChange={(e) => handleStoreChange(idx, 'tuya_scene_on_id', e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-neutral-500 uppercase">ID da Cena: Desligar Refrigeração</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-blue-500 outline-none"
+                                                placeholder="Ex: uiyf9876..."
+                                                value={store.tuya_scene_off_id || ''}
+                                                onChange={(e) => handleStoreChange(idx, 'tuya_scene_off_id', e.target.value)}
                                             />
                                         </div>
                                     </div>
