@@ -1509,7 +1509,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         setMessage(`Sincronizando ${cred.name} (${i + 1} de ${totalStores})...`);
         setLogs(prev => [...prev, `[VMPay] Sincronizando ${cred.name} (${cred.cnpj})...`]);
 
-        const url = `/api/vmpay/sync?source=manual&cnpj=${cred.cnpj}${isFirstSync ? "&force=true" : ""}`;
+        const url = `/api/vmpay/sync?manual=true&cnpj=${cred.cnpj}${isFirstSync ? "&force=true" : ""}`;
 
         try {
           const controller = new AbortController();

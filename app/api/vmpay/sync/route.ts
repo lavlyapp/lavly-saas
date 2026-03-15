@@ -14,7 +14,7 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url);
         const cnpj = searchParams.get('store') || searchParams.get('cnpj') || undefined;
         const force = searchParams.get('force') === 'true';
-        const isManual = searchParams.get('manual') === 'true' || searchParams.get('isManual') === 'true';
+        const isManual = searchParams.get('manual') === 'true' || searchParams.get('isManual') === 'true' || searchParams.get('source') === 'manual';
 
         // We MUST use the service role key for cron jobs and background syncs
         // because RLS blocking will silently drop the sales but return success
