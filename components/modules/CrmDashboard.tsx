@@ -106,39 +106,37 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
     const filteredRecords = useMemo(() => {
         if (!data?.records) return [];
 
-        // Force explicit BRT mapping for filters
-        const now = new Date(new Date().getTime() - (3 * 3600 * 1000));
-        let interval: { start: Date; end: Date };
-
-        switch (period) {
-            case 'today':
-                interval = { start: startOfDay(now), end: endOfDay(now) };
-                break;
-            case 'yesterday':
-                const yesterday = subDays(now, 1);
-                interval = { start: startOfDay(yesterday), end: endOfDay(yesterday) };
-                break;
-            case 'thisMonth':
-                interval = { start: startOfMonth(now), end: endOfMonth(now) };
-                break;
-            case 'lastMonth':
-                const lastMonth = subMonths(now, 1);
-                interval = { start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) };
-                break;
-            case 'custom':
-                interval = {
-                    start: startOfDay(new Date(customRange.start)),
-                    end: endOfDay(new Date(customRange.end))
-                };
-                break;
-            default:
-                interval = { start: startOfMonth(now), end: endOfMonth(now) };
+        // Exact match with FinancialDashboard.tsx to ensure totals align perfectly
+        // VMPay's native analytics group by UTC. We extract the exact YYYY-MM-DD from the UTC string.
+        const now = new Date();
+        const yest = new Date(now.getTime() - (24 * 3600 * 1000));
+        
+        const todayStr = now.toISOString().substring(0, 10);
+        const yesterdayStr = yest.toISOString().substring(0, 10);
+        
+        let targetMonthStr = todayStr.substring(0, 7);
+        let lastMonthStr = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().substring(0, 7);
+        
+        if (period === 'lastMonth') {
+            const m = now.getMonth();
+            const y = m === 0 ? now.getFullYear() - 1 : now.getFullYear();
+            const paddedM = m === 0 ? '12' : String(m).padStart(2, '0');
+            lastMonthStr = `${y}-${paddedM}`;
         }
 
         return data.records.filter((r) => {
             if (!r.data) return false;
-            const ts = r.data instanceof Date ? r.data.getTime() : new Date(r.data).getTime();
-            return ts >= interval.start.getTime() && ts <= interval.end.getTime();
+            const dataAny = r.data as any;
+            const dbDateStr = typeof dataAny === 'string' ? dataAny.substring(0, 10) : dataAny.toISOString().substring(0, 10);
+            
+            switch (period) {
+                case 'today': return dbDateStr === todayStr;
+                case 'yesterday': return dbDateStr === yesterdayStr;
+                case 'thisMonth': return dbDateStr.startsWith(targetMonthStr);
+                case 'lastMonth': return dbDateStr.startsWith(lastMonthStr);
+                case 'custom': return dbDateStr >= customRange.start && dbDateStr <= customRange.end;
+                default: return dbDateStr.startsWith(targetMonthStr);
+            }
         });
     }, [data.records, period, customRange]);
 

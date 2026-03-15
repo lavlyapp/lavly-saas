@@ -119,7 +119,8 @@ export function ComparativeDashboard({ data, customers, selectedStore = 'Todas' 
             // 1. Sales & Revenue
             const monthSales = filteredRecords.filter(r => {
                 if (!r.data) return false;
-                const d = new Date(r.data);
+                const rTime = typeof r.data === 'string' ? new Date(r.data).getTime() : r.data.getTime();
+                const d = new Date(rTime - (3 * 3600 * 1000));
                 return d >= month.start && d <= month.end;
             });
 
@@ -127,13 +128,18 @@ export function ComparativeDashboard({ data, customers, selectedStore = 'Todas' 
             const uniqueCustomers = new Set(monthSales.map(r => r.cliente || 'Anonimo')).size;
 
             // 1.5. CRM Metrics Equivalent (Fast Calculation based on pre-processed visits)
-            const monthVisits = customerVisitsList.filter(v => v.date >= month.start && v.date <= month.end);
+            const monthVisits = customerVisitsList.filter(v => {
+                const vTime = typeof v.date === 'string' ? new Date(v.date).getTime() : v.date.getTime();
+                const d = new Date(vTime - (3 * 3600 * 1000));
+                return d >= month.start && d <= month.end;
+            });
             const ticketAverage = monthVisits.length > 0 ? totalRevenue / monthVisits.length : 0;
 
             // 2. Orders & Services (Baskets, Washes, Dries)
             const monthOrders = filteredOrders.filter(o => {
                 if (!o.data) return false;
-                const d = new Date(o.data);
+                const oTime = typeof o.data === 'string' ? new Date(o.data).getTime() : o.data.getTime();
+                const d = new Date(oTime - (3 * 3600 * 1000));
                 return d >= month.start && d <= month.end;
             });
 
@@ -257,10 +263,10 @@ export function ComparativeDashboard({ data, customers, selectedStore = 'Todas' 
 
         filteredRecords.forEach(r => {
             if (!r.data) return;
-            const date = new Date(r.data);
+            const rTime = typeof r.data === 'string' ? new Date(r.data).getTime() : r.data.getTime();
             const val = r.valor || 0;
 
-            const brtDate = new Date(date.getTime() - (3 * 3600 * 1000));
+            const brtDate = new Date(rTime - (3 * 3600 * 1000));
             const dayOfWeek = brtDate.getUTCDay(); // 0 = Sunday, 1 = Monday...
             // @ts-ignore
             const dayName = format(brtDate, 'EEEE', { locale: ptBR }); // Not used in this snippet, but kept as per instruction

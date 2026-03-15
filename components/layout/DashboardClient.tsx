@@ -763,15 +763,6 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       let lastCachedOrderDate = null;
 
       if (cachedSales.length > 0) {
-        // --- EMERGENCY DEDUPLICATION PATCH ---
-        // If the legacy orders cache doesn't have explicit IDs, it means they are leftover
-        // corrupted ghosts from before the Fuso-Horário patch. Wipe them from memory now.
-        if (cachedOrders.length > 0 && !cachedOrders[0].id) {
-          console.warn("[System] Detected legacy corrupted orders format. Obliterating local cache.");
-          await clear();
-          cachedOrders = [];
-        }
-
         // Hydrate right away to show data instantly
         const hydratedCachedSales = cachedSales.map((s: any) => ({
           ...s,

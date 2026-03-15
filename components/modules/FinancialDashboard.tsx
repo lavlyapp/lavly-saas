@@ -69,9 +69,11 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
     });
 
     const [customRange, setCustomRange] = useState(() => {
+        const nowTimeStamp = new Date().getTime();
+        const brtNow = new Date(nowTimeStamp - (3 * 3600 * 1000));
         const defaultRange = {
-            start: format(startOfMonth(new Date(new Date().getTime() - (3 * 3600 * 1000))), 'yyyy-MM-dd'),
-            end: format(endOfMonth(new Date(new Date().getTime() - (3 * 3600 * 1000))), 'yyyy-MM-dd')
+            start: format(startOfMonth(brtNow), 'yyyy-MM-dd'),
+            end: format(endOfMonth(brtNow), 'yyyy-MM-dd')
         };
 
         if (!data?.records || data.records.length === 0) return defaultRange;
@@ -79,18 +81,18 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
         // Default custom range to min/max of dataset if exists
         const timestamps = data.records.map((r: any) => new Date(r.data).getTime());
         if (timestamps.length > 0) {
-            // Safe max/min finding for large arrays to avoid Maximum Call Stack Size Exceeded
             let minTs = timestamps[0];
             let maxTs = timestamps[0];
             for (let i = 1; i < timestamps.length; i++) {
                 if (timestamps[i] < minTs) minTs = timestamps[i];
                 if (timestamps[i] > maxTs) maxTs = timestamps[i];
             }
-            const minDate = new Date(minTs);
-            const maxDate = new Date(maxTs);
+            
+            const minBrt = new Date(minTs - (3 * 3600 * 1000));
+            const maxBrt = new Date(maxTs - (3 * 3600 * 1000));
             return {
-                start: format(minDate, 'yyyy-MM-dd'),
-                end: format(maxDate, 'yyyy-MM-dd')
+                start: minBrt.toISOString().substring(0, 10),
+                end: maxBrt.toISOString().substring(0, 10)
             };
         }
 
@@ -104,23 +106,19 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
     const filteredRecords = useMemo(() => {
         if (!data?.records) return [];
 
-        // VMPay's native analytics group by UTC. To match perfectly, we mimic this behavior
-        // by extracting the exact string equivalent of today in UTC.
-        // Even if local BRT says it's 21:30 "Today", VMPay says it's 00:30 "Tomorrow". 
-        // We follow VMPay.
         const now = new Date();
-        const yest = new Date(now.getTime() - (24 * 3600 * 1000));
+        const nowBrt = new Date(now.getTime() - (3 * 3600 * 1000));
+        const yestBrt = new Date(nowBrt.getTime() - (24 * 3600 * 1000));
         
-        const todayStr = now.toISOString().substring(0, 10);
-        const yesterdayStr = yest.toISOString().substring(0, 10);
+        const todayStr = nowBrt.toISOString().substring(0, 10);
+        const yesterdayStr = yestBrt.toISOString().substring(0, 10);
         
         let targetMonthStr = todayStr.substring(0, 7);
-        let lastMonthStr = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().substring(0, 7);
+        let lastMonthStr = new Date(nowBrt.getFullYear(), nowBrt.getMonth() - 1, 1).toISOString().substring(0, 7);
         
-        // Ensure accurate zero-padded dates
         if (period === 'lastMonth') {
-            const m = now.getMonth(); // 0-indexed. If Jan (0), last month is Dec (11)
-            const y = m === 0 ? now.getFullYear() - 1 : now.getFullYear();
+            const m = nowBrt.getMonth();
+            const y = m === 0 ? nowBrt.getFullYear() - 1 : nowBrt.getFullYear();
             const paddedM = m === 0 ? '12' : String(m).padStart(2, '0');
             lastMonthStr = `${y}-${paddedM}`;
         }
@@ -128,9 +126,9 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
         return data.records.filter((r: any) => {
             if (!r.data) return false;
             
-            // The DB saves dates in valid UTC timestamptz. We slice the YYYY-MM-DD off the UTC ISOString!
-            // This strictly locks the sale to the day VMPay originally assigned it to.
-            const dbDateStr = typeof r.data === 'string' ? r.data.substring(0, 10) : r.data.toISOString().substring(0, 10);
+            const rTime = typeof r.data === 'string' ? new Date(r.data).getTime() : r.data.getTime();
+            const rBrt = new Date(rTime - (3 * 3600 * 1000));
+            const dbDateStr = rBrt.toISOString().substring(0, 10);
 
             switch (period) {
                 case 'today': return dbDateStr === todayStr;
@@ -144,31 +142,33 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
         });
     }, [data?.records, period, customRange]);
 
-    // --- ORDERS FILTER Logic (Duplicate of Sales Filter for now) ---
     const filteredOrders = useMemo(() => {
         if (!data?.orders) return [];
 
         const now = new Date();
-        const yest = new Date(now.getTime() - (24 * 3600 * 1000));
+        const nowBrt = new Date(now.getTime() - (3 * 3600 * 1000));
+        const yestBrt = new Date(nowBrt.getTime() - (24 * 3600 * 1000));
         
-        const todayStr = now.toISOString().substring(0, 10);
-        const yesterdayStr = yest.toISOString().substring(0, 10);
+        const todayStr = nowBrt.toISOString().substring(0, 10);
+        const yesterdayStr = yestBrt.toISOString().substring(0, 10);
         
         let targetMonthStr = todayStr.substring(0, 7);
-        let lastMonthStr = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().substring(0, 7);
+        let lastMonthStr = new Date(nowBrt.getFullYear(), nowBrt.getMonth() - 1, 1).toISOString().substring(0, 7);
         
         if (period === 'lastMonth') {
-            const m = now.getMonth();
-            const y = m === 0 ? now.getFullYear() - 1 : now.getFullYear();
+            const m = nowBrt.getMonth();
+            const y = m === 0 ? nowBrt.getFullYear() - 1 : nowBrt.getFullYear();
             const paddedM = m === 0 ? '12' : String(m).padStart(2, '0');
             lastMonthStr = `${y}-${paddedM}`;
         }
 
         return data.orders.filter((r: any) => {
-            if (!r.created_at) return false;
+            const dateVal = r.data || r.created_at;
+            if (!dateVal) return false;
             
-            // Match the strict string extraction to exactly replicate VMPay's UTC-bound metrics
-            const dbDateStr = typeof r.created_at === 'string' ? r.created_at.substring(0, 10) : r.created_at.toISOString().substring(0, 10);
+            const rTime = typeof dateVal === 'string' ? new Date(dateVal).getTime() : dateVal.getTime();
+            const rBrt = new Date(rTime - (3 * 3600 * 1000));
+            const dbDateStr = rBrt.toISOString().substring(0, 10);
 
             switch (period) {
                 case 'today': return dbDateStr === todayStr;
