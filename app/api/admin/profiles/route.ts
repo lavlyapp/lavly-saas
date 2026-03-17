@@ -38,7 +38,7 @@ export async function GET(request: Request) {
         // 3. Get TOTAL Configured Physical Stores (for counting and location parsing)
         const { data: storesList, error: storesError } = await supabaseAdmin
             .from('stores')
-            .select('id, store_name, city, state, status');
+            .select('id, name, city, state, status');
 
         if (storesError) {
             console.error('[Admin API] Error fetching stores context:', storesError);
@@ -51,9 +51,9 @@ export async function GET(request: Request) {
         // Build a store location dictionary
         const storeLocations: Record<string, { city: string, state: string }> = {};
         storesList?.forEach(s => {
-             // We map both the store_name and ID because assigned_stores historically uses names in VMPay
-             if (s.city && s.state) {
-                 storeLocations[s.store_name.toLowerCase()] = { city: s.city, state: s.state };
+             // We map both the name and ID because assigned_stores historically uses names in VMPay
+             if (s.city && s.state && s.name) {
+                 storeLocations[s.name.toLowerCase()] = { city: s.city, state: s.state };
                  storeLocations[s.id] = { city: s.city, state: s.state };
              }
         });
