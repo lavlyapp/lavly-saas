@@ -180,6 +180,10 @@ function AppContent({
   const [isLogsCollapsed, setIsLogsCollapsed] = useState(false);
   const hasLoaded = useRef(false);
 
+  // UI States that must be defined before early returns
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   useEffect(() => {
     setMounted(true);
     if (!hasLoaded.current && isAuthenticated && token && stableInitialLoad) {
@@ -409,9 +413,7 @@ function AppContent({
     return <LoginForm />;
   }
 
-  // --- Adicionado estado local AQUI dento do Provider (onde o AppSidebar é renderizado) ---
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  // Moved states to the top to respect React's hook ordering rules.
 
   return (
     <div className="flex min-h-screen bg-neutral-950 font-sans text-neutral-100">
