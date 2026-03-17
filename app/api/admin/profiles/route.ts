@@ -35,26 +35,66 @@ export async function GET(request: Request) {
             throw profilesError;
         }
 
-        // 3. Get TOTAL Unique Configured Physical Stores
-        // A physical store is distinct by its id or cnpj. 
-        const { count: totalStores, error: storesError } = await supabaseAdmin
+        // 3. Get TOTAL Configured Physical Stores (for counting and location parsing)
+        const { data: storesList, error: storesError } = await supabaseAdmin
             .from('stores')
-            .select('*', { count: 'exact', head: true });
+            .select('id, store_name, city, state, status');
 
         if (storesError) {
             console.error('[Admin API] Error fetching stores context:', storesError);
             throw storesError;
         }
 
-        // 4. Combine and Build Hierarchy (Payers vs Sub-users)
-        let enrichedProfiles = profiles.map(p => ({
-            ...p,
-            email: userMap.get(p.id)?.email || null,
-            last_sign_in_at: userMap.get(p.id)?.last_sign_in_at || null,
-            subUsers: [] as any[]
-        }));
+        // Active generic physical stores count
+        const totalStores = storesList?.filter(s => s.status !== 'deleted').length || 0;
 
-        // Filter out the main admin from the payers list if needed, or keep it.
+        // Build a store location dictionary
+        const storeLocations: Record<string, { city: string, state: string }> = {};
+        storesList?.forEach(s => {
+             // We map both the store_name and ID because assigned_stores historically uses names in VMPay
+             if (s.city && s.state) {
+                 storeLocations[s.store_name.toLowerCase()] = { city: s.city, state: s.state };
+                 storeLocations[s.id] = { city: s.city, state: s.state };
+             }
+        });
+
+        // Helper to find dominant location
+        const getDominantLocation = (assignedStores: string[] | null) => {
+            if (!assignedStores || assignedStores.length === 0) return null;
+            
+            const counts: Record<string, number> = {};
+            for (const storeId of assignedStores) {
+                // Treat bezerra as cascavel
+                const normalizedId = storeId.toLowerCase().includes('bezerra de menezes') ? 'lavateria cascavel' : storeId.toLowerCase();
+                const loc = storeLocations[normalizedId];
+                if (loc) {
+                    const key = `${loc.city}/${loc.state}`;
+                    counts[key] = (counts[key] || 0) + 1;
+                }
+            }
+
+            let maxCount = 0;
+            let dominant = null;
+            for (const [key, count] of Object.entries(counts)) {
+                if (count > maxCount) {
+                    maxCount = count;
+                    dominant = key;
+                }
+            }
+            return dominant;
+        };
+
+        // 4. Combine and Build Hierarchy (Payers vs Sub-users)
+        let enrichedProfiles = profiles
+            .filter(p => p.status !== 'deleted')
+            .map(p => ({
+                ...p,
+                email: userMap.get(p.id)?.email || null,
+                last_sign_in_at: userMap.get(p.id)?.last_sign_in_at || null,
+                dominant_location: getDominantLocation(p.assigned_stores),
+                subUsers: [] as any[]
+            }));
+
         const allUsersCount = enrichedProfiles.length;
         
         // Create Payers List
@@ -72,7 +112,7 @@ export async function GET(request: Request) {
             data: {
                 payers,
                 totalUsers: allUsersCount,
-                totalPhysicalStores: totalStores || 0
+                totalPhysicalStores: totalStores
             }
         });
 

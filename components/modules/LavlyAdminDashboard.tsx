@@ -17,6 +17,7 @@ interface ProfileData {
   admin_alias: string | null;
   email: string | null;
   subUsers: any[];
+  dominant_location?: string | null;
 }
 
 export function LavlyAdminDashboard() {
@@ -244,6 +245,12 @@ export function LavlyAdminDashboard() {
                                     </div>
                                 )}
                               <div className="text-xs text-neutral-500 font-mono" title="Email da Conta">{profile.email || "Sem Email (Inválido)"}</div>
+                              {profile.dominant_location && (
+                                  <div className="text-[10px] text-indigo-300 mt-0.5 font-medium flex items-center gap-1">
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                                      {profile.dominant_location}
+                                  </div>
+                              )}
                             </div>
                           </div>
                         </td>

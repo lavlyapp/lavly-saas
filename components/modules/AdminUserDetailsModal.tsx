@@ -1,5 +1,6 @@
-import React from 'react';
-import { X, Calendar, User, Store, Clock, Users, MessageCircle, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Calendar, User, Store, Clock, Users, MessageCircle, AlertCircle, ShieldAlert, Ban, Trash2 } from 'lucide-react';
+import { AdminPasswordPrompt } from './AdminPasswordPrompt';
 
 interface SubUser {
     id: string;
@@ -30,7 +31,34 @@ interface AdminUserDetailsModalProps {
 }
 
 export function AdminUserDetailsModal({ isOpen, onClose, payer }: AdminUserDetailsModalProps) {
+    const [promptType, setPromptType] = useState<'block' | 'delete' | null>(null);
+
     if (!isOpen || !payer) return null;
+
+    const handleConfirmSecurityAction = async (password: string) => {
+        const response = await fetch('/api/admin/profiles/action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                targetId: payer.id,
+                action: promptType,
+                password
+            })
+        });
+
+        const data = await response.json();
+        if (!data.success) {
+            throw new Error(data.error || 'Erro ao processar ação');
+        }
+
+        // Se sucesso, vamos forçar uma atualização no dashboard pai.
+        // O ideal é passar uma prop onUpdate, mas para ser direto podemos recarregar 
+        // ou fechar o modal.
+        setPromptType(null);
+        onClose();
+        // Em um projeto real, idealmente o LavlyAdminDashboard tem uma escuta de evento ou passamos "onActionSuccess".
+        window.location.reload(); 
+    };
 
     const formatDate = (ds: string | null) => {
         if (!ds) return 'N/A';
@@ -139,7 +167,9 @@ export function AdminUserDetailsModal({ isOpen, onClose, payer }: AdminUserDetai
                         </h3>
                         {payer.assigned_stores && payer.assigned_stores.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
-                                {payer.assigned_stores.map(storeId => (
+                                {Array.from(new Set(payer.assigned_stores.map(storeId => 
+                                    storeId.toLowerCase().includes('bezerra de menezes') ? 'Lavateria Cascavel' : storeId
+                                ))).map(storeId => (
                                     <div key={storeId} className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-medium rounded-lg">
                                         {storeId}
                                     </div>
@@ -180,7 +210,9 @@ export function AdminUserDetailsModal({ isOpen, onClose, payer }: AdminUserDetai
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-3 text-neutral-400">
-                                                    {sub.assigned_stores?.length || 0} lojas
+                                                    {Array.from(new Set((sub.assigned_stores || []).map(s => 
+                                                        s.toLowerCase().includes('bezerra de menezes') ? 'Lavateria Cascavel' : s
+                                                    ))).length} lojas
                                                 </td>
                                                 <td className="px-4 py-3 text-neutral-500 text-right text-xs">
                                                     {formatDate(sub.last_sign_in_at)}
@@ -197,8 +229,39 @@ export function AdminUserDetailsModal({ isOpen, onClose, payer }: AdminUserDetai
                         </div>
                     </div>
 
+                    {/* Security Frame */}
+                    <div className="mt-8 pt-6 border-t border-neutral-800">
+                        <h3 className="text-sm font-bold text-neutral-400 flex items-center gap-2 uppercase tracking-wide mb-4">
+                            <ShieldAlert className="w-4 h-4 text-red-500" />
+                            Zona de Perigo (Ações do Administrador)
+                        </h3>
+                        <div className="flex gap-4">
+                            <button 
+                                onClick={() => setPromptType('block')}
+                                className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 rounded-lg text-sm font-medium transition-colors"
+                            >
+                                <Ban className="w-4 h-4" /> Suspender Acesso (Bloquear)
+                            </button>
+                            <button 
+                                onClick={() => setPromptType('delete')}
+                                className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 rounded-lg text-sm font-medium transition-colors"
+                            >
+                                <Trash2 className="w-4 h-4" /> Excluir Conta e Sub-usuários
+                            </button>
+                        </div>
+                        <p className="text-xs text-neutral-600 mt-2">Ao realizar estas ações, o histórico de Vendas permanecerá preservado no banco.</p>
+                    </div>
+
                 </div>
             </div>
+
+            <AdminPasswordPrompt 
+                isOpen={!!promptType}
+                actionType={promptType as 'block' | 'delete'}
+                targetName={payer.email || payer.admin_alias || payer.id}
+                onClose={() => setPromptType(null)}
+                onConfirm={handleConfirmSecurityAction}
+            />
         </div>
     );
 }
