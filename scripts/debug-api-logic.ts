@@ -17,20 +17,30 @@ async function testApiLogic() {
         console.log("1. Fetching auth users...");
         const { data: { users }, error: authError } = await supabaseAdmin.auth.admin.listUsers();
         if (authError) throw authError;
+        console.log("Users:", users.length);
 
         console.log("2. Fetching profiles...");
         const { data: profiles, error: profilesError } = await supabaseAdmin.from('profiles').select('*');
         if (profilesError) throw profilesError;
+        console.log("Profiles:", profiles?.length);
 
         console.log("3. Fetching stores...");
         const { data: storesList, error: storesError } = await supabaseAdmin
             .from('stores')
-            .select('id, store_name, city, state, status');
+            .select('id, name, city, state, status');
 
         if (storesError) throw storesError;
         
-        console.log(`Successfully fetched ${storesList?.length} stores. Checking status column error...`);
-        console.log("First store sample:", storesList?.[0]);
+        console.log(`Stores fetched length: ${storesList?.length}`);
+        
+        const activeStores = storesList?.filter(s => s.status !== 'deleted') || [];
+        console.log(`Active non-deleted stores length: ${activeStores.length}`);
+
+        const activeProfiles = profiles?.filter(p => p.status !== 'deleted') || [];
+        console.log(`Active profiles length (allUsersCount): ${activeProfiles.length}`);
+
+        const payers = activeProfiles.filter(p => p.role !== 'admin' && !p.parent_id);
+        console.log(`Payers length (totalProprietarios): ${payers.length}`);
 
     } catch (e) {
         console.error("API ROUTE ERROR:", e);

@@ -111,8 +111,8 @@ export async function GET(request: Request) {
             success: true,
             data: {
                 payers,
-                totalUsers: allUsersCount,
-                totalPhysicalStores: totalStores
+                totalUsers: Number(allUsersCount || 0),
+                totalPhysicalStores: Number(totalStores || 0)
             }
         });
 
