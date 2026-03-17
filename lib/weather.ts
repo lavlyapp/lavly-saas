@@ -10,12 +10,18 @@ export async function getCoordinatesFromAddress(address: string, city?: string, 
 
         const query = encodeURIComponent(queryText);
 
+        // Set an explicit 3-second timeout so the UI never freezes for minutes if Nominatim is degraded
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
+
         // Using Nominatim (OpenStreetMap) - requires User-Agent
         const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`, {
             headers: {
                 'User-Agent': 'Lavly-App/1.0 (brasil)'
-            }
+            },
+            signal: controller.signal
         });
+        clearTimeout(timeoutId);
 
         if (!res.ok) {
             console.error(`Geocoding failed for ${queryText}: ${res.status}`);
@@ -31,15 +37,13 @@ export async function getCoordinatesFromAddress(address: string, city?: string, 
             };
         }
 
-        // Fallback: try just address and city if full query failed (and we originally included state)
-        if (city && state) {
-            console.warn(`Geocoding full query failed. Retrying without state for: ${address}, ${city}`);
-            return getCoordinatesFromAddress(address, city);
-        }
-
         return null;
-    } catch (e) {
-        console.error("Failed to geocode address:", e);
+    } catch (e: any) {
+        if (e.name === 'AbortError') {
+            console.warn(`Geocoding forcibly timed out to text strict SLAs for: ${address}`);
+        } else {
+            console.error("Failed to geocode address:", e);
+        }
         return null;
     }
 }

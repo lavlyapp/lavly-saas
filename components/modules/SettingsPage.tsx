@@ -148,15 +148,21 @@ export function SettingsPage() {
         } catch (e: any) {
             console.error("SettingsPage: Critical error in loadData", e);
             // Ensure we don't trap the user in a loading screen if the DB schema is mismatched or RLS blocks
-            console.log("SettingsPage: Fallback activated within catch block (RLS missing).");
-            setStores(STATIC_VMPAY_CREDENTIALS.map(s => ({
-                cnpj: s.cnpj || "",
-                name: s.name || "Sem Nome",
-                api_key: s.apiKey || "",
-                open_time: s.openTime || "07:00:00",
-                close_time: s.closeTime || "23:00:00",
-                is_active: s.is_active !== false,
-            })));
+            // Only apply fallback if we have absolutely nothing in the UI, otherwise preserve user data
+            setStores(prev => {
+                if (prev.length === 0) {
+                    console.log("SettingsPage: Fallback activated within catch block (RLS missing).");
+                    return STATIC_VMPAY_CREDENTIALS.map(s => ({
+                        cnpj: s.cnpj || "",
+                        name: s.name || "Sem Nome",
+                        api_key: s.apiKey || "",
+                        open_time: s.openTime || "07:00:00",
+                        close_time: s.closeTime || "23:00:00",
+                        is_active: s.is_active !== false,
+                    }));
+                }
+                return prev;
+            });
             setIsInitialized(true);
         } finally {
             clearTimeout(timeoutId);
