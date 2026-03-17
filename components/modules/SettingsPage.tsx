@@ -457,6 +457,30 @@ export function SettingsPage() {
                 </p>
             </div>
 
+            {/* Lavly System Access */}
+            <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 shadow-lg">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-2">
+                    <Key className="w-5 h-5 text-emerald-500" />
+                    Acesso ao Sistema Lavly
+                </h3>
+                <p className="text-sm text-neutral-400 mb-6">
+                    Gerencie a senha que você utiliza para entrar neste painel de controle.
+                </p>
+                
+                <div className="flex items-center justify-between p-4 bg-neutral-950/50 border border-neutral-800 rounded-xl">
+                    <div>
+                        <p className="text-sm font-bold text-white">Senha de Acesso</p>
+                        <p className="text-xs text-neutral-500 mt-1">Sua senha é criptografada e não pode ser revelada, apenas redefinida.</p>
+                    </div>
+                    <button 
+                        onClick={() => window.location.href = '/update-password'}
+                        className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-bold rounded-lg transition-colors"
+                    >
+                        Redefinir Senha
+                    </button>
+                </div>
+            </div>
+
             {/* VMPay Account Credentials (MASTER) */}
             <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 shadow-lg">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">

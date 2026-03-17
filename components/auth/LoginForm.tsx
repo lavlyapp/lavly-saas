@@ -1,31 +1,31 @@
 "use client";
 
 import { useState } from "react";
+import Link from 'next/link';
 import { useAuth } from "../context/AuthContext";
 import { Lock, User, ArrowRight, Sparkles, WashingMachine as Machine } from "lucide-react";
 
 export function LoginForm() {
-    const { loginWithMagicLink, loginWithGoogle } = useAuth();
+    const { login, loginWithGoogle } = useAuth();
     const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
     const [error, setError] = useState("");
-    const [successMsg, setSuccessMsg] = useState("");
     const [isLoading, setIsLoading] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
         setError("");
-        setSuccessMsg("");
 
-        const { error: loginError } = await loginWithMagicLink(email);
+        const { error: loginError } = await login(email, password);
 
         if (loginError) {
-            setError(loginError.message || "Erro ao enviar o link de acesso.");
+            setError(loginError.message || "Email ou senha incorretos.");
+            setIsLoading(false);
         } else {
-            setSuccessMsg("Link de acesso enviado! Verifique sua caixa de entrada (e o Spam) e clique no link para entrar automaticamente.");
-            setEmail("");
+            // Sucesso: auth state change redirectará via middleware/efeito ou força reload seguro
+            window.location.href = '/dashboard';
         }
-        setIsLoading(false);
     };
 
     return (
@@ -64,10 +64,35 @@ export function LoginForm() {
                                     className="block w-full bg-neutral-950/50 border border-neutral-800 text-white rounded-2xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all placeholder:text-neutral-700"
                                     placeholder="seu@email.com"
                                     required
-                                    disabled={isLoading || !!successMsg}
+                                    disabled={isLoading}
                                 />
                             </div>
-                            <p className="text-xs text-neutral-500 mt-2 ml-1">Enviaremos um link seguro para você entrar direto, sem senha.</p>
+                            <p className="text-xs text-neutral-500 mt-2 ml-1">Ambiente protegido e criptografado.</p>
+                        </div>
+                        
+                        <div>
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="block text-xs font-bold text-neutral-500 uppercase tracking-widest ml-1">
+                                    Senha
+                                </label>
+                                <Link href="/forgot-password" className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition-colors">
+                                    Esqueci minha senha
+                                </Link>
+                            </div>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <Lock className="h-5 w-5 text-neutral-600 group-focus-within:text-indigo-400 transition-colors" />
+                                </div>
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="block w-full bg-neutral-950/50 border border-neutral-800 text-white rounded-2xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all placeholder:text-neutral-700"
+                                    placeholder="••••••••"
+                                    required
+                                    disabled={isLoading}
+                                />
+                            </div>
                         </div>
 
                         {error && (
@@ -76,31 +101,23 @@ export function LoginForm() {
                             </div>
                         )}
 
-                        {successMsg && (
-                            <div className="text-emerald-400 text-xs font-medium text-center animate-in fade-in slide-in-from-top-2 bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl">
-                                {successMsg}
-                            </div>
-                        )}
-
-                        {!successMsg && (
-                            <button
-                                type="submit"
-                                disabled={isLoading}
-                                className={`w-full group flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-sm transition-all shadow-lg ${isLoading
-                                    ? 'bg-indigo-600/50 text-white/50 cursor-not-allowed'
-                                    : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5'
-                                    }`}
-                            >
-                                {isLoading ? (
-                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                ) : (
-                                    <>
-                                        Receber Link de Acesso
-                                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                                    </>
-                                )}
-                            </button>
-                        )}
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className={`w-full group flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-sm transition-all shadow-lg ${isLoading
+                                ? 'bg-indigo-600/50 text-white/50 cursor-not-allowed'
+                                : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5'
+                                }`}
+                        >
+                            {isLoading ? (
+                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            ) : (
+                                <>
+                                    Acessar Painel
+                                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                </>
+                            )}
+                        </button>
                     </form>
 
                     {/* Separator */}
