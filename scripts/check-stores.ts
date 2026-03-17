@@ -1,25 +1,21 @@
-import * as dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+import { createClient } from "@supabase/supabase-js";
+import * as dotenv from "dotenv";
 
-import { createClient } from '@supabase/supabase-js';
+dotenv.config({ path: ".env.local" });
 
-const supabase = createClient(
+const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-async function run() {
-    console.log("Checking unique stores via RPC or pagination...");
-
-    const stores = new Set();
-    let page = 0;
-    while (true) {
-        const { data } = await supabase.from('sales').select('loja').range(page * 1000, (page + 1) * 1000 - 1);
-        if (!data || data.length === 0) break;
-        data.forEach(d => stores.add(d.loja));
-        page++;
+async function checkStores() {
+    const { data: stores, error } = await supabaseAdmin.from("stores").select("*");
+    if (error) {
+        console.error("Error reading stores:", error);
+    } else {
+        console.log("Total stores in DB:", stores.length);
+        console.log(stores.map(s => ({ id: s.id, name: s.name, cnpj: s.cnpj })));
     }
-
-    console.log("Real Unique Stores in DB:", Array.from(stores));
 }
-run();
+
+checkStores();
