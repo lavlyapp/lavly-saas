@@ -358,8 +358,10 @@ export function CustomerDemographics({ records, customers, selectedStore, orders
                         <thead>
                             <tr className="border-b border-neutral-800 bg-neutral-900">
                                 <th className="px-5 py-3 text-left font-medium text-neutral-300">Faixa Etária</th>
+                                <th className="px-3 py-3 text-center font-medium text-indigo-400/80">Clientes</th>
                                 <th className="px-4 py-3 text-right font-medium text-emerald-400/80">Total Gasto</th>
-                                <th className="px-4 py-3 text-right font-medium text-emerald-400/80">Ticket Médio</th>
+                                <th className="px-4 py-3 text-right font-medium text-emerald-400/80" title="Gasto médio por visita (Faturamento / Visitas)">Ticket Médio</th>
+                                <th className="px-4 py-3 text-right font-medium text-emerald-400/80" title="LTV Médio: Gasto total acumulado por cliente único na faixa">LTV Médio</th>
                                 <th className="px-4 py-3 text-center font-medium text-blue-400/80" title="Sessões na loja. Compras feitas em um intervalo de até 3 horas contam como 1 única visita.">Visitas Tot.</th>
                                 <th className="px-4 py-3 text-right font-medium text-blue-400/80" title="Média de Visitas por Cliente Único">Média/Cli.</th>
                                 <th className="px-4 py-3 text-center font-medium text-orange-400/80" title="Soma de Lavagens e Secagens">Cestos Tot.</th>
@@ -376,11 +378,17 @@ export function CustomerDemographics({ records, customers, selectedStore, orders
                                 return (
                                     <tr key={stat.name} className="hover:bg-neutral-800/30 transition-colors">
                                         <td className="px-5 py-4 font-bold text-white whitespace-nowrap">{stat.name}</td>
+                                        <td className="px-3 py-4 text-center text-indigo-300 font-bold bg-indigo-500/5">
+                                            {stat.count}
+                                        </td>
                                         <td className="px-4 py-4 text-right text-emerald-400 font-mono">
                                             {stat.spent.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
                                         </td>
                                         <td className="px-4 py-4 text-right text-neutral-300 font-mono">
-                                            {(stat.spent / (stat.count || 1)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                            {(stat.spent / (stat.visits || 1)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                        </td>
+                                        <td className="px-4 py-4 text-right text-emerald-400/60 font-mono">
+                                            {(stat.spent / (stat.count || 1)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
                                         </td>
                                         <td className="px-4 py-4 text-center text-blue-400 font-bold bg-blue-500/5">
                                             {stat.visits}
