@@ -36,13 +36,16 @@ export function OnboardingVMPay({ onSuccess }: OnboardingVMPayProps) {
         setLoading(true);
 
         try {
-            const { error: dbError } = await supabase
-                .from('profiles')
-                .update({ vmpay_api_key: apiKey.trim() })
-                .eq('id', user.id);
-            
-            if (dbError) {
-                setError(`Erro ao salvar chave: ${dbError.message}`);
+            const response = await fetch('/api/onboarding/setup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ apiKey: apiKey.trim(), userId: user.id }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                setError(data.error || 'Erro ao validar sua chave e buscar lojas.');
             } else {
                 onSuccess(apiKey.trim());
             }
