@@ -176,7 +176,7 @@ function AppContent({
   syncProgress
 }: AppContentProps) {
   const { selectedCustomerName, closeCustomerDetails } = useCustomerContext();
-  const { isAuthenticated, isLoading, token, isExpired, role, vmpayApiKey } = useAuth();
+  const { user, isAuthenticated, isLoading, token, isExpired, role, vmpayApiKey } = useAuth();
   const [showTerms, setShowTerms] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [isLogsCollapsed, setIsLogsCollapsed] = useState(false);
