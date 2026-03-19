@@ -18,70 +18,66 @@ export async function POST(req: Request) {
         const { email, apiKey, password, plan = 'ouro', role = 'proprietario', maxStores = 1 } = body;
 
         console.log(`[Admin Invite] Starting invite for: ${email} with plan: ${plan}, maxStores: ${maxStores}`);
-        if (!email || !apiKey || !password) {
-            return NextResponse.json({ error: 'Email, Password, and API Key are required' }, { status: 400 });
+        if (!email || !password) {
+            return NextResponse.json({ error: 'Email and Password are required' }, { status: 400 });
         }
 
-        // 1. Verify if the user making the request is an admin
-        // Note: In a real production app, verify the JWT from cookies/headers here
-        // For now, relying on the client sending a valid request from the admin dashboard
-        // A better approach would be to extract auth from headers
-
-        // 2. Hit the VMPay API to discover stores linked to this key
-        console.log(`[Admin Invite] Validating API Key for ${email}...`);
-        const vmpayUrl = `${VMPAY_API_BASE_URL}/maquinas`;
-        const vmpayResponse = await fetch(vmpayUrl, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-            },
-        });
-
-        if (!vmpayResponse.ok) {
-            return NextResponse.json(
-                { error: `Invalid API Key. VMPay returned status ${vmpayResponse.status}` },
-                { status: 401 }
-            );
-        }
-
-        const machinesData = await vmpayResponse.json();
-        if (!Array.isArray(machinesData)) {
-            return NextResponse.json({ error: 'Unexpected response from VMPay API' }, { status: 500 });
-        }
-
-        // 3. Extract unique store names and normalize them
+        let assignedStoresArray: string[] = [];
         const uniqueStoreNames = new Set<string>();
-        const storesData = new Map<string, any>(); // Map canonical name to the first machine's store data
+        const storesData = new Map<string, any>();
 
-        machinesData.forEach(machine => {
-            if (machine.loja) {
-                const canonicalName = getCanonicalStoreName(machine.loja);
-                uniqueStoreNames.add(canonicalName);
-                if (!storesData.has(canonicalName)) {
-                    // Save generic store info from this machine to seed the db
-                    storesData.set(canonicalName, {
-                        name: canonicalName,
-                        originalName: machine.loja,
-                        cnpj: machine.documentoDeIdentificacao || '', // Often VMPay returns CNPJ here
-                        is_active: true,
-                        api_key: apiKey
-                    });
-                }
+        // 2. ONLY Validate and hit the VMPay API if an apiKey was provided
+        if (apiKey && apiKey.trim().length > 0) {
+            console.log(`[Admin Invite] Validating API Key for ${email}...`);
+            const vmpayUrl = `${VMPAY_API_BASE_URL}/maquinas`;
+            const vmpayResponse = await fetch(vmpayUrl, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (!vmpayResponse.ok) {
+                return NextResponse.json(
+                    { error: `Invalid API Key. VMPay returned status ${vmpayResponse.status}` },
+                    { status: 401 }
+                );
             }
-        });
 
-        // Limit assigned stores to the purchased amount
-        const assignedStoresArray = Array.from(uniqueStoreNames).slice(0, Number(maxStores));
+            const machinesData = await vmpayResponse.json();
+            if (!Array.isArray(machinesData)) {
+                return NextResponse.json({ error: 'Unexpected response from VMPay API' }, { status: 500 });
+            }
 
-        if (assignedStoresArray.length === 0) {
-            return NextResponse.json(
-                { error: 'API Key is valid, but no stores ou machines were found for this key.' },
-                { status: 400 }
-            );
+            machinesData.forEach(machine => {
+                if (machine.loja) {
+                    const canonicalName = getCanonicalStoreName(machine.loja);
+                    uniqueStoreNames.add(canonicalName);
+                    if (!storesData.has(canonicalName)) {
+                        storesData.set(canonicalName, {
+                            name: canonicalName,
+                            originalName: machine.loja,
+                            cnpj: machine.documentoDeIdentificacao || '',
+                            is_active: true,
+                            api_key: apiKey
+                        });
+                    }
+                }
+            });
+
+            assignedStoresArray = Array.from(uniqueStoreNames).slice(0, Number(maxStores));
+
+            if (assignedStoresArray.length === 0) {
+                return NextResponse.json(
+                    { error: 'API Key is valid, mas nenhuma loja foi encontrada para esta chave.' },
+                    { status: 400 }
+                );
+            }
+            console.log(`[Admin Invite] Found ${assignedStoresArray.length} stores based on provided API Key.`);
+        } else {
+            console.log(`[Admin Invite] No API Key provided. Creating user in ONBOARDING PENDING status...`);
         }
-
-        console.log(`[Admin Invite] Found ${assignedStoresArray.length} stores:`, assignedStoresArray);
 
         // 4. Create User in Supabase Auth
         console.log(`[Admin Invite] Creating auth user for ${email}...`);
@@ -130,7 +126,7 @@ export async function POST(req: Request) {
                 plan: plan,
                 max_stores: Number(maxStores),
                 assigned_stores: assignedStoresArray,
-                vmpay_api_key: apiKey,
+                vmpay_api_key: apiKey && apiKey.trim().length > 0 ? apiKey : null,
                 subscription_status: 'active',
                 updated_at: new Date().toISOString()
             });
@@ -139,29 +135,30 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: `Profile Error: ${profileError.message}` }, { status: 500 });
         }
 
-        // 6. Upsert Stores into public.stores
-        console.log(`[Admin Invite] Seeding ${storesData.size} stores into the database...`);
-        const storesToInsert = Array.from(storesData.values()).map(store => ({
-            name: store.name,
-            cnpj: store.cnpj || null,
-            api_key: apiKey,
-            is_active: true
-        }));
+        // 6. Upsert Stores into public.stores if any
+        if (storesData.size > 0) {
+            console.log(`[Admin Invite] Seeding ${storesData.size} stores into the database...`);
+            const storesToInsert = Array.from(storesData.values()).map(store => ({
+                name: store.name,
+                cnpj: store.cnpj || null,
+                api_key: apiKey,
+                is_active: true
+            }));
 
-        // We use upsert based on 'name' as it was unique, or we just insert if they don't exist
-        for (const store of storesToInsert) {
-            const { error: storeError } = await supabaseAdmin
-                .from('stores')
-                .upsert(store, { onConflict: 'name', ignoreDuplicates: false });
+            for (const store of storesToInsert) {
+                const { error: storeError } = await supabaseAdmin
+                    .from('stores')
+                    .upsert(store, { onConflict: 'name', ignoreDuplicates: false });
 
-            if (storeError) {
-                console.warn(`[Admin Invite] Warn: Could not upsert store ${store.name}:`, storeError.message);
+                if (storeError) {
+                    console.warn(`[Admin Invite] Warn: Could not upsert store ${store.name}:`, storeError.message);
+                }
             }
         }
 
         return NextResponse.json({
             success: true,
-            message: `User invited successfully! Found ${assignedStoresArray.length} stores.`,
+            message: `User created successfully! ${assignedStoresArray.length > 0 ? 'Stores connected.' : 'Pending Client Setup.'}`,
             stores: assignedStoresArray
         });
 

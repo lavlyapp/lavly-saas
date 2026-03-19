@@ -26,6 +26,7 @@ import { getCanonicalStoreName } from "@/lib/vmpay-config";
 import { supabase } from "@/lib/supabase";
 import { createClient } from "@supabase/supabase-js";
 import { OnboardingCnpj } from "@/components/modules/OnboardingCnpj";
+import { OnboardingVMPay } from "@/components/modules/OnboardingVMPay";
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import { LavlyAdminDashboard } from "@/components/modules/LavlyAdminDashboard";
 
@@ -174,7 +175,7 @@ function AppContent({
   syncProgress
 }: AppContentProps) {
   const { selectedCustomerName, closeCustomerDetails } = useCustomerContext();
-  const { isAuthenticated, isLoading, token, isExpired } = useAuth();
+  const { isAuthenticated, isLoading, token, isExpired, role, vmpayApiKey } = useAuth();
   const [showTerms, setShowTerms] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [isLogsCollapsed, setIsLogsCollapsed] = useState(false);
@@ -411,6 +412,11 @@ function AppContent({
 
   if (!isAuthenticated) {
     return <LoginForm />;
+  }
+
+  // VMPay Onboarding Block - Strict Enforcement
+  if (role && role !== 'admin' && !vmpayApiKey) {
+    return <OnboardingVMPay onSuccess={() => window.location.reload()} />;
   }
 
   // Moved states to the top to respect React's hook ordering rules.
