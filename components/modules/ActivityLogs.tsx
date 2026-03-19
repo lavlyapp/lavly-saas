@@ -16,24 +16,40 @@ export function ActivityLogs() {
 
     const fetchLogs = async () => {
         setLoading(true);
-        const { data, error } = await supabase
-            .from('activity_logs')
-            .select(`
-                *,
-                profiles (
-                    email,
-                    role
-                )
-            `)
-            .order('created_at', { ascending: false })
-            .limit(50);
+        try {
+            const { data: logsData, error: logsError } = await supabase
+                .from('activity_logs')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(50);
 
-        if (error) {
-            console.error("Error fetching logs:", error);
-        } else {
-            setLogs(data || []);
+            if (logsError) throw logsError;
+
+            const userIds = Array.from(new Set((logsData || []).map(l => l.user_id).filter(Boolean)));
+            let userMap = new Map();
+
+            if (userIds.length > 0) {
+                const { data: profilesData } = await supabase
+                    .from('profiles')
+                    .select('id, email, role')
+                    .in('id', userIds);
+
+                if (profilesData) {
+                    profilesData.forEach(p => userMap.set(p.id, { email: p.email, role: p.role }));
+                }
+            }
+
+            const enrichedLogs = (logsData || []).map(log => ({
+                ...log,
+                profiles: userMap.get(log.user_id) || null
+            }));
+
+            setLogs(enrichedLogs);
+        } catch (e: any) {
+            console.error("Error fetching logs:", e);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     if (loading) {
