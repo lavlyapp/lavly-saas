@@ -133,7 +133,6 @@ export async function POST(req: Request) {
             .upsert({
                 id: userId,
                 role: role,
-                plan: plan,
                 max_stores: Number(maxStores),
                 assigned_stores: assignedStoresArray,
                 vmpay_api_key: apiKey && apiKey.trim().length > 0 ? apiKey : null,
