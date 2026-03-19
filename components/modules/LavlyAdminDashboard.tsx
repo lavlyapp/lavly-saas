@@ -19,10 +19,12 @@ interface ProfileData {
   email: string | null;
   subUsers: any[];
   dominant_location?: string | null;
+  status?: string;
 }
 
 export function LavlyAdminDashboard() {
   const [payers, setPayers] = useState<ProfileData[]>([]);
+  const [deletedPayers, setDeletedPayers] = useState<ProfileData[]>([]);
   const [totalUsersCount, setTotalUsersCount] = useState(0);
   const [totalPhysicalStoresCount, setTotalPhysicalStoresCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -31,6 +33,7 @@ export function LavlyAdminDashboard() {
   // Modal state
   const [selectedPayer, setSelectedPayer] = useState<ProfileData | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'ativos' | 'lixeira'>('ativos');
 
   // Inline edit alias state
   const [editingAliasId, setEditingAliasId] = useState<string | null>(null);
@@ -48,6 +51,7 @@ export function LavlyAdminDashboard() {
 
       if (data.success) {
           setPayers(data.data.payers || []);
+          setDeletedPayers(data.data.deletedProfiles || []);
           setTotalUsersCount(data.data.totalUsers || 0);
           setTotalPhysicalStoresCount(data.data.totalPhysicalStores || 0);
       } else {
@@ -93,7 +97,7 @@ export function LavlyAdminDashboard() {
           });
           const data = await res.json();
           if (data.success) {
-              setPayers(payers.filter(p => p.id !== id));
+              fetchAdminData(); // Refreshes to move user to deleted arrays
           } else {
               alert('Erro ao excluir usuário: ' + data.error);
           }
@@ -109,7 +113,9 @@ export function LavlyAdminDashboard() {
   // Symbologic MRR (Monthly Recurring Revenue): R$ 99 per allocated MAX_STORES constraint globally, or just a fixed estimate
   const mrrEstimado = payers.reduce((acc, p) => acc + (p.max_stores || 0), 0) * 99;
 
-  const filteredProfiles = payers
+  const baseList = activeTab === 'ativos' ? payers : deletedPayers;
+  
+  const filteredProfiles = baseList
     .filter(p => 
       (p.email || p.id).toLowerCase().includes(searchTerm.toLowerCase()) || 
       (p.admin_alias || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -212,10 +218,22 @@ export function LavlyAdminDashboard() {
       {/* Tabela de Assinantes */}
       <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden flex flex-col">
         <div className="p-4 border-b border-neutral-800 flex flex-col sm:flex-row justify-between items-center gap-4 bg-neutral-900/50 backdrop-blur-xl">
-          <h3 className="text-lg font-bold text-white flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-indigo-400" />
-            Controle de Assinaturas
-          </h3>
+          <div className="flex gap-4 items-center w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0">
+            <button
+              onClick={() => setActiveTab('ativos')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition-all whitespace-nowrap ${activeTab === 'ativos' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:text-white hover:bg-neutral-800'}`}
+            >
+              <Calendar className="w-5 h-5" />
+              Assinaturas Ativas
+            </button>
+            <button
+              onClick={() => setActiveTab('lixeira')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition-all whitespace-nowrap ${activeTab === 'lixeira' ? 'bg-red-600/20 text-red-500 border border-red-600/30' : 'text-neutral-400 hover:text-red-400 hover:bg-neutral-800'}`}
+            >
+              <Trash2 className="w-5 h-5" />
+              Lixeira / Histórico ({deletedPayers.length})
+            </button>
+          </div>
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
             <input
@@ -290,9 +308,11 @@ export function LavlyAdminDashboard() {
                                         <button onClick={() => { setEditingAliasId(profile.id); setTempAlias(profile.admin_alias || ''); }} className="opacity-0 group-hover/alias:opacity-100 text-neutral-500 hover:text-indigo-400 transition-opacity">
                                             <Edit2 className="w-3 h-3" />
                                         </button>
-                                        <button onClick={() => handleDeleteUser(profile.id, profile.email)} title="Excluir Usuário" className="opacity-0 group-hover/alias:opacity-100 text-neutral-500 hover:text-red-500 transition-opacity ml-1">
-                                            <Trash2 className="w-3 h-3" />
-                                        </button>
+                                        {profile.status !== 'deleted' && (
+                                          <button onClick={() => handleDeleteUser(profile.id, profile.email)} title="Excluir Usuário" className="opacity-0 group-hover/alias:opacity-100 text-neutral-500 hover:text-red-500 transition-opacity ml-1">
+                                              <Trash2 className="w-3 h-3" />
+                                          </button>
+                                        )}
                                     </div>
                                 )}
                               <div className="text-xs text-neutral-500 font-mono" title="Email da Conta">{profile.email || "Sem Email (Inválido)"}</div>
@@ -325,7 +345,11 @@ export function LavlyAdminDashboard() {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {isVencido ? (
+                          {profile.status === 'deleted' ? (
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-500/10 text-red-500 border border-red-500/20">
+                              Excluído Definido
+                            </span>
+                          ) : isVencido ? (
                             <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-500/10 text-red-500 border border-red-500/20">
                               Bloqueado (Vencido)
                             </span>

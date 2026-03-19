@@ -22,6 +22,7 @@ interface PayerProfile {
     max_stores: number;
     admin_alias: string | null;
     subUsers: SubUser[];
+    status?: string;
 }
 
 interface AdminUserDetailsModalProps {
@@ -230,27 +231,41 @@ export function AdminUserDetailsModal({ isOpen, onClose, payer }: AdminUserDetai
                     </div>
 
                     {/* Security Frame */}
-                    <div className="mt-8 pt-6 border-t border-neutral-800">
-                        <h3 className="text-sm font-bold text-neutral-400 flex items-center gap-2 uppercase tracking-wide mb-4">
-                            <ShieldAlert className="w-4 h-4 text-red-500" />
-                            Zona de Perigo (Ações do Administrador)
-                        </h3>
-                        <div className="flex gap-4">
-                            <button 
-                                onClick={() => setPromptType('block')}
-                                className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 rounded-lg text-sm font-medium transition-colors"
-                            >
-                                <Ban className="w-4 h-4" /> Suspender Acesso (Bloquear)
-                            </button>
-                            <button 
-                                onClick={() => setPromptType('delete')}
-                                className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 rounded-lg text-sm font-medium transition-colors"
-                            >
-                                <Trash2 className="w-4 h-4" /> Excluir Conta e Sub-usuários
-                            </button>
+                    {payer.status !== 'deleted' ? (
+                        <div className="mt-8 pt-6 border-t border-neutral-800">
+                            <h3 className="text-sm font-bold text-neutral-400 flex items-center gap-2 uppercase tracking-wide mb-4">
+                                <ShieldAlert className="w-4 h-4 text-red-500" />
+                                Zona de Perigo (Ações do Administrador)
+                            </h3>
+                            <div className="flex gap-4">
+                                <button 
+                                    onClick={() => setPromptType('block')}
+                                    className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 rounded-lg text-sm font-medium transition-colors"
+                                >
+                                    <Ban className="w-4 h-4" /> Suspender Acesso (Bloquear)
+                                </button>
+                                <button 
+                                    onClick={() => setPromptType('delete')}
+                                    className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 rounded-lg text-sm font-medium transition-colors"
+                                >
+                                    <Trash2 className="w-4 h-4" /> Excluir Conta e Sub-usuários
+                                </button>
+                            </div>
+                            <p className="text-xs text-neutral-600 mt-2">Ao realizar estas ações, o histórico de Vendas permanecerá preservado no banco.</p>
                         </div>
-                        <p className="text-xs text-neutral-600 mt-2">Ao realizar estas ações, o histórico de Vendas permanecerá preservado no banco.</p>
-                    </div>
+                    ) : (
+                        <div className="mt-8 pt-6 border-t border-red-500/20">
+                            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-4">
+                                <Trash2 className="w-6 h-6 text-red-500 shrink-0" />
+                                <div>
+                                    <h3 className="text-red-400 font-bold">Esta conta foi excluída permanentemente.</h3>
+                                    <p className="text-sm text-red-400/80 mt-1">
+                                        Os registros e sub-usuários foram preservados como histórico, mas o acesso autenticado a esta conta foi banido.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                 </div>
             </div>

@@ -107,10 +107,21 @@ export async function GET(request: Request) {
             payer.subUsers = subUsers.filter(sub => sub.parent_id === payer.id);
         });
 
+        // Collect Deleted Users
+        const deletedProfiles = profiles
+            .filter(p => p.status === 'deleted')
+            .map(p => ({
+                ...p,
+                email: userMap.get(p.id)?.email || null,
+                last_sign_in_at: userMap.get(p.id)?.last_sign_in_at || null,
+                dominant_location: getDominantLocation(p.assigned_stores),
+            }));
+
         return NextResponse.json({
             success: true,
             data: {
                 payers,
+                deletedProfiles,
                 totalUsers: Number(allUsersCount || 0),
                 totalPhysicalStores: Number(totalStores || 0)
             }
@@ -153,12 +164,19 @@ export async function DELETE(request: Request) {
              return NextResponse.json({ success: false, error: 'User ID is required' }, { status: 400 });
         }
 
-        // Delete from auth.users (this should cascade to profiles, but we can do both to be safe)
-        const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
-        if (error) throw error;
+        // Soft Delete: Ban user from Auth (100 years)
+        const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(id, {
+            ban_duration: '876000h'
+        });
+        if (banError) throw banError;
 
-        // Cleanup profile manually just in case
-        await supabaseAdmin.from('profiles').delete().eq('id', id);
+        // Change Profile Status
+        const { error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .update({ status: 'deleted' })
+            .eq('id', id);
+            
+        if (profileError) throw profileError;
 
         return NextResponse.json({ success: true });
     } catch (e: any) {
