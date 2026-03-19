@@ -27,6 +27,7 @@ import { supabase } from "@/lib/supabase";
 import { createClient } from "@supabase/supabase-js";
 import { OnboardingCnpj } from "@/components/modules/OnboardingCnpj";
 import { OnboardingVMPay } from "@/components/modules/OnboardingVMPay";
+import { OnboardingPassword } from "@/components/modules/OnboardingPassword";
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import { LavlyAdminDashboard } from "@/components/modules/LavlyAdminDashboard";
 
@@ -412,6 +413,11 @@ function AppContent({
 
   if (!isAuthenticated) {
     return <LoginForm />;
+  }
+
+  // Password Change Onboarding - Highest Priority
+  if (user?.user_metadata?.force_password_change) {
+    return <OnboardingPassword onSuccess={() => window.location.reload()} />;
   }
 
   // VMPay Onboarding Block - Strict Enforcement

@@ -94,7 +94,8 @@ export async function POST(req: Request) {
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
             email,
             password,
-            email_confirm: true // Force confirmation so they can login immediately
+            email_confirm: true, // Force confirmation so they can login immediately
+            user_metadata: { force_password_change: true }
         });
 
         let userId = authData?.user?.id;
