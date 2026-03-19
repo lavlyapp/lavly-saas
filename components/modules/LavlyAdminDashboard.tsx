@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Store, Users, DollarSign, Calendar, RefreshCcw, Search, Edit2, Check, X } from 'lucide-react';
+import { Store, Users, DollarSign, Calendar, RefreshCcw, Search, Edit2, Check, X, Trash2 } from 'lucide-react';
 import { Role } from '../context/AuthContext';
 import { AdminUserDetailsModal } from './AdminUserDetailsModal';
+import { AdminCreateUserModal } from './AdminCreateUserModal';
 
 // Update ProfileData to match the new API structure
 interface ProfileData {
@@ -29,6 +30,7 @@ export function LavlyAdminDashboard() {
   
   // Modal state
   const [selectedPayer, setSelectedPayer] = useState<ProfileData | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   // Inline edit alias state
   const [editingAliasId, setEditingAliasId] = useState<string | null>(null);
@@ -79,6 +81,30 @@ export function LavlyAdminDashboard() {
       }
   };
 
+  const handleDeleteUser = async (id: string, email: string | null) => {
+      if (!window.confirm(`Tem certeza que deseja EXCLUIR DEFINITIVAMENTE o usuário ${email || id}? Esta ação não pode ser desfeita.`)) {
+          return;
+      }
+
+      setLoading(true);
+      try {
+          const res = await fetch(`/api/admin/profiles?id=${id}`, {
+              method: 'DELETE',
+          });
+          const data = await res.json();
+          if (data.success) {
+              setPayers(payers.filter(p => p.id !== id));
+          } else {
+              alert('Erro ao excluir usuário: ' + data.error);
+          }
+      } catch (e) {
+          console.error("Error deleting user", e);
+          alert('Erro de conexão ao excluir usuário.');
+      } finally {
+          setLoading(false);
+      }
+  };
+
   const totalProprietarios = payers.length;
   // Symbologic MRR (Monthly Recurring Revenue): R$ 99 per allocated MAX_STORES constraint globally, or just a fixed estimate
   const mrrEstimado = payers.reduce((acc, p) => acc + (p.max_stores || 0), 0) * 99;
@@ -95,13 +121,21 @@ export function LavlyAdminDashboard() {
           <h2 className="text-2xl font-bold text-white tracking-tight">Lavly SaaS Admin</h2>
           <p className="text-neutral-400">Visão master da plataforma e controle de assinaturas</p>
         </div>
-        <button
-          onClick={fetchAdminData}
-          className="flex items-center gap-2 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg transition-colors border border-neutral-700"
-        >
-          <RefreshCcw className="w-4 h-4" />
-          <span className="text-sm font-medium">Atualizar Dados</span>
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition-colors shadow-lg shadow-indigo-500/20"
+          >
+            <span className="text-sm">Nova Conta</span>
+          </button>
+          <button
+            onClick={fetchAdminData}
+            className="flex items-center gap-2 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg transition-colors border border-neutral-700"
+          >
+            <RefreshCcw className="w-4 h-4" />
+            <span className="text-sm font-medium hidden sm:inline">Atualizar Dados</span>
+          </button>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -242,6 +276,9 @@ export function LavlyAdminDashboard() {
                                         <button onClick={() => { setEditingAliasId(profile.id); setTempAlias(profile.admin_alias || ''); }} className="opacity-0 group-hover/alias:opacity-100 text-neutral-500 hover:text-indigo-400 transition-opacity">
                                             <Edit2 className="w-3 h-3" />
                                         </button>
+                                        <button onClick={() => handleDeleteUser(profile.id, profile.email)} title="Excluir Usuário" className="opacity-0 group-hover/alias:opacity-100 text-neutral-500 hover:text-red-500 transition-opacity ml-1">
+                                            <Trash2 className="w-3 h-3" />
+                                        </button>
                                     </div>
                                 )}
                               <div className="text-xs text-neutral-500 font-mono" title="Email da Conta">{profile.email || "Sem Email (Inválido)"}</div>
@@ -308,6 +345,14 @@ export function LavlyAdminDashboard() {
         isOpen={!!selectedPayer}
         onClose={() => setSelectedPayer(null)}
         payer={selectedPayer}
+      />
+
+      <AdminCreateUserModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={() => {
+          fetchAdminData();
+        }}
       />
     </div>
   );

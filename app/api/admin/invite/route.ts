@@ -15,11 +15,11 @@ export async function POST(req: Request) {
         const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
         const body = await req.json();
-        const { email, apiKey, role = 'proprietario', maxStores = 1 } = body;
+        const { email, apiKey, password, plan = 'ouro', role = 'proprietario', maxStores = 1 } = body;
 
-        console.log(`[Admin Invite] Starting invite for: ${email} with maxStores: ${maxStores}`);
-        if (!email || !apiKey) {
-            return NextResponse.json({ error: 'Email and API Key are required' }, { status: 400 });
+        console.log(`[Admin Invite] Starting invite for: ${email} with plan: ${plan}, maxStores: ${maxStores}`);
+        if (!email || !apiKey || !password) {
+            return NextResponse.json({ error: 'Email, Password, and API Key are required' }, { status: 400 });
         }
 
         // 1. Verify if the user making the request is an admin
@@ -76,37 +76,40 @@ export async function POST(req: Request) {
 
         if (assignedStoresArray.length === 0) {
             return NextResponse.json(
-                { error: 'API Key is valid, but no stores or machines were found for this key.' },
+                { error: 'API Key is valid, but no stores ou machines were found for this key.' },
                 { status: 400 }
             );
         }
 
         console.log(`[Admin Invite] Found ${assignedStoresArray.length} stores:`, assignedStoresArray);
 
-        // 4. Create User in Supabase Auth (This sends the invite email if email confirmations are on)
-        // If the user already exists, Supabase might throw or return the existing user based on settings
+        // 4. Create User in Supabase Auth
         console.log(`[Admin Invite] Creating auth user for ${email}...`);
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
             email,
-            email_confirm: false // Depends on if you want them to have to click a link
+            password,
+            email_confirm: true // Force confirmation so they can login immediately
         });
 
         let userId = authData?.user?.id;
 
         if (authError) {
-            // If user already exists, we might just want to update their profile instead of failing
             if (authError.message.includes('already registered')) {
-                console.log(`[Admin Invite] User ${email} already exists. We will just update their profile.`);
-                // We need to find their ID
-                const { data: existingUser } = await supabaseAdmin.from('profiles').select('id').eq('id', (await supabaseAdmin.from('auth.users').select('id').eq('email', email).single()).data?.id).single()
-
-                // Fallback direct query if first query fails (admin API)
-                const { data: usersData } = await supabaseAdmin.auth.admin.listUsers();
-                const foundUser = usersData.users.find(u => u.email === email);
-                if (foundUser) {
-                    userId = foundUser.id;
+                console.log(`[Admin Invite] User ${email} already exists. Updating their profile.`);
+                const { data: existingUser } = await supabaseAdmin.from('auth.users').select('id').eq('email', email).single();
+                if (existingUser) {
+                    userId = existingUser.id;
+                    // Optional: update their password if they already exist so the new password works
+                    await supabaseAdmin.auth.admin.updateUserById(userId as string, { password });
                 } else {
-                    return NextResponse.json({ error: `User exists but could not find ID: ${authError.message}` }, { status: 400 });
+                    const { data: usersData } = await supabaseAdmin.auth.admin.listUsers();
+                    const foundUser = usersData.users.find(u => u.email === email);
+                    if (foundUser) {
+                        userId = foundUser.id;
+                        await supabaseAdmin.auth.admin.updateUserById(userId as string, { password });
+                    } else {
+                        return NextResponse.json({ error: `User exists but could not find ID: ${authError.message}` }, { status: 400 });
+                    }
                 }
             } else {
                 return NextResponse.json({ error: `Auth Error: ${authError.message}` }, { status: 400 });
@@ -124,9 +127,11 @@ export async function POST(req: Request) {
             .upsert({
                 id: userId,
                 role: role,
+                plan: plan,
                 max_stores: Number(maxStores),
                 assigned_stores: assignedStoresArray,
                 vmpay_api_key: apiKey,
+                subscription_status: 'active',
                 updated_at: new Date().toISOString()
             });
 

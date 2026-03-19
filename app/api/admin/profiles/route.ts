@@ -143,3 +143,25 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ success: false, error: e.message }, { status: 500 });
     }
 }
+
+export async function DELETE(request: Request) {
+    try {
+        const url = new URL(request.url);
+        const id = url.searchParams.get('id');
+
+        if (!id) {
+             return NextResponse.json({ success: false, error: 'User ID is required' }, { status: 400 });
+        }
+
+        // Delete from auth.users (this should cascade to profiles, but we can do both to be safe)
+        const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
+        if (error) throw error;
+
+        // Cleanup profile manually just in case
+        await supabaseAdmin.from('profiles').delete().eq('id', id);
+
+        return NextResponse.json({ success: true });
+    } catch (e: any) {
+        return NextResponse.json({ success: false, error: e.message }, { status: 500 });
+    }
+}
