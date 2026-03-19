@@ -109,10 +109,24 @@ export function LavlyAdminDashboard() {
   // Symbologic MRR (Monthly Recurring Revenue): R$ 99 per allocated MAX_STORES constraint globally, or just a fixed estimate
   const mrrEstimado = payers.reduce((acc, p) => acc + (p.max_stores || 0), 0) * 99;
 
-  const filteredProfiles = payers.filter(p => 
-    (p.email || p.id).toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (p.admin_alias || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProfiles = payers
+    .filter(p => 
+      (p.email || p.id).toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (p.admin_alias || '').toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      // 1. Agrupar por Loja (primeira loja assinalada)
+      const storeA = a.assigned_stores && a.assigned_stores.length > 0 ? a.assigned_stores[0].toLowerCase() : 'zzzzz';
+      const storeB = b.assigned_stores && b.assigned_stores.length > 0 ? b.assigned_stores[0].toLowerCase() : 'zzzzz';
+      
+      if (storeA < storeB) return -1;
+      if (storeA > storeB) return 1;
+
+      // 2. Desempate por Nome (Alias ou Email)
+      const nameA = (a.admin_alias || a.email || '').toLowerCase();
+      const nameB = (b.admin_alias || b.email || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
 
   return (
     <div className="space-y-6">
