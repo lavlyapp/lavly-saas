@@ -153,7 +153,7 @@ export function AdminCreateUserModal({ isOpen, onClose, onSuccess }: AdminCreate
                                 value={formData.apiKey}
                                 onChange={e => setFormData({ ...formData, apiKey: e.target.value })}
                                 className="w-full h-24 bg-black border border-neutral-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-lg p-3 text-white text-xs font-mono transition-all resize-none"
-                                placeholder="Deixe em branco para forçar o cliente a configurar no primeiro acesso..."
+                                placeholder="Cole aqui a chave VMPay API Key"
                             />
                             <p className="text-xs text-neutral-500">
                                 Se preenchido, o sistema importará as lojas; se vazio, a área do cliente ficará bloqueada até ele cadastrar sua chave.
