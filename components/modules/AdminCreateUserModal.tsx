@@ -28,6 +28,18 @@ export function AdminCreateUserModal({ isOpen, onClose, onSuccess }: AdminCreate
         setSuccessMsg(null);
 
         try {
+            if (
+                formData.password.length < 8 ||
+                !/[A-Z]/.test(formData.password) ||
+                !/[a-z]/.test(formData.password) ||
+                !/[0-9]/.test(formData.password) ||
+                !/[^A-Za-z0-9]/.test(formData.password)
+            ) {
+                setError('A senha deve ter pelo menos 8 caracteres, contendo maiúsculas, minúsculas, números e símbolos (ex: @, #, $).');
+                setLoading(false);
+                return;
+            }
+
             const res = await fetch('/api/admin/invite', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -92,7 +104,7 @@ export function AdminCreateUserModal({ isOpen, onClose, onSuccess }: AdminCreate
                                 value={formData.email}
                                 onChange={e => setFormData({ ...formData, email: e.target.value })}
                                 className="w-full bg-black border border-neutral-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-lg p-3 text-white transition-all"
-                                placeholder="ex: efigenia@lavanderia.com"
+                                placeholder="Seu e-mail"
                             />
                         </div>
 

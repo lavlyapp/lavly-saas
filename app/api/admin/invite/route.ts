@@ -22,6 +22,16 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Email and Password are required' }, { status: 400 });
         }
 
+        if (
+            password.length < 8 ||
+            !/[A-Z]/.test(password) ||
+            !/[a-z]/.test(password) ||
+            !/[0-9]/.test(password) ||
+            !/[^A-Za-z0-9]/.test(password)
+        ) {
+            return NextResponse.json({ error: 'A senha deve ter pelo menos 8 caracteres, contendo letras maiúsculas, minúsculas, números e símbolos.' }, { status: 400 });
+        }
+
         let assignedStoresArray: string[] = [];
         const uniqueStoreNames = new Set<string>();
         const storesData = new Map<string, any>();
