@@ -27,7 +27,6 @@ export default function LandingPage() {
           </div>
           <div className="flex items-center gap-6">
             <a href="#features" className="text-sm font-medium text-neutral-400 hover:text-white transition-colors hidden md:block">Recursos</a>
-            <a href="#testimonials" className="text-sm font-medium text-neutral-400 hover:text-white transition-colors hidden md:block">Depoimentos</a>
             <Link
               href="/dashboard"
               className="group relative px-6 py-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-all duration-300 flex items-center gap-2 overflow-hidden"
@@ -163,39 +162,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Testimonials (Fictional Social Proof) */}
-      <section id="testimonials" className="py-24 border-t border-white/5 relative overflow-hidden">
-        {/* Glow */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg h-[400px] bg-indigo-500/10 blur-[100px] rounded-full pointer-events-none"></div>
 
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-white mb-4">Aprovado por quem inova</h2>
-            <p className="text-neutral-400">Lavanderias de todo o país já utilizam a inteligência do Lavly.</p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            <TestimonialCard
-              quote="Antes do Lavly eu controlava o faturamento vendo os e-mails do PIX. Hoje eu sei até que o público feminino gasta 30% mais em secadoras do que o masculino. Surreal."
-              name="Carlos Moraes"
-              store="Lavanderia Express Downtown (Loja Fictícia)"
-              initial="C"
-            />
-            <TestimonialCard
-              quote="O gráfico do monitor de máquinas mudou nosso atendimento. Quando vejo que todas as máquinas estão lotadas pelo painel de casa, já mando um WhatsApp pra loja pedindo organização."
-              name="Letícia S."
-              store="EcoWash Premium (Loja Fictícia)"
-              initial="L"
-            />
-            <TestimonialCard
-              quote="Eu perdia dias cruzando Excel pra fechar o mês. Aquele filtro do calendário e os resumos de PIX x Crédito entregam isso mastigado."
-              name="Roberto Almeida"
-              store="Auto Lavagem Rápida (Loja Fictícia)"
-              initial="R"
-            />
-          </div>
-        </div>
-      </section>
 
       {/* CTA / Footer */}
       <footer id="whatsapp" className="border-t border-white/10 bg-neutral-950 pt-20 pb-10">
@@ -243,20 +210,3 @@ function FeatureCard({ icon, title, description }: { icon: React.ReactNode, titl
   );
 }
 
-function TestimonialCard({ quote, name, store, initial }: { quote: string, name: string, store: string, initial: string }) {
-  return (
-    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-8 relative">
-      <div className="text-4xl text-neutral-800 absolute top-4 right-6 font-serif">"</div>
-      <p className="text-neutral-300 text-sm leading-relaxed mb-8 relative z-10 italic">"{quote}"</p>
-      <div className="flex items-center gap-4">
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500/20 to-emerald-500/20 border border-white/10 flex items-center justify-center font-bold text-white">
-          {initial}
-        </div>
-        <div>
-          <h4 className="text-sm font-bold text-white">{name}</h4>
-          <p className="text-xs text-neutral-500">{store}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
