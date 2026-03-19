@@ -127,7 +127,10 @@ export function AppSidebar({ activeTab, onTabChange, collapsed, onToggle, isMobi
 
             <div className="p-4 mt-auto">
                 <button
-                    onClick={logout}
+                    onClick={async () => {
+                        await logout();
+                        window.location.href = '/';
+                    }}
                     className="w-full flex items-center gap-3 px-4 py-3 text-neutral-400 hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-all"
                 >
                     <LogOut className="w-5 h-5" />
