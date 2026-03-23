@@ -203,12 +203,6 @@ export function MachineMonitor({ allRecords, allOrders, selectedStore }: Machine
                         <div>
                             <div className="flex items-center gap-3">
                                 <h3 className="text-lg font-bold text-white">Visão Geral</h3>
-                                {renderTime && (
-                                    <span className="text-[10px] text-neutral-500 font-mono bg-neutral-900/80 px-2 py-0.5 rounded-full border border-neutral-800 flex items-center gap-1 shadow-inner">
-                                        <RefreshCw className="w-3 h-3" />
-                                        Verificado às {renderTime}
-                                    </span>
-                                )}
                             </div>
                             <p className="text-sm text-neutral-400">
                                 {isAllStores ? 'Todas as Lojas' : selectedStore}
@@ -407,6 +401,15 @@ export function MachineMonitor({ allRecords, allOrders, selectedStore }: Machine
                     </div>
                 </Card>
             ))}
+
+            {renderTime && (
+                <div className="flex justify-end pt-2 pb-6 px-4">
+                    <span className="text-[11px] text-neutral-500 font-mono px-3 py-1 rounded-full border border-neutral-800/50 flex items-center gap-1.5 shadow-inner">
+                        <RefreshCw className="w-3 h-3 text-neutral-400" />
+                        Última atualização: {renderTime}
+                    </span>
+                </div>
+            )}
         </div>
     );
 }
