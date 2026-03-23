@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { ArrowUpRight, DollarSign, Calendar, TrendingUp, CreditCard, Filter, Users, Activity, BarChart3, ShoppingBasket, Waves, Wind } from "lucide-react";
+import { ArrowUpRight, DollarSign, Calendar, TrendingUp, CreditCard, Filter, Users, Activity, BarChart3, ShoppingBasket, Waves, Wind, RefreshCw } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, subMonths, format, getDaysInMonth, differenceInCalendarDays } from 'date-fns';
 import { MachineMonitor } from './MachineMonitor';
@@ -28,6 +28,11 @@ type PeriodOption = 'today' | 'yesterday' | 'thisMonth' | 'lastMonth' | 'custom'
 
 export function FinancialDashboard({ data, allRecords, allOrders, selectedStore = 'Todas' }: FinancialDashboardProps) {
     const { role } = useAuth();
+    
+    const [renderTime, setRenderTime] = useState<string>("");
+    useEffect(() => {
+        setRenderTime(format(new Date(), "dd/MM/yyyy HH:mm"));
+    }, [data, allRecords, allOrders]);
 
     // DEBUG: Inject precise length check
     console.log(`[DEBUG-FinancialDashboard] Mounted. Stores: ${selectedStore}`);
@@ -550,6 +555,17 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(globalMetrics.projection)}
                             </div>
                             <p className="text-[10px] text-neutral-600">Mês {globalMetrics.daysInViewMonth} dias</p>
+                        </div>
+                        
+                        {/* 8. Ultima Atualizacao */}
+                        <div className="bg-neutral-900/50 p-6 rounded-xl border border-neutral-800 flex flex-col justify-center items-center h-full group bg-black/20">
+                            <div className="flex items-center gap-2 text-neutral-500 mb-2">
+                                <RefreshCw className="w-4 h-4 opacity-50" />
+                                <span className="text-sm font-medium">Última Verificação</span>
+                            </div>
+                            <div className="text-sm font-mono text-neutral-400 font-bold bg-neutral-900 px-3 py-1 rounded-md border border-neutral-800">
+                                {renderTime}
+                            </div>
                         </div>
                     </>
                 )}
