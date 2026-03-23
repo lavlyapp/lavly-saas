@@ -2,9 +2,10 @@ import { Card } from "@/components/ui/card";
 import { SaleRecord } from "@/lib/processing/etl";
 import { format, addMinutes, isAfter, differenceInMinutes } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { WashingMachine, Wind, Activity, Power, Clock, AlertCircle, Store } from "lucide-react";
+import { WashingMachine, Wind, Activity, Power, Clock, AlertCircle, Store, RefreshCw } from "lucide-react";
 import { getCycleDuration } from "@/lib/processing/crm";
 import { getCanonicalStoreName } from "@/lib/vmpay-config";
+import { useState, useEffect } from "react";
 
 interface MachineMonitorProps {
     allRecords: SaleRecord[];  // Keep for backwards compatibility if needed
@@ -24,6 +25,12 @@ interface MachineStatus {
 }
 
 export function MachineMonitor({ allRecords, allOrders, selectedStore }: MachineMonitorProps) {
+    const [renderTime, setRenderTime] = useState<string>("");
+
+    useEffect(() => {
+        setRenderTime(format(new Date(), "HH:mm"));
+    }, [allRecords, allOrders]);
+
     if (!allRecords || allRecords.length === 0) return null;
 
     const canonicalSelected = getCanonicalStoreName(selectedStore);
@@ -194,7 +201,15 @@ export function MachineMonitor({ allRecords, allOrders, selectedStore }: Machine
                             <Activity className="w-5 h-5 text-[#a3e635]" />
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold text-white">Visão Geral</h3>
+                            <div className="flex items-center gap-3">
+                                <h3 className="text-lg font-bold text-white">Visão Geral</h3>
+                                {renderTime && (
+                                    <span className="text-[10px] text-neutral-500 font-mono bg-neutral-900/80 px-2 py-0.5 rounded-full border border-neutral-800 flex items-center gap-1 shadow-inner">
+                                        <RefreshCw className="w-3 h-3" />
+                                        Verificado às {renderTime}
+                                    </span>
+                                )}
+                            </div>
                             <p className="text-sm text-neutral-400">
                                 {isAllStores ? 'Todas as Lojas' : selectedStore}
                             </p>
