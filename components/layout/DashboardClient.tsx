@@ -1452,6 +1452,15 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       setLogs(prev => [...prev, `[VMPay] Ciclo completo: ${totalToProcess} novos registros integrados no banco de dados.`]);
       setLogs(prev => [...prev, `[Sistema] Atualizando painel...`]);
 
+      // Destruição do cache corrompido: as vendas locais antigas de hoje tem o timestamp 3 horas no passado devido ao bug +Z.
+      // O sync Delta (.gte('data')) na UI vai ignorá-las porque seus horários são do "passado" da última sincronia.
+      // Forçamos a limpeza do IndexedDB local para que a UI puxe tudo fresco do zero da Nuvem em todos os Syncs Manuais.
+      try {
+        const { clear } = await import('idb-keyval');
+        await clear();
+        setLogs(prev => [...prev, `[Sistema] Cache local antigo destruído para forçar novo Fuso Horário.`]);
+      } catch (e) { }
+
       try {
         await reloadAllData("Sincronismo", token);
       } catch (dbErr: any) {
