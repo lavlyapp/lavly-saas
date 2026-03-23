@@ -73,12 +73,24 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
         console.log(`[Sync Manager] No last sync found OR force=true for ${cred.name}. Fetching 10-day history: ${lastSync.toISOString()}`);
     }
 
-    // Auto-Heal: Manual syncs always look back at least 3 days to cover temporary cloud outages or timezone holes
-    if (isManual && !force) {
-        const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
-        if (lastSync > threeDaysAgo) {
-            lastSync = threeDaysAgo;
-            console.log(`[Sync Manager] Manual Sync Auto-Heal: Reverting lastSync to ${lastSync.toISOString()} for ${cred.name}`);
+    // Métrica Inteligente de Janela Segura (Delta-Sync Window)
+    // Para evitar perdas por máquinas offline ou delays da VMPay:
+    // - Sync Automático (a cada 30min): Retorna 3 horas (cobre perfeitamente o gap)
+    // - Sync Manual (botão): Retorna 8 horas (dá segurança para ver vendas atrasadas no mesmo dia)
+    // - Sync de Auto-Cura (03:00 da manhã): Retorna 72 horas (3 dias) para fechar caixa perfeito.
+    if (!force) {
+        const currentHour = now.getHours();
+        let lookbackHours = isManual ? 8 : 3;
+        
+        // Auto-Cura Profunda durante a madrugada
+        if (!isManual && currentHour === 3) {
+            lookbackHours = 72;
+        }
+        
+        const safeWindowDate = new Date(now.getTime() - lookbackHours * 60 * 60 * 1000);
+        if (lastSync > safeWindowDate) {
+            lastSync = safeWindowDate;
+            console.log(`[Sync Manager] Janela de Segurança Ativa (${lookbackHours}h): Ajustando sync para ${lastSync.toISOString()} na loja ${cred.name}`);
         }
     }
 
