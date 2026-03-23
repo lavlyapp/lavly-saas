@@ -175,6 +175,12 @@ function AppContent({
   stableInitialLoad,
   syncProgress
 }: AppContentProps) {
+  // Last Update Timestamp
+  const [renderTime, setRenderTime] = useState("");
+  useEffect(() => {
+    if (allRecords && allRecords.length > 0) setRenderTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+  }, [allRecords]);
+
   const { selectedCustomerName, closeCustomerDetails } = useCustomerContext();
   const { user, isAuthenticated, isLoading, token, isExpired, role, vmpayApiKey } = useAuth();
   const [showTerms, setShowTerms] = useState(false);
@@ -462,11 +468,18 @@ function AppContent({
                   {activeTab === 'machines' && 'Parque de Máquinas'}
                   {activeTab === 'logs' && 'Auditoria de Sistema'}
                 </h2>
-                <p className="text-xs md:text-sm text-neutral-500 truncate">
-                  {allRecords.length > 0
-                    ? `${allRecords.length} vendas | ${stores.length} lojas`
-                    : 'Aguardando importação...'}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs md:text-sm text-neutral-500 truncate">
+                    {allRecords.length > 0
+                      ? `${allRecords.length} vendas | ${stores.length} lojas`
+                      : 'Aguardando importação...'}
+                  </p>
+                  {renderTime && (
+                    <p className="text-[11px] text-neutral-400 font-mono border-l border-neutral-800 pl-2">
+                      {renderTime}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
