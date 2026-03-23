@@ -132,15 +132,10 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                             produto = "SECAGEM";
                         }
 
-                        // Fix Timezone: VMPay returns strings representing local BRT time but lacking offset data.
-                        // Vercel server runs in UTC. If we don't append explicit -03:00, the parser
-                        // will create a UTC date heavily shifted into the past, causing 'active machines' to vanish!
+                        // Fix Timezone: API natively returns UTC timestamps but often omits the 'Z' suffix
                         let dateStr = sale.data;
-                        if (dateStr && typeof dateStr === 'string') {
-                            if (dateStr.endsWith('Z')) {
-                                dateStr = dateStr.slice(0, -1);
-                            }
-                            dateStr += '-03:00';
+                        if (dateStr && typeof dateStr === 'string' && !dateStr.endsWith('Z')) {
+                            dateStr += 'Z';
                         }
                         const safeDate = new Date(dateStr);
 
