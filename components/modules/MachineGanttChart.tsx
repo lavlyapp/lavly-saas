@@ -2,7 +2,7 @@
 
 import { SaleRecord } from "@/lib/processing/etl";
 import { getCycleDuration } from "@/lib/processing/crm";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { format, addMinutes, startOfDay, endOfDay } from "date-fns";
 
@@ -123,6 +123,13 @@ export function MachineGanttChart({ records }: MachineGanttChartProps) {
         return (diffMinutes / totalMinutes) * 100;
     };
 
+    const [renderTime, setRenderTime] = useState<string>("");
+
+    // Capture the time exactly when the records were passed to this component
+    useEffect(() => {
+        setRenderTime(format(new Date(), "HH:mm"));
+    }, [records]);
+
     return (
         <Card className="col-span-1 border-neutral-800 bg-gradient-to-br from-neutral-900 to-neutral-950 text-neutral-100 shadow-xl overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between border-b border-neutral-800/50 pb-4 bg-black/20">
@@ -136,8 +143,14 @@ export function MachineGanttChart({ records }: MachineGanttChartProps) {
                             Linha do Tempo (Gantt)
                         </span>
                     </CardTitle>
-                    <CardDescription className="text-neutral-400 mt-1 flex items-center gap-2">
-                        Acompanhe a ocupação e ciclos em tempo real
+                    <CardDescription className="text-neutral-400 mt-2 flex flex-col sm:flex-row sm:items-center gap-2">
+                        <span>Acompanhe a ocupação e ciclos em tempo real.</span>
+                        {renderTime && (
+                            <span className="text-[11px] text-neutral-500 font-mono bg-neutral-900/50 px-2 py-0.5 rounded border border-neutral-800 flex items-center gap-1">
+                                <RefreshCw className="w-3 h-3" />
+                                Verificado às {renderTime}
+                            </span>
+                        )}
                     </CardDescription>
                 </div>
                 <div className="flex items-center gap-3">
