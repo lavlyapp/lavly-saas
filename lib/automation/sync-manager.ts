@@ -80,11 +80,13 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
     // - Sync de Auto-Cura (03:00 da manhã): Retorna 72 horas (3 dias) para fechar caixa perfeito.
     if (!force) {
         const currentHour = now.getHours();
-        let lookbackHours = isManual ? 8 : 3;
+        // Manual Sync fetches 3 days (72h) to heal any possible timezone/machine drops.
+        // Auto Sync fetches 12 hours.
+        let lookbackHours = isManual ? 72 : 12;
         
         // Auto-Cura Profunda durante a madrugada
         if (!isManual && currentHour === 3) {
-            lookbackHours = 72;
+            lookbackHours = 120; // 5 days
         }
         
         const safeWindowDate = new Date(now.getTime() - lookbackHours * 60 * 60 * 1000);

@@ -76,12 +76,10 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                 let page = 0;
                 const size = 1000; // API max
 
-                // FIX: VMPay API ignores 'Z' and assumes the string is local BRT time. 
-                // Passing a UTC ISO string causes a 3-hour forward shift, losing data.
-                const startStr = formatInTimeZone(chunk.start, 'America/Sao_Paulo', "yyyy-MM-dd'T'HH:mm:ss");
-                const endStr = formatInTimeZone(chunk.end, 'America/Sao_Paulo', "yyyy-MM-dd'T'HH:mm:ss");
+                const startStr = chunk.start.toISOString();
+                const endStr = chunk.end.toISOString();
 
-                console.log(`[VMPay Client] Syncing ${cred.name} chunk: ${startStr} to ${endStr} (BRT)`);
+                console.log(`[VMPay Client] Syncing ${cred.name} chunk: ${startStr} to ${endStr}`);
 
                 while (true) {
                     const url = `${VMPAY_API_BASE_URL}/vendas?dataInicio=${startStr}&dataTermino=${endStr}&somenteSucesso=true&pagina=${page}&quantidade=${size}`;
@@ -134,10 +132,15 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                             produto = "SECAGEM";
                         }
 
-                        // Fix Timezone: API natively returns UTC timestamps but often omits the 'Z' suffix
+                        // Fix Timezone: VMPay returns strings representing local BRT time but lacking offset data.
+                        // Vercel server runs in UTC. If we don't append explicit -03:00, the parser
+                        // will create a UTC date heavily shifted into the past, causing 'active machines' to vanish!
                         let dateStr = sale.data;
-                        if (dateStr && typeof dateStr === 'string' && !dateStr.endsWith('Z')) {
-                            dateStr += 'Z';
+                        if (dateStr && typeof dateStr === 'string') {
+                            if (dateStr.endsWith('Z')) {
+                                dateStr = dateStr.slice(0, -1);
+                            }
+                            dateStr += '-03:00';
                         }
                         const safeDate = new Date(dateStr);
 
