@@ -1342,6 +1342,21 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       return;
     }
 
+    // Rate Limiting Logic (1 minute cooldown) to prevent VMPay API block
+    const lastSyncTimeStr = localStorage.getItem('last_vmpay_sync');
+    const now = Date.now();
+    if (lastSyncTimeStr) {
+        const lastSyncTime = parseInt(lastSyncTimeStr, 10);
+        if (now - lastSyncTime < 60000) {
+            const remainingSeconds = Math.ceil((60000 - (now - lastSyncTime)) / 1000);
+            setStatus("error");
+            setMessage(`Proteção contra bloqueio: Aguarde ${remainingSeconds} segundos antes de sincronizar novamente.`);
+            setTimeout(() => setStatus("idle"), 5000);
+            return;
+        }
+    }
+    localStorage.setItem('last_vmpay_sync', now.toString());
+
     try {
       setStatus("uploading");
       setSyncProgress(0);
