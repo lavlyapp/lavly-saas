@@ -76,10 +76,12 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                 let page = 0;
                 const size = 1000; // API max
 
-                const startStr = chunk.start.toISOString();
-                const endStr = chunk.end.toISOString();
+                // FIX: VMPay API ignores 'Z' and assumes the string is local BRT time. 
+                // Passing a UTC ISO string causes a 3-hour forward shift, losing data.
+                const startStr = formatInTimeZone(chunk.start, 'America/Sao_Paulo', "yyyy-MM-dd'T'HH:mm:ss");
+                const endStr = formatInTimeZone(chunk.end, 'America/Sao_Paulo', "yyyy-MM-dd'T'HH:mm:ss");
 
-                console.log(`[VMPay Client] Syncing ${cred.name} chunk: ${startStr} to ${endStr}`);
+                console.log(`[VMPay Client] Syncing ${cred.name} chunk: ${startStr} to ${endStr} (BRT)`);
 
                 while (true) {
                     const url = `${VMPAY_API_BASE_URL}/vendas?dataInicio=${startStr}&dataTermino=${endStr}&somenteSucesso=true&pagina=${page}&quantidade=${size}`;
