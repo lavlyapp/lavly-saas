@@ -556,17 +556,6 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                             </div>
                             <p className="text-[10px] text-neutral-600">Mês {globalMetrics.daysInViewMonth} dias</p>
                         </div>
-                        
-                        {/* 8. Ultima Atualizacao */}
-                        <div className="bg-neutral-900/50 p-6 rounded-xl border border-neutral-800 flex flex-col justify-center items-center h-full group bg-black/20">
-                            <div className="flex items-center gap-2 text-neutral-500 mb-2">
-                                <RefreshCw className="w-4 h-4 opacity-50" />
-                                <span className="text-sm font-medium">Última Verificação</span>
-                            </div>
-                            <div className="text-sm font-mono text-neutral-400 font-bold bg-neutral-900 px-3 py-1 rounded-md border border-neutral-800">
-                                {renderTime}
-                            </div>
-                        </div>
                     </>
                 )}
             </div>

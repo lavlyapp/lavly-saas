@@ -403,10 +403,9 @@ export function MachineMonitor({ allRecords, allOrders, selectedStore }: Machine
             ))}
 
             {renderTime && (
-                <div className="flex justify-end pt-2 pb-6 px-4">
-                    <span className="text-[11px] text-neutral-500 font-mono px-3 py-1 rounded-full border border-neutral-800/50 flex items-center gap-1.5 shadow-inner">
-                        <RefreshCw className="w-3 h-3 text-neutral-400" />
-                        Última atualização: {renderTime}
+                <div className="flex justify-end pt-1 pb-4 px-2">
+                    <span className="text-xs text-neutral-600 font-mono tracking-wider opacity-60">
+                        {renderTime}
                     </span>
                 </div>
             )}
