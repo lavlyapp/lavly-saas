@@ -519,16 +519,12 @@ function AppContent({
             </button>
 
             <button
-              onClick={async () => {
-                const { clear } = await import('idb-keyval');
-                await clear();
-                window.location.reload();
-              }}
-              title="Apagar dados fantasmas travados na memória do celular"
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-500/20 transition-all"
+              onClick={() => window.location.reload()}
+              title="Recarregar interface e buscar dados mais recentes"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-neutral-800 hover:bg-neutral-700 text-white shadow-lg transition-all"
             >
               <RefreshCw className="w-4 h-4" />
-              <span>Resetar App</span>
+              <span>Atualizar Tela</span>
             </button>
 
             <div className="relative group">
@@ -757,77 +753,8 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         return; // Halt data loading until CNPJs are provided
       }
 
-      // 2. Load from Local Cache (IndexedDB)
-      const { get, set, clear } = await import('idb-keyval');
-      setLogs(prev => [...prev, "[System] Verificando cache offline ultrarrápido..."]);
-
-      const withLocalTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> => {
-        let timeoutId: NodeJS.Timeout;
-        const timeoutPromise = new Promise<T>((resolve) => {
-          timeoutId = setTimeout(() => resolve(fallback), timeoutMs);
-        });
-        return Promise.race([promise.catch(() => fallback), timeoutPromise]).finally(() => clearTimeout(timeoutId));
-      };
-
-      let cachedSales = await withLocalTimeout(get('lavly_sales'), 2000, []) || [];
-      let cachedOrders = await withLocalTimeout(get('lavly_orders'), 2000, []) || [];
-      let cachedCustomers = await withLocalTimeout(get('lavly_customers'), 2000, []) || [];
-
-      let lastCachedDate = null;
-      let lastCachedOrderDate = null;
-
-      if (cachedSales.length > 0) {
-        // Hydrate right away to show data instantly
-        const hydratedCachedSales = cachedSales.map((s: any) => ({
-          ...s,
-          data: new Date(s.data),
-          produto: s.produto || s.service || "",
-          formaPagamento: s.formaPagamento || s.forma_pagamento || s.tipoPagamento || "Outros",
-          tipoCartao: s.tipoCartao || s.tipo_cartao || "",
-          categoriaVoucher: s.categoriaVoucher || s.categoria_voucher || "",
-          customerId: s.customerId || s.customer_id,
-          birthDate: s.birthDate || s.birth_date ? new Date(s.birthDate || s.birth_date) : undefined,
-          items: s.items ? s.items.map((i: any) => ({ ...i, startTime: new Date(i.startTime) })) : []
-        }));
-        const hydratedCachedOrders = cachedOrders.map((o: any) => ({ ...o, data: new Date(o.data) }));
-        const hydratedCachedCustomers = cachedCustomers.map((c: any) => ({ ...c, registrationDate: c.registrationDate ? new Date(c.registrationDate) : undefined }));
-
-        setAllRecords(hydratedCachedSales);
-        setAllOrders(hydratedCachedOrders);
-        if (hydratedCachedCustomers.length > 0) setAllCustomers(hydratedCachedCustomers);
-
-        setLogs(prev => [...prev, `[System] Flash Load: ${cachedSales.length} registros restaurados do dispositivo local.`]);
-
-        // Find max dates for Delta Sync safely to prevent Maximum Call Stack Size Exceeded
-        // Anti-Poisoning: Ensure local lastCachedDate is NEVER wildly in the future
-        // A single typo in an Excel import (e.g. year 2027) stored locally would permanently break the delta sync
-        // because gte(2027) would always yield 0, ignoring legitimate new Supabase records.
-        const currentPhysicalTime = new Date().getTime() + 3600000;
-
-        const validDates = hydratedCachedSales.map((s: any) => s.data.getTime()).filter((ts: number) => ts <= currentPhysicalTime);
-        const maxTimestamp = validDates.length > 0 ? validDates.reduce((max: number, d: number) => Math.max(max, d), validDates[0]) : 0;
-        lastCachedDate = new Date(maxTimestamp || Date.now());
-
-        const orderDates = hydratedCachedOrders.map((o: any) => o.data.getTime()).filter((ts: number) => ts <= currentPhysicalTime);
-        if (orderDates.length > 0) {
-          const maxOrderTs = orderDates.reduce((max: number, d: number) => Math.max(max, d), orderDates[0]);
-          lastCachedOrderDate = new Date(maxOrderTs);
-        }
-      } else {
-        setMessage("Carregando 100% do histórico inicial (Pode demorar na primeira vez)...");
-      }
-
-      // 3. Fallback ou Delta Sync
-      let newSales: any[] = [];
-      let newOrders: any[] = [];
-      let newCustomers: any[] = [];
-
-      // DEDICATED FETCH CLIENT
-      // By explicitly creating a raw @supabase/supabase-js client (instead of using the 
-      // global @supabase/ssr one), we bypass a known bug where the SSR wrapper queues 
-      // requests indefinitely if it thinks the auth cookie resolution is still pending.
-      // This guarantees the request hits the physical network layer immediately.
-      setLogs(prev => [...prev, `[System-Debug] Token JWT capturado: ${!!authToken}`]);
+      // 2. Carregar dados 100% da Nuvem (Parallel Fetching sem cache do navegador)
+      setLogs(prev => [...prev, "[System] Conectando ao Banco de Dados na Nuvem (100% Cloud)..."]);
 
       const rawSupabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -840,237 +767,58 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         }
       );
 
-      // --- AUTO-HEALING CACHE BUSTER ---
-      // Se a diferença de vendas entre o cache local e o banco na nuvem for maior que 75 
-      // para QUALQUER loja específica, consideramos o cache corrompido e forçamos o recarregamento.
-      if (cachedSales.length > 0) {
-        setLogs(prev => [...prev, "[System] Validando integridade do cache local por loja..."]);
+      const fetchAllParallel = async (tableName: string, columns: string, orderBy: string) => {
+        let totalCount = 0;
         
-        let cachePoisoned = false;
-        
-        // Conta as vendas locais agrupadas por loja
-        const localCounts: Record<string, number> = {};
-        cachedSales.forEach((s: any) => {
-          const lojaNorm = getCanonicalStoreName(s.loja);
-          localCounts[lojaNorm] = (localCounts[lojaNorm] || 0) + 1;
-        });
-
-        // Para evitar dezenas de queries e timeout, agrupamos as lojas locais
-        // e fazemos consultas em paralelo apenas para as lojas ativas
-        const storesToCheck = Object.keys(localCounts);
-        
-        if (dbStores.length > 0) {
+        if (dbStores.length > 0 && tableName !== 'customers') {
            const countPromises = dbStores.map(async (lojaName) => {
-              const { count, error } = await rawSupabase
-                .from('sales')
-                .select('id', { count: 'exact', head: true })
-                .ilike('loja', `%${lojaName}%`);
-              
-              if (!error && count !== null) {
-                 const localCount = localCounts[lojaName] || 0;
-                 if (localCount > count + 75 || (count === 0 && localCount > 75)) {
-                    setLogs(prev => [...prev, `[System] Inconsistência Crítica na loja ${lojaName} (Local: ${localCount} vs Nuvem: ${count}).`]);
-                    cachePoisoned = true;
-                 }
-              }
+              const { count } = await rawSupabase.from(tableName).select('id', { count: 'exact', head: true }).ilike('loja', `%${lojaName}%`);
+              return count || 0;
            });
-           
-           await Promise.all(countPromises);
+           const counts = await Promise.all(countPromises);
+           totalCount = counts.reduce((a,b) => a+b, 0);
         } else {
-           // Fallback se não tiver lojas configuradas (ex: admin global)
-           const { count, error: countErr } = await rawSupabase
-            .from('sales')
-            .select('id', { count: 'exact', head: true }); 
-            
-           if (!countErr && count !== null) {
-              if (cachedSales.length > count + 75 || (count === 0 && cachedSales.length > 75)) {
-                 cachePoisoned = true;
-              }
-           }
+           const { count } = await rawSupabase.from(tableName).select('id', { count: 'exact', head: true });
+           totalCount = count || 0;
         }
 
-        if (cachePoisoned) {
-          setLogs(prev => [...prev, "[System] Revalidando base inteira devido a exclusões na nuvem..."]);
-          lastCachedDate = null;
-          lastCachedOrderDate = null;
-          cachedSales = [];
-          cachedOrders = [];
-          cachedCustomers = [];
-          await clear();
-          setAllRecords([]);
-          setAllOrders([]);
-        } else {
-          setLogs(prev => [...prev, "[System] Cache validado (Diferenças toleráveis)."]);
-        }
-      }
-      // -----------------------------------
+        if (totalCount === 0) return [];
 
-      if (!lastCachedDate || cachedSales.length === 0) {
-        // FULL LOAD (Paginated & Robust for first run)
-        setLogs(prev => [...prev, `[System] Baixando banco de dados completo (primeiro acesso neste dispositivo)...`]);
+        const pageSize = 1000;
+        const pages = Math.ceil(totalCount / pageSize);
+        setLogs(prev => [...prev, `[System] Baixando ${totalCount} registros de ${tableName} em ${pages} lotes paralelos...`]);
 
-        const withDbTimeout = async (promise: Promise<any>, timeoutMs: number) => {
-          let timeoutId: any;
-          const timeoutPromise = new Promise((_, reject) => {
-            timeoutId = setTimeout(() => reject(new Error("Timeout de Rede (Supabase)")), timeoutMs);
-          });
-          return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
-        };
-
-        const fetchTable = async (tableName: string, columns: string) => {
-          const pageSize = 1000;
-          const allResults: any[] = [];
-
-          let hasMore = true;
-          let i = 0;
-
-          while (hasMore) {
-            setLogs(prev => [...prev, `[System] Baixando ${tableName}: Lote ${i + 1} (até ${pageSize} registros)...`]);
-            try {
-              const { data, error } = await withDbTimeout(
-                rawSupabase.from(tableName).select(columns).order('id', { ascending: true }).range(i * pageSize, (i + 1) * pageSize - 1) as any,
-                20000 // 20s rigid timeout per chunk
-              );
-
-              if (error) {
-                console.error(`[${tableName}] Error fetching page ${i}:`, error);
-                setLogs(prev => [...prev, `[System] Erro no Banco no Lote ${i + 1}. Tentando continuar com os dados obtidos...`]);
-                break;
-              }
-
-              if (data && data.length > 0) {
-                setLogs(prev => [...prev, `[System-Debug] Lote ${i + 1} retornou ${data.length} linhas da nuvem.`]);
-                allResults.push(...data);
-                if (data.length < pageSize) {
-                  hasMore = false; // Last page reached
-                } else {
-                  i++;
-                }
-              } else {
-                setLogs(prev => [...prev, `[System-Debug] Lote ${i + 1} VAZIO (0 linhas). Supabase não retornou erro, mas ocultou os dados (Possível bloqueio RLS).`]);
-                hasMore = false; // Empty page
-              }
-            } catch (timeoutErr) {
-              console.error(`[${tableName}] Timeout fetching page ${i}:`, timeoutErr);
-              setLogs(prev => [...prev, `[System] A conexão com o banco de dados expirou (Timeout) no Lote ${i + 1}. A nuvem pode estar bloqueada nesta rede.`]);
-              throw timeoutErr; // Bubble up to abort the whole initialization
-            }
-          }
-
-          return allResults;
-        };
-
-        // Fetch tables sequentially to avoid overloading the browser network thread
-        setLogs(prev => [...prev, `[System] Iniciando download das Vendas...`]);
-        newSales = await fetchTable('sales', 'id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age');
-
-        setLogs(prev => [...prev, `[System] Iniciando download dos Pedidos...`]);
-        newOrders = await fetchTable('orders', 'id, data, loja, cliente, machine, service, status, valor, customer_id, sale_id');
-
-        setLogs(prev => [...prev, `[System] Iniciando download dos Clientes...`]);
-        newCustomers = await fetchTable('customers', 'id, cpf, name, phone, email, gender, registration_date');
-
-      } else {
-        // DELTA SYNC (Only fetch newer records)
-        setLogs(prev => [...prev, `[System] Buscando apenas mudanças recentes no servidor...`]);
-
-        const offsetDate = new Date(lastCachedDate.getTime() + 1000);
-        const salesQuery = rawSupabase.from('sales').select('id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age').gte('data', offsetDate.toISOString()).order('data', { ascending: false });
-
-        let ordersQuery: any = rawSupabase.from('orders').select('id, data, loja, cliente, machine, service, status, valor, customer_id, sale_id').order('data', { ascending: false }).limit(2000);
-        if (lastCachedOrderDate) {
-          const offsetOrderDate = new Date(lastCachedOrderDate.getTime() + 1000);
-          ordersQuery = ordersQuery.gte('data', offsetOrderDate.toISOString());
+        const promises = [];
+        for (let i = 0; i < pages; i++) {
+          promises.push(
+            rawSupabase.from(tableName).select(columns).order(orderBy, { ascending: false }).range(i * pageSize, (i + 1) * pageSize - 1)
+          );
         }
 
-        const [newSalesRes, newOrdersRes] = await Promise.all([
-          salesQuery as any,
-          ordersQuery as any
-        ]);
+        const results = await Promise.all(promises);
+        const allData = results.flatMap(r => r.data || []);
+        
+        // Remove duplicates just in case
+        const uniqueMap = new Map();
+        allData.forEach((item: any) => {
+          const key = item.id || `${item.sale_id || Math.random()}-${item.data}`;
+          uniqueMap.set(key, item);
+        });
+        
+        return Array.from(uniqueMap.values());
+      };
 
-        if (newSalesRes.error) {
-          console.error("Delta Sync error:", newSalesRes.error);
-          setLogs(prev => [...prev, `[System Debug] Erro Delta Sync (Vendas): ${newSalesRes.error.message}`]);
-        }
-        if (newOrdersRes.error) {
-          console.error("Delta Sync error:", newOrdersRes.error);
-        }
+      setLogs(prev => [...prev, `[System] Baixando matriz de Vendas...`]);
+      const finalRawSales = await fetchAllParallel('sales', 'id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age', 'data');
+      
+      setLogs(prev => [...prev, `[System] Baixando matriz de Pedidos e Máquinas...`]);
+      const finalRawOrders = await fetchAllParallel('orders', 'id, data, loja, cliente, machine, service, status, valor, customer_id, sale_id', 'data');
+      
+      setLogs(prev => [...prev, `[System] Sincronizando Dicionário de Clientes...`]);
+      const finalRawCustomers = await fetchAllParallel('customers', 'id, cpf, name, phone, email, gender, registration_date', 'id');
 
-        newSales = newSalesRes.data || [];
-        newOrders = newOrdersRes.data || [];
-
-        // FALLBACK: If Delta Sync silently returns 0 records, but we KNOW there's an inconsistency,
-        // or if it threw an RLS error, we bypass RLS by falling back to the backend proxy API
-        if (newSalesRes.error && cachedSales.length > 0 && reason === "Sincronismo") {
-          setLogs(prev => [...prev, `[System] Falha no cliente nativo. Tentando API Segura de Backup...`]);
-          try {
-            // To avoid a heavy 30k query, just fetch the last 500 orders via server admin route
-            const bkpRes = await fetch(`/api/vmpay/sync-fallback?after=${offsetDate.toISOString()}`);
-            const bkpData = await bkpRes.json();
-            if (bkpData.success && bkpData.records) {
-              newSales = bkpData.records;
-              setLogs(prev => [...prev, `[System] Backup API recuperou ${newSales.length} registros ocultos.`]);
-            }
-          } catch (bkpErr) {
-            console.warn("Fallback failed too", bkpErr);
-          }
-        }
-
-        // For customers, since we only have ~18k max, we fetch all of them to ensure the map is full
-        // Delta sync for customers is tricky because we update their gender, so we just fetch all blindly to guarantee correctness
-        setLogs(prev => [...prev, `[System] Sincronizando Dicionário de Clientes...`]);
-
-        const fetchAllCustomers = async () => {
-          let hasMore = true;
-          let i = 0;
-          const pageSize = 1000;
-          const all = [];
-          while (hasMore) {
-            const { data, error } = await rawSupabase.from('customers').select('id, cpf, name, phone, email, gender, registration_date').range(i * pageSize, (i + 1) * pageSize - 1);
-            if (error || !data || data.length === 0) break;
-            all.push(...data);
-            if (data.length < pageSize) hasMore = false;
-            i++;
-          }
-          return all;
-        };
-        newCustomers = await fetchAllCustomers();
-      }
-
-      if (newSales.length > 0 || cachedSales.length === 0) {
-        if (newSales.length > 0) setLogs(prev => [...prev, `[System] Delta Sync: ${newSales.length} novas vendas integradas.`]);
-      } else {
-        setLogs(prev => [...prev, "[System] Histórico validado. Sem novas vendas externas."]);
-      }
-
-      // Merge old + new (if any) AND always Hydrate & Normalize for UI
-      const combinedSales = [...newSales, ...cachedSales];
-      // Simple deduplication by ID just in case
-      const uniqueSalesMap = new Map();
-      combinedSales.forEach(s => uniqueSalesMap.set(s.id, s));
-      const finalRawSales = Array.from(uniqueSalesMap.values()).sort((a: any, b: any) => new Date(b.data).getTime() - new Date(a.data).getTime());
-
-      // Orders merge
-      const combinedOrders = [...newOrders, ...cachedOrders];
-      const uniqueOrdersMap = new Map();
-      combinedOrders.forEach(o => {
-        if (o.id) uniqueOrdersMap.set(o.id, o);
-        // If no unique ID (legacy cache), fallback to a composite key
-        else uniqueOrdersMap.set(`${o.sale_id}-${o.machine}-${new Date(o.data).getTime()}`, o);
-      });
-      const finalRawOrders = Array.from(uniqueOrdersMap.values()).sort((a: any, b: any) => new Date(b.data).getTime() - new Date(a.data).getTime());
-
-      // Customers (replace entirely as it's small)
-      const finalRawCustomers = newCustomers.length > 0 ? newCustomers : cachedCustomers;
-
-      // Save to super-fast IndexedDB in background ONLY if there are new records
-      if (newSales.length > 0 || newOrders.length > 0 || newCustomers.length > 0 || cachedSales.length === 0) {
-        Promise.all([
-          withLocalTimeout(set('lavly_sales', finalRawSales), 5000, undefined),
-          withLocalTimeout(set('lavly_orders', finalRawOrders), 5000, undefined),
-          withLocalTimeout(set('lavly_customers', finalRawCustomers), 5000, undefined)
-        ]).catch(e => console.warn("Failed to cache to IndexedDB", e));
-      }
+      const cachedSales: any[] = [];
+      const newSales = finalRawSales;
 
       // Hydrate & Normalize for UI MUST run to populate the screen
       const hydratedSales = finalRawSales.map((s: any) => ({
