@@ -753,8 +753,60 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         return; // Halt data loading until CNPJs are provided
       }
 
-      // 2. Carregar dados 100% da Nuvem (Parallel Fetching sem cache do navegador)
-      setLogs(prev => [...prev, "[System] Conectando ao Banco de Dados na Nuvem (100% Cloud)..."]);
+      // 2. Carregar dados Híbridos (Cache Rápido + Delta Sync na Nuvem)
+      const { get, set } = await import('idb-keyval');
+      setLogs(prev => [...prev, "[System] Verificando cache offline de altíssima velocidade..."]);
+
+      const withLocalTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> => {
+        let timeoutId: NodeJS.Timeout;
+        const timeoutPromise = new Promise<T>((resolve) => {
+          timeoutId = setTimeout(() => resolve(fallback), timeoutMs);
+        });
+        return Promise.race([promise.catch(() => fallback), timeoutPromise]).finally(() => clearTimeout(timeoutId));
+      };
+
+      let cachedSales = await withLocalTimeout(get('lavly_sales'), 2000, []) || [];
+      let cachedOrders = await withLocalTimeout(get('lavly_orders'), 2000, []) || [];
+      let cachedCustomers = await withLocalTimeout(get('lavly_customers'), 2000, []) || [];
+
+      let lastCachedDate = null;
+      let lastCachedOrderDate = null;
+
+      if (cachedSales.length > 0) {
+        // Hydrate UI State Instantly
+        const hydratedCachedSales = cachedSales.map((s: any) => ({
+          ...s,
+          data: new Date(s.data),
+          produto: s.produto || s.service || "",
+          formaPagamento: s.formaPagamento || s.forma_pagamento || s.tipoPagamento || "Outros",
+          tipoCartao: s.tipoCartao || s.tipo_cartao || "",
+          categoriaVoucher: s.categoriaVoucher || s.categoria_voucher || "",
+          customerId: s.customerId || s.customer_id,
+          birthDate: s.birthDate || s.birth_date ? new Date(s.birthDate || s.birth_date) : undefined,
+          items: s.items ? s.items.map((i: any) => ({ ...i, startTime: new Date(i.startTime) })) : []
+        }));
+        const hydratedCachedOrders = cachedOrders.map((o: any) => ({ ...o, data: new Date(o.data) }));
+        const hydratedCachedCustomers = cachedCustomers.map((c: any) => ({ ...c, registrationDate: c.registrationDate ? new Date(c.registrationDate) : undefined }));
+
+        setAllRecords(hydratedCachedSales);
+        setAllOrders(hydratedCachedOrders);
+        if (hydratedCachedCustomers.length > 0) setAllCustomers(hydratedCachedCustomers);
+
+        setLogs(prev => [...prev, `[System] Flash Load: ${cachedSales.length} registros restaurados localmente em 0.1s.`]);
+
+        const currentPhysicalTime = new Date().getTime() + 3600000;
+        const validDates = hydratedCachedSales.map((s: any) => s.data.getTime()).filter((ts: number) => ts <= currentPhysicalTime);
+        const maxTimestamp = validDates.length > 0 ? validDates.reduce((max: number, d: number) => Math.max(max, d), validDates[0]) : 0;
+        lastCachedDate = new Date(maxTimestamp || Date.now());
+
+        const orderDates = hydratedCachedOrders.map((o: any) => o.data.getTime()).filter((ts: number) => ts <= currentPhysicalTime);
+        if (orderDates.length > 0) {
+          const maxOrderTs = orderDates.reduce((max: number, d: number) => Math.max(max, d), orderDates[0]);
+          lastCachedOrderDate = new Date(maxOrderTs);
+        }
+      }
+
+      setLogs(prev => [...prev, "[System] Conectando ao Banco de Dados na Nuvem..."]);
 
       const rawSupabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -798,7 +850,6 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         const results = await Promise.all(promises);
         const allData = results.flatMap(r => r.data || []);
         
-        // Remove duplicates just in case
         const uniqueMap = new Map();
         allData.forEach((item: any) => {
           const key = item.id || `${item.sale_id || Math.random()}-${item.data}`;
@@ -808,17 +859,70 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         return Array.from(uniqueMap.values());
       };
 
-      setLogs(prev => [...prev, `[System] Baixando matriz de Vendas...`]);
-      const finalRawSales = await fetchAllParallel('sales', 'id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age', 'data');
-      
-      setLogs(prev => [...prev, `[System] Baixando matriz de Pedidos e Máquinas...`]);
-      const finalRawOrders = await fetchAllParallel('orders', 'id, data, loja, cliente, machine, service, status, valor, customer_id, sale_id', 'data');
-      
-      setLogs(prev => [...prev, `[System] Sincronizando Dicionário de Clientes...`]);
-      const finalRawCustomers = await fetchAllParallel('customers', 'id, cpf, name, phone, email, gender, registration_date', 'id');
+      let newSales: any[] = [];
+      let newOrders: any[] = [];
+      let newCustomers: any[] = [];
 
-      const cachedSales: any[] = [];
-      const newSales = finalRawSales;
+      if (!lastCachedDate || cachedSales.length === 0) {
+        // FULL LOAD using parallel approach ONLY ONCE for new devices
+        setLogs(prev => [...prev, `[System] Sem memória local. Baixando base de dados completa (Primeiro Acesso)...`]);
+        
+        newSales = await fetchAllParallel('sales', 'id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age', 'data');
+        newOrders = await fetchAllParallel('orders', 'id, data, loja, cliente, machine, service, status, valor, customer_id, sale_id', 'data');
+        newCustomers = await fetchAllParallel('customers', 'id, cpf, name, phone, email, gender, registration_date', 'id');
+      } else {
+        // DELTA SYNC (Only fetch newer records!)
+        setLogs(prev => [...prev, `[System] Analisando novas vendas na nuvem desde de ${lastCachedDate.toLocaleString()}...`]);
+
+        const offsetDate = new Date(lastCachedDate.getTime() + 1000);
+        const salesQuery = rawSupabase.from('sales').select('id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age').gte('data', offsetDate.toISOString()).order('data', { ascending: false });
+
+        let ordersQuery: any = rawSupabase.from('orders').select('id, data, loja, cliente, machine, service, status, valor, customer_id, sale_id').order('data', { ascending: false }).limit(2000);
+        if (lastCachedOrderDate) {
+          const offsetOrderDate = new Date(lastCachedOrderDate.getTime() + 1000);
+          ordersQuery = ordersQuery.gte('data', offsetOrderDate.toISOString());
+        }
+
+        const [newSalesRes, newOrdersRes] = await Promise.all([
+          salesQuery as any,
+          ordersQuery as any
+        ]);
+
+        newSales = newSalesRes.data || [];
+        newOrders = newOrdersRes.data || [];
+
+        // Delta sync for customers is all-or-nothing since gender updates happen retroactively
+        newCustomers = await fetchAllParallel('customers', 'id, cpf, name, phone, email, gender, registration_date', 'id');
+
+        if (newSales.length > 0) setLogs(prev => [...prev, `[System] ${newSales.length} novas vendas integradas da internet.`]);
+        else setLogs(prev => [...prev, "[System] Histórico do painel 100% atualizado."]);
+      }
+
+      // Merge old + new
+      const combinedSales = [...newSales, ...cachedSales];
+      const uniqueSalesMap = new Map();
+      combinedSales.forEach(s => uniqueSalesMap.set(s.id, s));
+      const finalRawSales = Array.from(uniqueSalesMap.values()).sort((a: any, b: any) => new Date(b.data).getTime() - new Date(a.data).getTime());
+
+      // Orders merge
+      const combinedOrders = [...newOrders, ...cachedOrders];
+      const uniqueOrdersMap = new Map();
+      combinedOrders.forEach(o => {
+        if (o.id) uniqueOrdersMap.set(o.id, o);
+        else uniqueOrdersMap.set(`${o.sale_id}-${o.machine}-${new Date(o.data).getTime()}`, o);
+      });
+      const finalRawOrders = Array.from(uniqueOrdersMap.values()).sort((a: any, b: any) => new Date(b.data).getTime() - new Date(a.data).getTime());
+
+      const finalRawCustomers = newCustomers.length > 0 ? newCustomers : cachedCustomers;
+
+      // Persist locally for instant loading next time
+      if (newSales.length > 0 || newOrders.length > 0 || newCustomers.length > 0 || cachedSales.length === 0) {
+        Promise.all([
+          withLocalTimeout(set('lavly_sales', finalRawSales), 5000, undefined),
+          withLocalTimeout(set('lavly_orders', finalRawOrders), 5000, undefined),
+          withLocalTimeout(set('lavly_customers', finalRawCustomers), 5000, undefined)
+        ]).catch(e => console.warn("Failed to cache to IndexedDB", e));
+      }
 
       // Hydrate & Normalize for UI MUST run to populate the screen
       const hydratedSales = finalRawSales.map((s: any) => ({
