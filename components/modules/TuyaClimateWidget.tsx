@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Power, Thermostat, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Power, Thermometer, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 
 interface TuyaConfig {
     clientId: string;
@@ -69,7 +69,7 @@ export function TuyaClimateWidget({ storeName, config }: TuyaClimateWidgetProps)
 
             <div className="flex items-center gap-4 relative z-10 w-full md:w-auto">
                 <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30 shrink-0 border border-blue-400/30">
-                    <Thermostat className="w-7 h-7 text-white" />
+                    <Thermometer className="w-7 h-7 text-white" />
                 </div>
                 <div>
                     <h3 className="text-xl font-bold text-white tracking-tight">Controle Climático Inteligente</h3>
