@@ -4,6 +4,8 @@ import { calculateMachineAvailability } from '@/lib/processing/machine-availabil
 import { SaleRecord } from '@/lib/processing/etl';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info, AlertTriangle, TrendingUp, Calendar, Clock } from "lucide-react";
+import { TuyaClimateWidget } from './TuyaClimateWidget';
+import { useSettings } from '../context/SettingsContext';
 
 interface MachineAvailabilityProps {
     records: SaleRecord[];
@@ -14,6 +16,27 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 export function MachineAvailability({ records }: MachineAvailabilityProps) {
     const metrics = useMemo(() => calculateMachineAvailability(records), [records]);
+    const { stores, storeSettings } = useSettings();
+    
+    // Find Tuya config for the active store (if user hasn't selected a store manually, we default to the first one)
+    const activeStoreConfig = useMemo(() => {
+        // If single store approach:
+        if (stores.length === 0) return null;
+        const currentStoreId = storeSettings?.activeStoreId || stores[0].id; // Fallback to store[0]
+        const currentStoreDoc = stores.find(s => s.id === currentStoreId) || stores[0];
+        
+        if (!currentStoreDoc) return null;
+        
+        return {
+            storeName: currentStoreDoc.name,
+            config: currentStoreDoc.tuya_client_id ? {
+                clientId: currentStoreDoc.tuya_client_id,
+                clientSecret: currentStoreDoc.tuya_client_secret || "",
+                sceneOnId: currentStoreDoc.tuya_scene_on_id || "",
+                sceneOffId: currentStoreDoc.tuya_scene_off_id || ""
+            } : null
+        };
+    }, [stores, storeSettings?.activeStoreId]);
 
     // Format saturation for heatmap color
     const getSaturationColor = (saturation: number) => {
@@ -38,6 +61,14 @@ export function MachineAvailability({ records }: MachineAvailabilityProps) {
 
     return (
         <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+            {/* Tuya Climate Remote Widget */}
+            {activeStoreConfig?.config && (
+                <TuyaClimateWidget 
+                    storeName={activeStoreConfig.storeName || 'Loja'} 
+                    config={activeStoreConfig.config} 
+                />
+            )}
+
             {/* Header Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card>

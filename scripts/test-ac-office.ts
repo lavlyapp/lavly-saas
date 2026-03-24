@@ -9,11 +9,11 @@ async function main() {
         clientSecret: 'd65cd79efc7f49489664e92a37042afe', // <-- A senha que estava nos scripts antigos
         
         // Se você controla o Ar por um Device ID direto (ex: Tomada Inteligente ou IR Blaster via comando genérico):
-        deviceId: 'eb0d7b0b9fa30e5de83kly', // <-- Ar LG Escr liga 2a tcla
+        deviceId: '', 
         
         // OU se você usa Cenas Inteligentes no App da Tuya (Recomendado para IR):
-        sceneOnId: '',
-        sceneOffId: ''
+        sceneOnId: '7nAClkIUiF80Y7yt', // Ligar ar escritório
+        sceneOffId: 'w0HDUmJzA57nvGXY' // Desligar ar escritório
     };
 
     console.log("\n[TESTE 1] Enviando comando para LIGAR o Ar-Condicionado...");
