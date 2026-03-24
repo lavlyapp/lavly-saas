@@ -16,27 +16,35 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 export function MachineAvailability({ records }: MachineAvailabilityProps) {
     const metrics = useMemo(() => calculateMachineAvailability(records), [records]);
-    const { stores, storeSettings } = useSettings();
-    
-    // Find Tuya config for the active store (if user hasn't selected a store manually, we default to the first one)
-    const activeStoreConfig = useMemo(() => {
-        // If single store approach:
-        if (stores.length === 0) return null;
-        const currentStoreId = storeSettings?.activeStoreId || stores[0].id; // Fallback to store[0]
-        const currentStoreDoc = stores.find(s => s.id === currentStoreId) || stores[0];
-        
-        if (!currentStoreDoc) return null;
-        
-        return {
-            storeName: currentStoreDoc.name,
-            config: currentStoreDoc.tuya_client_id ? {
-                clientId: currentStoreDoc.tuya_client_id,
-                clientSecret: currentStoreDoc.tuya_client_secret || "",
-                sceneOnId: currentStoreDoc.tuya_scene_on_id || "",
-                sceneOffId: currentStoreDoc.tuya_scene_off_id || ""
-            } : null
+    const [activeStoreConfig, setActiveStoreConfig] = React.useState<{ storeName: string, config: any } | null>(null);
+
+    React.useEffect(() => {
+        const fetchStoreConfig = async () => {
+            try {
+                // Fetch stores to get Tuya configuration directly from API
+                const res = await fetch('/api/stores');
+                const data = await res.json();
+                if (data.success && data.data && data.data.length > 0) {
+                    // Try to find Cascavel or default to first
+                    const store = data.data.find((s: any) => s.name?.toLowerCase().includes('cascavel')) || data.data[0];
+                    if (store && store.tuya_scene_on_id) {
+                        setActiveStoreConfig({
+                            storeName: store.name,
+                            config: {
+                                clientId: store.tuya_client_id || '',
+                                clientSecret: store.tuya_client_secret || '',
+                                sceneOnId: store.tuya_scene_on_id || '',
+                                sceneOffId: store.tuya_scene_off_id || ''
+                            }
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to load Tuya config for Widget", e);
+            }
         };
-    }, [stores, storeSettings?.activeStoreId]);
+        fetchStoreConfig();
+    }, []);
 
     // Format saturation for heatmap color
     const getSaturationColor = (saturation: number) => {
