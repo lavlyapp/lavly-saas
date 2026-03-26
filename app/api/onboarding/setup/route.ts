@@ -17,47 +17,56 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'API Key and User ID are required' }, { status: 400 });
         }
 
-        // 1. Validate against VMPay API
-        const vmpayUrl = `${VMPAY_API_BASE_URL}/maquinas`;
-        const vmpayResponse = await fetch(vmpayUrl, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-            },
-        });
+        const apiKeys = apiKey ? apiKey.split(/[\n,]+/).map((k: string) => k.trim()).filter((k: string) => k.length > 0) : [];
+        const cleanApiKeyString = apiKeys.join(',');
 
-        if (!vmpayResponse.ok) {
-            return NextResponse.json(
-                { error: `Chave Inválida. A VMPay retornou status ${vmpayResponse.status}` },
-                { status: 401 }
-            );
-        }
-
-        const machinesData = await vmpayResponse.json();
-        if (!Array.isArray(machinesData)) {
-            return NextResponse.json({ error: 'Resposta inesperada da VMPay API' }, { status: 500 });
+        if (apiKeys.length === 0) {
+            return NextResponse.json({ error: 'Nenhuma API Key válida informada' }, { status: 400 });
         }
 
         // 2. Discover Stores
         const uniqueStoreNames = new Set<string>();
         const storesData = new Map<string, any>();
 
-        machinesData.forEach(machine => {
-            if (machine.loja) {
-                const canonicalName = getCanonicalStoreName(machine.loja);
-                uniqueStoreNames.add(canonicalName);
-                if (!storesData.has(canonicalName)) {
-                    storesData.set(canonicalName, {
-                        name: canonicalName,
-                        originalName: machine.loja,
-                        cnpj: machine.documentoDeIdentificacao || '',
-                        is_active: true,
-                        api_key: apiKey
-                    });
-                }
+        for (const key of apiKeys) {
+            // 1. Validate against VMPay API
+            const vmpayUrl = `${VMPAY_API_BASE_URL}/maquinas`;
+            const vmpayResponse = await fetch(vmpayUrl, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${key}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (!vmpayResponse.ok) {
+                return NextResponse.json(
+                    { error: `Chave Inválida (${key}). A VMPay retornou status ${vmpayResponse.status}` },
+                    { status: 401 }
+                );
             }
-        });
+
+            const machinesData = await vmpayResponse.json();
+            if (!Array.isArray(machinesData)) {
+                return NextResponse.json({ error: 'Resposta inesperada da VMPay API' }, { status: 500 });
+            }
+
+            machinesData.forEach(machine => {
+                if (machine.loja) {
+                    const canonicalName = getCanonicalStoreName(machine.loja);
+                    uniqueStoreNames.add(canonicalName);
+                    if (!storesData.has(canonicalName)) {
+                        storesData.set(canonicalName, {
+                            name: canonicalName,
+                            originalName: machine.loja,
+                            cnpj: machine.documentoDeIdentificacao || '',
+                            is_active: true,
+                            api_key: key
+                        });
+                    }
+                }
+            });
+        }
 
         const assignedStoresArray = Array.from(uniqueStoreNames);
         console.log(`[Onboarding] Discovered ${assignedStoresArray.length} stores.`);
@@ -75,7 +84,7 @@ export async function POST(req: Request) {
         const { error: profileError } = await supabaseAdmin
             .from('profiles')
             .update({ 
-                vmpay_api_key: apiKey,
+                vmpay_api_key: cleanApiKeyString,
                 assigned_stores: assignedStoresArray,
                 updated_at: new Date().toISOString()
             })
@@ -89,7 +98,7 @@ export async function POST(req: Request) {
         const storesToInsert = Array.from(storesData.values()).map(store => ({
             name: store.name,
             cnpj: store.cnpj || null,
-            api_key: apiKey,
+            api_key: store.api_key,
             is_active: true
         }));
 
