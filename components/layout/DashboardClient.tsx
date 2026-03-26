@@ -852,16 +852,14 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         }
       );
 
-      const fetchAllParallel = async (tableName: string, columns: string, orderBy: string) => {
+      const fetchAllParallel = async (tableName: string, columns: string, orderBy: string, targetStores: string[]) => {
         let totalCount = 0;
         
-        if (dbStores.length > 0 && tableName !== 'customers') {
-           const countPromises = dbStores.map(async (lojaName) => {
-              const { count } = await rawSupabase.from(tableName).select('id', { count: 'exact', head: true }).ilike('loja', `%${lojaName}%`);
-              return count || 0;
-           });
-           const counts = await Promise.all(countPromises);
-           totalCount = counts.reduce((a,b) => a+b, 0);
+        const shouldFilterByStore = targetStores.length > 0 && tableName !== 'customers';
+        
+        if (shouldFilterByStore) {
+           const { count } = await rawSupabase.from(tableName).select('id', { count: 'exact', head: true }).in('loja', targetStores);
+           totalCount = count || 0;
         } else {
            const { count } = await rawSupabase.from(tableName).select('id', { count: 'exact', head: true });
            totalCount = count || 0;
@@ -875,9 +873,11 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
 
         const promises = [];
         for (let i = 0; i < pages; i++) {
-          promises.push(
-            rawSupabase.from(tableName).select(columns).order(orderBy, { ascending: false }).range(i * pageSize, (i + 1) * pageSize - 1)
-          );
+          let query = rawSupabase.from(tableName).select(columns).order(orderBy, { ascending: false }).range(i * pageSize, (i + 1) * pageSize - 1);
+          if (shouldFilterByStore) {
+              query = query.in('loja', targetStores);
+          }
+          promises.push(query);
         }
 
         const results = await Promise.all(promises);
@@ -900,32 +900,34 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         // FULL LOAD using parallel approach ONLY ONCE for new devices
         setLogs(prev => [...prev, `[System] Sem memória local. Baixando base de dados completa (Primeiro Acesso)...`]);
         
-        newSales = await fetchAllParallel('sales', 'id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age', 'data');
-        newOrders = await fetchAllParallel('orders', 'id, data, loja, cliente, machine, service, status, valor, customer_id, sale_id', 'data');
-        newCustomers = await fetchAllParallel('customers', 'id, cpf, name, phone, email, gender, registration_date', 'id');
+        newSales = await fetchAllParallel('sales', 'id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age', 'data', configuredNames);
+        newOrders = await fetchAllParallel('orders', 'id, data, loja, cliente, machine, service, status, valor, customer_id, sale_id', 'data', configuredNames);
+        newCustomers = await fetchAllParallel('customers', 'id, cpf, name, phone, email, gender, registration_date', 'id', configuredNames);
       } else {
         // DELTA SYNC (Only fetch newer records!)
         setLogs(prev => [...prev, `[System] Analisando novas vendas na nuvem desde de ${lastCachedDate.toLocaleString()}...`]);
 
         const offsetDate = new Date(lastCachedDate.getTime() + 1000);
-        const salesQuery = rawSupabase.from('sales').select('id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age').gte('data', offsetDate.toISOString()).order('data', { ascending: false });
+        let salesQuery: any = rawSupabase.from('sales').select('id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age').gte('data', offsetDate.toISOString()).order('data', { ascending: false });
+        if (configuredNames.length > 0) salesQuery = salesQuery.in('loja', configuredNames);
 
         let ordersQuery: any = rawSupabase.from('orders').select('id, data, loja, cliente, machine, service, status, valor, customer_id, sale_id').order('data', { ascending: false }).limit(2000);
         if (lastCachedOrderDate) {
           const offsetOrderDate = new Date(lastCachedOrderDate.getTime() + 1000);
           ordersQuery = ordersQuery.gte('data', offsetOrderDate.toISOString());
         }
+        if (configuredNames.length > 0) ordersQuery = ordersQuery.in('loja', configuredNames);
 
         const [newSalesRes, newOrdersRes] = await Promise.all([
-          salesQuery as any,
-          ordersQuery as any
+          salesQuery,
+          ordersQuery
         ]);
 
         newSales = newSalesRes.data || [];
         newOrders = newOrdersRes.data || [];
 
         // Delta sync for customers is all-or-nothing since gender updates happen retroactively
-        newCustomers = await fetchAllParallel('customers', 'id, cpf, name, phone, email, gender, registration_date', 'id');
+        newCustomers = await fetchAllParallel('customers', 'id, cpf, name, phone, email, gender, registration_date', 'id', configuredNames);
 
         if (newSales.length > 0) setLogs(prev => [...prev, `[System] ${newSales.length} novas vendas integradas da internet.`]);
         else setLogs(prev => [...prev, "[System] Histórico do painel 100% atualizado."]);
