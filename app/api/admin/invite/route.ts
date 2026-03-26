@@ -48,7 +48,7 @@ export async function POST(req: Request) {
                 const vmpayResponse = await fetch(vmpayUrl, {
                     method: 'GET',
                     headers: {
-                        'Authorization': `Bearer ${key}`,
+                        'x-api-key': key,
                         'Content-Type': 'application/json',
                     },
                 });
