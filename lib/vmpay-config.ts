@@ -165,19 +165,32 @@ export async function getVMPayCredentials(customSupabaseClient?: any): Promise<V
     try {
         const client = customSupabaseClient || supabase;
         console.log("[VMPay Config] Fetching stores with 15s timeout...");
-        const { data, error } = await withTimeout(
-            client
-                .from('stores')
-                .select(`
-                    id, name, cnpj, api_key, open_time, close_time, 
-                    is_active, has_ac_subscription, tuya_device_id,
-                    tuya_client_id, tuya_client_secret, tuya_scene_on_id,
-                    tuya_scene_off_id, cep, address, number,
-                    complement, neighborhood, city, state
-                `)
-                .eq('is_active', true) as any,
-            15000
-        );
+
+        // SECURITY: Enforce Data Isolation by fetching user profile and assigned stores
+        const { data: { user } } = await client.auth.getUser();
+        let storesQuery = client
+            .from('stores')
+            .select(`
+                id, name, cnpj, api_key, open_time, close_time, 
+                is_active, has_ac_subscription, tuya_device_id,
+                tuya_client_id, tuya_client_secret, tuya_scene_on_id,
+                tuya_scene_off_id, cep, address, number,
+                complement, neighborhood, city, state
+            `)
+            .eq('is_active', true);
+
+        if (user) {
+            const { data: profile } = await client.from('profiles').select('role, assigned_stores').eq('id', user.id).single();
+            if (profile && profile.role !== 'admin') {
+                if (profile.assigned_stores && profile.assigned_stores.length > 0) {
+                    storesQuery = storesQuery.in('name', profile.assigned_stores);
+                } else {
+                    return []; // Block access if no stores are assigned
+                }
+            }
+        }
+
+        const { data, error } = await withTimeout(storesQuery as any, 15000);
 
         if (error) throw error;
 

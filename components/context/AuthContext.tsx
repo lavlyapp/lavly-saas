@@ -125,6 +125,13 @@ export function AuthProvider({ children, initialSession, initialRole, initialExp
     };
 
     const logout = async () => {
+        try {
+            const { clear } = await import('idb-keyval');
+            await clear();
+            console.log("[Auth] Local cache cleared.");
+        } catch (e) {
+            console.error("[Auth] Failed to clear local cache:", e);
+        }
         await supabase.auth.signOut();
     };
 

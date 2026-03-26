@@ -767,8 +767,23 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       }
 
       // 2. Carregar dados Híbridos (Cache Rápido + Delta Sync na Nuvem)
-      const { get, set } = await import('idb-keyval');
+      const { get, set, clear } = await import('idb-keyval');
       setLogs(prev => [...prev, "[System] Verificando cache offline de altíssima velocidade..."]);
+
+      // Verify that this cache belongs to the CURRENT user. If not, blow it away to prevent Cross-Account Data Leaks!
+      const cachedUserId = await get('lavly_cached_user_id');
+      const currentUserId = (await supabase.auth.getSession()).data.session?.user?.id;
+      
+      const hasLegacyCache = !cachedUserId && (await get('lavly_sales'))?.length > 0;
+
+      if ((cachedUserId && currentUserId && cachedUserId !== currentUserId) || hasLegacyCache) {
+          console.warn("[Security] Cross-account cache detected! User changed without explicit logout. Wiping cache...");
+          setLogs(prev => [...prev, "[Segurança] Troca de Conta detectada. Destruindo cache do usuário antigo..."]);
+          await clear();
+      }
+      if (currentUserId) {
+          await set('lavly_cached_user_id', currentUserId);
+      }
 
       const withLocalTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> => {
         let timeoutId: NodeJS.Timeout;
