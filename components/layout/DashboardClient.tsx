@@ -753,7 +753,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
 
       // 2. Load active stores and config
       const { getVMPayCredentials, getCanonicalStoreName } = await import("@/lib/vmpay-config");
-      const activeStores = await getVMPayCredentials(authenticatedClient);
+      const activeStores = await getVMPayCredentials();
       const configuredNames = activeStores.map(s => getCanonicalStoreName(s.name));
       setDbStores(configuredNames);
 
@@ -855,10 +855,11 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       const fetchAllParallel = async (tableName: string, columns: string, orderBy: string, targetStores: string[]) => {
         let totalCount = 0;
         
-        const shouldFilterByStore = targetStores.length > 0 && tableName !== 'customers';
+        const shouldFilterByStore = targetStores.length > 0;
+        const storeColumnName = tableName === 'customers' ? 'favorite_store' : 'loja';
         
         if (shouldFilterByStore) {
-           const { count } = await rawSupabase.from(tableName).select('id', { count: 'exact', head: true }).in('loja', targetStores);
+           const { count } = await rawSupabase.from(tableName).select('id', { count: 'exact', head: true }).in(storeColumnName, targetStores);
            totalCount = count || 0;
         } else {
            const { count } = await rawSupabase.from(tableName).select('id', { count: 'exact', head: true });
@@ -875,7 +876,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         for (let i = 0; i < pages; i++) {
           let query = rawSupabase.from(tableName).select(columns).order(orderBy, { ascending: false }).range(i * pageSize, (i + 1) * pageSize - 1);
           if (shouldFilterByStore) {
-              query = query.in('loja', targetStores);
+              query = query.in(storeColumnName, targetStores);
           }
           promises.push(query);
         }
