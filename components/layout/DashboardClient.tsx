@@ -736,13 +736,13 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
 
   const isInitializing = useRef(false);
 
-  const reloadAllData = async (reason: string = "Inicial", authToken: string | null = null) => {
+  const reloadAllData = async (reason: string = "Inicial", authToken: string | null = null, forceFullSync: boolean = false) => {
     if (isInitializing.current) return;
     isInitializing.current = true;
 
     console.log(`[Home] Reloading all data (Reason: ${reason})...`);
     setStatus("uploading");
-
+    
     try {
       // 1. Create Authenticated Client
       const authenticatedClient = createClient(
@@ -784,9 +784,14 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       const legacySales = await withLocalTimeout(get('lavly_sales'), 1000, null);
       const hasLegacyCache = !cachedUserId && legacySales && (legacySales as any[]).length > 0;
 
-      if ((cachedUserId && currentUserId && cachedUserId !== currentUserId) || hasLegacyCache) {
-          console.warn("[Security] Cross-account cache detected! User changed without explicit logout. Wiping cache...");
-          setLogs(prev => [...prev, "[Segurança] Troca de Conta detectada. Destruindo cache do usuário antigo..."]);
+      if ((cachedUserId && currentUserId && cachedUserId !== currentUserId) || hasLegacyCache || forceFullSync) {
+          if (forceFullSync) {
+             console.warn("[Memory] Force Full Sync requested. Wiping cache...");
+             setLogs(prev => [...prev, "[System] Modo Resgate de Histórico ativo. Reconstruindo memória local..."]);
+          } else {
+             console.warn("[Security] Cross-account cache detected! User changed without explicit logout. Wiping cache...");
+             setLogs(prev => [...prev, "[Segurança] Troca de Conta detectada. Destruindo cache do usuário antigo..."]);
+          }
           await withLocalTimeout(clear(), 2000, undefined);
       }
       if (currentUserId) {
@@ -794,13 +799,16 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       }
 
       let cachedSales = legacySales || [];
-      if ((cachedUserId && currentUserId && cachedUserId !== currentUserId) || hasLegacyCache) {
+      if ((cachedUserId && currentUserId && cachedUserId !== currentUserId) || hasLegacyCache || forceFullSync) {
           cachedSales = []; // We just cleared it
       } else if (!legacySales) {
           cachedSales = await withLocalTimeout(get('lavly_sales'), 2000, []) || [];
       }
       let cachedOrders = await withLocalTimeout(get('lavly_orders'), 2000, []) || [];
+      if (forceFullSync) cachedOrders = []; // Wipe orders cache too for full sync
+
       let cachedCustomers = await withLocalTimeout(get('lavly_customers'), 2000, []) || [];
+      if (forceFullSync) cachedCustomers = [];
 
       let lastCachedDate = null;
       let lastCachedOrderDate = null;
@@ -897,9 +905,9 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       let newOrders: any[] = [];
       let newCustomers: any[] = [];
 
-      if (!lastCachedDate || cachedSales.length === 0) {
-        // FULL LOAD using parallel approach ONLY ONCE for new devices
-        setLogs(prev => [...prev, `[System] Sem memória local. Baixando base de dados completa (Primeiro Acesso)...`]);
+      if (!lastCachedDate || cachedSales.length === 0 || forceFullSync) {
+        // FULL LOAD using parallel approach ONLY ONCE for new devices OR when forcing history resync
+        setLogs(prev => [...prev, `[System] Reconstruindo base de dados completa a partir da nuvem...`]);
         
         newSales = await fetchAllParallel('sales', 'id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age', 'data', configuredNames);
         newOrders = await fetchAllParallel('orders', 'id, data, loja, cliente, machine, service, status, valor, customer_id, sale_id', 'data', configuredNames);
