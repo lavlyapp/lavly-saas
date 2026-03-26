@@ -1327,50 +1327,54 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
 
   }
 
-  async function handleForceSync() {
+  async function handleForceSync(passedToken: string | null = null) {
     setStatus("uploading");
-    setLogs(prev => [...prev, "[System] Iniciando resgate completo do histórico (180 dias)..."]);
+    setLogs(prev => [...prev, "[System] Iniciando resgate completo do histórico (últimos 6 meses)..."]);
 
-    // We fetch in chunks of 15 days, going back up to 180 days (12 chunks)
+    // Fetch 180 days in 15-day chunks to avoid VMPay Timeouts (12 periods)
     const chunks = 12;
     const chunkSize = 15;
     let totalFetched = 0;
     const errors = [];
 
     for (let i = 0; i < chunks; i++) {
-      const offset = i * chunkSize;
-      setMessage(`Recuperando histórico... Etapa ${i + 1} de ${chunks} (${offset} dias atrás)`);
+      const offsetStart = i * chunkSize;
+      const offsetEnd = (i + 1) * chunkSize;
+      setMessage(`Resgatando vendas passadas... Quinzena ${i + 1} de 12 (${offsetStart} a ${offsetEnd} dias atrás)`);
+      
       try {
-        const response = await fetch(`/api/force-sync?chunk=${chunkSize}&offset=${offset}&_=${Date.now()}`);
+        const response = await fetch(`/api/force-sync?chunk=${chunkSize}&offset=${offsetStart}&_=${Date.now()}`);
         if (!response.ok) throw new Error(`HTTP error ${response.status}`);
         const result = await response.json();
 
         if (result.success) {
           totalFetched += result.count;
-          setLogs(prev => [...prev, `[System] Etapa ${i + 1}/${chunks} concluída: ${result.count} registros adicionados.`]);
+          setLogs(prev => [...prev, `[System] Quinzena ${i + 1}/12 (${offsetStart}-${offsetEnd} dias) concluída: ${result.count} vendas resgatadas.`]);
         } else {
-          setLogs(prev => [...prev, `[Erro] Etapa ${i + 1}/${chunks} falhou: ${result.error}`]);
+          setLogs(prev => [...prev, `[Erro] Quinzena ${i + 1}/12 falhou: ${result.error}`]);
           errors.push(result.error);
         }
       } catch (err: any) {
-        setLogs(prev => [...prev, `[Erro] Falha na requisição da etapa ${i + 1}: ${err.message}`]);
+        setLogs(prev => [...prev, `[Erro] Falha na rede durante a Quinzena ${i + 1}: ${err.message}`]);
         errors.push(err.message);
       }
     }
 
     if (errors.length < chunks) {
       if (errors.length > 0) {
-        setMessage(`Resgate parcial: ${totalFetched} registros salvos, mas houve erros em algumas etapas. Atualizando painel...`);
-        setStatus("error");
-        await reloadAllData();
-      } else {
-        setMessage(`Sucesso! Histórico de 180 dias recuperado com sucesso. Atualizando dashboards...`);
+        setMessage(`Resgate parcial: ${totalFetched} registros salvos, mas houve erros em algumas quinzenas. Atualizando painel...`);
         setStatus("success");
-        await reloadAllData();
-        setMessage(`Sucesso! Dados atualizados. Você já pode visualizar os meses anteriores.`);
+        await reloadAllData("resgate_parcial", passedToken || token);
+        setStatus("success"); // Garante que a tela destrave após o recarregamento
+      } else {
+        setMessage(`Sucesso! Histórico de 6 meses recuperado completamente (${totalFetched} vendas). Atualizando tela...`);
+        setStatus("success");
+        await reloadAllData("resgate_total", passedToken || token);
+        setMessage(`Tudo Pronto! O histórico completo já está disponível nos seus relatórios.`);
+        setStatus("success"); // Quebra a trava de tela de carregamento infinita
       }
     } else {
-      setMessage("Falha ao resgatar o histórico. Todas as etapas falharam.");
+      setMessage("Falha ao resgatar o histórico. VMPay negou a conexão em todas as etapas.");
       setStatus("error");
     }
   }
