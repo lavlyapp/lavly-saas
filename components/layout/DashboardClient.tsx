@@ -15,6 +15,7 @@ import { CustomerProvider, useCustomerContext } from "@/components/context/Custo
 import { getProfile } from "@/lib/processing/crm";
 import { CustomerDetails } from "@/components/modules/CustomerDetails";
 import { get, set, clear } from 'idb-keyval';
+import { getVMPayCredentials, getCanonicalStoreName } from "@/lib/vmpay-config";
 import { mergeOrders } from "@/lib/processing/merger";
 import { SubscriptionProvider } from "@/components/context/SubscriptionContext";
 import { SettingsProvider } from "@/components/context/SettingsContext";
@@ -22,7 +23,6 @@ import { calculateCrmMetrics } from "@/lib/processing/crm"; // New
 import { AuthProvider, useAuth } from "@/components/context/AuthContext";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { TermsOfUse } from "@/components/modules/TermsOfUse";
-import { getCanonicalStoreName } from "@/lib/vmpay-config";
 import { supabase } from "@/lib/supabase";
 import { createClient } from "@supabase/supabase-js";
 import { OnboardingCnpj } from "@/components/modules/OnboardingCnpj";
@@ -1400,7 +1400,6 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       setLogs(prev => [...prev, "[VMPay] Verificando sessão segura..."]);
       let token = passedToken;
       if (!token) {
-        const { supabase } = await import("@/lib/supabase");
         const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
         if (sessionErr) setLogs(prev => [...prev, `[Aviso] Erro de sessão: ${sessionErr.message}`]);
         token = sessionData?.session?.access_token || null;
@@ -1408,7 +1407,6 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
 
       setLogs(prev => [...prev, "[VMPay] Buscando lista de lojas cadastradas..."]);
       // 1. Get available store credentials first
-      const { getVMPayCredentials } = await import("@/lib/vmpay-config");
       const credentials = await getVMPayCredentials();
       setLogs(prev => [...prev, `[VMPay] ${credentials.length} lojas identificadas. Iniciando ciclo...`]);
 
@@ -1479,7 +1477,6 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       // O sync Delta (.gte('data')) na UI vai ignorá-las porque seus horários são do "passado" da última sincronia.
       // Forçamos a limpeza do IndexedDB local para que a UI puxe tudo fresco do zero da Nuvem em todos os Syncs Manuais.
       try {
-        const { clear } = await import('idb-keyval');
         await clear();
         setLogs(prev => [...prev, `[Sistema] Cache local antigo destruído para forçar novo Fuso Horário.`]);
       } catch (e) { }
