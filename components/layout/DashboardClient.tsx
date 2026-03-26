@@ -14,7 +14,7 @@ import { SaleRecord, OrderRecord, CustomerRecord } from "@/lib/processing/etl";
 import { CustomerProvider, useCustomerContext } from "@/components/context/CustomerContext";
 import { getProfile } from "@/lib/processing/crm";
 import { CustomerDetails } from "@/components/modules/CustomerDetails";
-// import { CustomerDemographics } from "@/components/modules/CustomerDemographics"; // Moved to dynamic
+import { get, set, clear } from 'idb-keyval';
 import { mergeOrders } from "@/lib/processing/merger";
 import { SubscriptionProvider } from "@/components/context/SubscriptionContext";
 import { SettingsProvider } from "@/components/context/SettingsContext";
@@ -767,7 +767,6 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       }
 
       // 2. Carregar dados Híbridos (Cache Rápido + Delta Sync na Nuvem)
-      const { get, set, clear } = await import('idb-keyval');
       setLogs(prev => [...prev, "[System] Verificando cache offline de altíssima velocidade..."]);
 
       const withLocalTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> => {

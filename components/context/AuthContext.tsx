@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import { User } from "@supabase/supabase-js";
+import { clear } from 'idb-keyval';
 
 export type Role = "admin" | "proprietario" | "atendente";
 
@@ -126,7 +127,6 @@ export function AuthProvider({ children, initialSession, initialRole, initialExp
 
     const logout = async () => {
         try {
-            const { clear } = await import('idb-keyval');
             await Promise.race([clear(), new Promise(resolve => setTimeout(resolve, 1500))]);
             console.log("[Auth] Local cache cleared.");
         } catch (e) {
