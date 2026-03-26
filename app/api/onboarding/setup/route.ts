@@ -30,7 +30,7 @@ export async function POST(req: Request) {
 
         for (const key of apiKeys) {
             // 1. Validate against VMPay API
-            const vmpayUrl = `${VMPAY_API_BASE_URL}/maquinas`;
+            const vmpayUrl = `${VMPAY_API_BASE_URL}/maquinas?pagina=0&quantidade=1000`;
             const vmpayResponse = await fetch(vmpayUrl, {
                 method: 'GET',
                 headers: {

@@ -44,7 +44,7 @@ export async function POST(req: Request) {
             console.log(`[Admin Invite] Validating ${apiKeys.length} API Key(s) for ${email}...`);
 
             for (const key of apiKeys) {
-                const vmpayUrl = `${VMPAY_API_BASE_URL}/maquinas`;
+                const vmpayUrl = `${VMPAY_API_BASE_URL}/maquinas?pagina=0&quantidade=1000`;
                 const vmpayResponse = await fetch(vmpayUrl, {
                     method: 'GET',
                     headers: {
