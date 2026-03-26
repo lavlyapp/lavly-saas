@@ -55,11 +55,13 @@ export async function GET(request: Request) {
 
         // upsertSales returns undefined if records length is 0, handle it gracefully
         if (allFilteredRecords.length > 0 && (!result || !result.success)) {
-            throw new Error(result?.error || "Unknown database error during upsert.");
+            const rawError = result ? JSON.stringify(result) : "Result is undefined";
+            throw new Error(`Data Insert Error: ${result?.error || rawError}`);
         }
 
         return NextResponse.json({ success: true, count: allFilteredRecords.length, startDate, endDate, result });
     } catch (e: any) {
-        return NextResponse.json({ success: false, error: e.message });
+        console.error("[Force API] Caught Exception:", e);
+        return NextResponse.json({ success: false, error: e.message || String(e) });
     }
 }

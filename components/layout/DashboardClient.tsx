@@ -1341,7 +1341,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       const offset = i * chunkSize;
       setMessage(`Recuperando histórico... Etapa ${i + 1} de ${chunks} (${offset} dias atrás)`);
       try {
-        const response = await fetch(`/api/force-sync?chunk=${chunkSize}&offset=${offset}`);
+        const response = await fetch(`/api/force-sync?chunk=${chunkSize}&offset=${offset}&_=${Date.now()}`);
         if (!response.ok) throw new Error(`HTTP error ${response.status}`);
         const result = await response.json();
 
@@ -1424,7 +1424,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         setMessage(`Sincronizando ${cred.name} (${i + 1} de ${totalStores})...`);
         setLogs(prev => [...prev, `[VMPay] Sincronizando ${cred.name} (${cred.cnpj})...`]);
 
-        const url = `/api/vmpay/sync?manual=true&cnpj=${cred.cnpj}${isFirstSync ? "&force=true" : ""}`;
+        const url = `/api/vmpay/sync?manual=true&cnpj=${cred.cnpj}${isFirstSync ? "&force=true" : ""}&_=${Date.now()}`;
 
         try {
           const controller = new AbortController();
