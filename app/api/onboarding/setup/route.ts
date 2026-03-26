@@ -30,7 +30,7 @@ export async function POST(req: Request) {
 
         for (const key of apiKeys) {
             // 1. Validate against VMPay API
-            const vmpayUrl = `${VMPAY_API_BASE_URL}/maquinas?pagina=0&quantidade=1000`;
+            const vmpayUrl = `${VMPAY_API_BASE_URL}/lavanderias?pagina=0&quantidade=1000`;
             const vmpayResponse = await fetch(vmpayUrl, {
                 method: 'GET',
                 headers: {
@@ -46,20 +46,20 @@ export async function POST(req: Request) {
                 );
             }
 
-            const machinesData = await vmpayResponse.json();
-            if (!Array.isArray(machinesData)) {
+            const lavanderiasData = await vmpayResponse.json();
+            if (!Array.isArray(lavanderiasData)) {
                 return NextResponse.json({ error: 'Resposta inesperada da VMPay API' }, { status: 500 });
             }
 
-            machinesData.forEach(machine => {
-                if (machine.loja) {
-                    const canonicalName = getCanonicalStoreName(machine.loja);
+            lavanderiasData.forEach((lavanderia: any) => {
+                if (lavanderia.nome) {
+                    const canonicalName = getCanonicalStoreName(lavanderia.nome);
                     uniqueStoreNames.add(canonicalName);
                     if (!storesData.has(canonicalName)) {
                         storesData.set(canonicalName, {
                             name: canonicalName,
-                            originalName: machine.loja,
-                            cnpj: machine.documentoDeIdentificacao || '',
+                            originalName: lavanderia.nome,
+                            cnpj: lavanderia.documentoEmpresa?.identificador || '',
                             is_active: true,
                             api_key: key
                         });
