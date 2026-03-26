@@ -1360,11 +1360,14 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
 
     if (errors.length < chunks) {
       if (errors.length > 0) {
-        setMessage(`Resgate parcial: ${totalFetched} registros salvos, mas houve erros em algumas etapas. Atualize a página e tente novamente mais tarde.`);
+        setMessage(`Resgate parcial: ${totalFetched} registros salvos, mas houve erros em algumas etapas. Atualizando painel...`);
         setStatus("error");
+        await reloadAllData();
       } else {
-        setMessage(`Sucesso! Histórico completo de 180 dias recuperado. Atualize a página (F5) para ver os milhares de Cestos.`);
+        setMessage(`Sucesso! Histórico de 180 dias recuperado com sucesso. Atualizando dashboards...`);
         setStatus("success");
+        await reloadAllData();
+        setMessage(`Sucesso! Dados atualizados. Você já pode visualizar os meses anteriores.`);
       }
     } else {
       setMessage("Falha ao resgatar o histórico. Todas as etapas falharam.");
