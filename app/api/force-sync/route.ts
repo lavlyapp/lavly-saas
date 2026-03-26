@@ -33,23 +33,32 @@ export async function GET(request: Request) {
         const startDate = new Date(endDate);
         startDate.setDate(startDate.getDate() - chunkDays);
 
-        const records = await syncVMPaySales(startDate, endDate);
-        
-        // SECURITY ISOLATION: Filter records to only include stores the user is assigned to!
+        // SECURITY ISOLATION: Fetch credentials specifically for the authenticated user
         const { getVMPayCredentials, getCanonicalStoreName } = await import("@/lib/vmpay-config");
         const activeStores = await getVMPayCredentials(supabase);
-        const configuredNames = activeStores.map(s => getCanonicalStoreName(s.name));
         
-        const filteredRecords = records.filter(r => configuredNames.includes(r.loja));
+        if (activeStores.length === 0) {
+            return NextResponse.json({ success: true, count: 0, startDate, endDate });
+        }
 
-        console.log(`[Force API] Fetched ${records.length} total, filtered down to ${filteredRecords.length} historical records for assigned stores.`);
-        const result = await upsertSales(filteredRecords, supabase);
+        const configuredNames = activeStores.map(s => getCanonicalStoreName(s.name));
+        let allFilteredRecords: any[] = [];
+        
+        // Pass specific credential array sequentially to restrict VMPay API fetch strictly to allowed stores
+        for (const storeCred of activeStores) {
+            const records = await syncVMPaySales(startDate, endDate, storeCred);
+            allFilteredRecords.push(...records);
+        }
 
-        if (!result || !result.success) {
+        console.log(`[Force API] Fetched ${allFilteredRecords.length} historical records for assigned stores.`);
+        const result = await upsertSales(allFilteredRecords, supabase);
+
+        // upsertSales returns undefined if records length is 0, handle it gracefully
+        if (allFilteredRecords.length > 0 && (!result || !result.success)) {
             throw new Error(result?.error || "Unknown database error during upsert.");
         }
 
-        return NextResponse.json({ success: true, count: filteredRecords.length, startDate, endDate, result });
+        return NextResponse.json({ success: true, count: allFilteredRecords.length, startDate, endDate, result });
     } catch (e: any) {
         return NextResponse.json({ success: false, error: e.message });
     }
