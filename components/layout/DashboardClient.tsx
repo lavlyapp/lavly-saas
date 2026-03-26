@@ -151,6 +151,7 @@ interface AppContentProps {
   handleSyncVMPay: (token: string | null) => Promise<void>;
   handleForceSync: (token: string | null) => Promise<void>;
   stableInitialLoad: (token: string | null) => void;
+  stableFullRefresh: (token: string | null) => void;
   syncProgress: number;
 }
 
@@ -173,6 +174,7 @@ function AppContent({
   handleSyncVMPay,
   handleForceSync,
   stableInitialLoad,
+  stableFullRefresh,
   syncProgress
 }: AppContentProps) {
   // Last Update Timestamp
@@ -532,11 +534,11 @@ function AppContent({
             </button>
 
             <button
-              onClick={() => window.location.reload()}
-              title="Recarregar interface e buscar dados mais recentes"
+              onClick={() => stableFullRefresh(token)}
+              title="Recarregar base de dados completa (Ignorar Cache)"
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-neutral-800 hover:bg-neutral-700 text-white shadow-lg transition-all"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className={cn("w-4 h-4", status === 'uploading' && "animate-spin")} />
               <span>Atualizar Tela</span>
             </button>
 
@@ -1036,6 +1038,10 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
     reloadDataRef.current("Inicial", token);
   }, []);
 
+  const stableFullRefresh = useCallback((token: string | null) => {
+    reloadDataRef.current("Manual Atualizar", token, true);
+  }, []);
+
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1372,12 +1378,12 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       if (errors.length > 0) {
         setMessage(`Resgate parcial: ${totalFetched} registros salvos, mas houve erros em algumas quinzenas. Atualizando painel...`);
         setStatus("success");
-        await reloadAllData("resgate_parcial", passedToken || token);
+        await reloadAllData("resgate_parcial", passedToken, true);
         setStatus("success"); // Garante que a tela destrave após o recarregamento
       } else {
         setMessage(`Sucesso! Histórico de 6 meses recuperado completamente (${totalFetched} vendas). Atualizando tela...`);
         setStatus("success");
-        await reloadAllData("resgate_total", passedToken || token);
+        await reloadAllData("resgate_total", passedToken, true);
         setMessage(`Tudo Pronto! O histórico completo já está disponível nos seus relatórios.`);
         setStatus("success"); // Quebra a trava de tela de carregamento infinita
       }
@@ -1554,6 +1560,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
               handleSyncVMPay={handleSyncVMPay}
               handleForceSync={handleForceSync}
               stableInitialLoad={stableInitialLoad}
+              stableFullRefresh={stableFullRefresh}
               syncProgress={syncProgress}
             />
           </CustomerProvider>
