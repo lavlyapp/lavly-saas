@@ -227,50 +227,34 @@ export function AdminUserDetailsModal({ isOpen, onClose, payer }: AdminUserDetai
                             </div>
                         )}
                         
-                        <div className="mt-4">
-                            {!showKeyInput ? (
-                                <button 
-                                    onClick={() => setShowKeyInput(true)}
-                                    className="text-xs font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 rounded-md border border-emerald-500/20 transition-colors"
-                                >
-                                    + Sincronizar Nova Chave API
-                                </button>
-                            ) : (
-                                <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 mt-2 animate-in fade-in slide-in-from-top-2">
-                                    <h4 className="text-xs font-bold text-emerald-400 mb-2">Importar Lojas (VMPay API Key)</h4>
-                                    
-                                    {syncError && <div className="text-xs text-red-400 bg-red-500/10 p-2 rounded mb-2 border border-red-500/20">{syncError}</div>}
-                                    {syncSuccess && <div className="text-xs text-emerald-400 bg-emerald-500/10 p-2 rounded mb-2 border border-emerald-500/20">{syncSuccess}</div>}
-                                    
-                                    <textarea
-                                        value={syncKey}
-                                        onChange={e => setSyncKey(e.target.value)}
-                                        className="w-full bg-black border border-neutral-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-lg p-3 text-white text-xs font-mono transition-all resize-none h-20 mb-2"
-                                        placeholder="Cole aqui a nova Chave de Integração..."
+                        <div className="mt-6">
+                            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 animate-in fade-in slide-in-from-top-2">
+                                <h4 className="text-xs font-bold text-emerald-400 mb-2">Importar Novas Lojas (VMPay API Key)</h4>
+                                
+                                {syncError && <div className="text-xs text-red-400 bg-red-500/10 p-2 rounded mb-2 border border-red-500/20">{syncError}</div>}
+                                {syncSuccess && <div className="text-xs text-emerald-400 bg-emerald-500/10 p-2 rounded mb-2 border border-emerald-500/20">{syncSuccess}</div>}
+                                
+                                <textarea
+                                    value={syncKey}
+                                    onChange={e => setSyncKey(e.target.value)}
+                                    className="w-full bg-black border border-neutral-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-lg p-3 text-white text-xs font-mono transition-all resize-none h-20 mb-3"
+                                    placeholder="Cole aqui a nova Chave de Integração..."
+                                    disabled={isSyncing || !!syncSuccess}
+                                />
+                                <div className="flex justify-end">
+                                    <button 
+                                        onClick={handleSyncStores}
                                         disabled={isSyncing || !!syncSuccess}
-                                    />
-                                    <div className="flex gap-2 justify-end">
-                                        <button 
-                                            onClick={() => setShowKeyInput(false)}
-                                            className="px-3 py-1.5 text-xs text-neutral-400 hover:text-white transition-colors"
-                                            disabled={isSyncing || !!syncSuccess}
-                                        >
-                                            Cancelar
-                                        </button>
-                                        <button 
-                                            onClick={handleSyncStores}
-                                            disabled={isSyncing || !!syncSuccess}
-                                            className="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition-colors flex items-center gap-2"
-                                        >
-                                            {isSyncing ? (
-                                                <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                                            ) : null}
-                                            Buscar e Vincular
-                                        </button>
-                                    </div>
-                                    <p className="text-[10px] text-emerald-500/60 mt-2">Esta ação unirá as novas lojas com as atuais e expandirá o limite automaticamente.</p>
+                                        className="px-4 py-2 text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition-colors flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+                                    >
+                                        {isSyncing ? (
+                                            <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                                        ) : null}
+                                        Buscar e Vincular Novas Lojas
+                                    </button>
                                 </div>
-                            )}
+                                <p className="text-[10px] text-emerald-500/60 mt-3">Esta ação unirá as novas lojas com as atuais e expandirá o limite automaticamente.</p>
+                            </div>
                         </div>
                     </div>
 
