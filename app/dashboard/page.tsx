@@ -26,22 +26,23 @@ export default async function Page() {
 
     let initialRole = null;
     let initialExpiresAt = null;
+    let initialVmpayApiKey = null;
     if (session?.user) {
         try {
             const { data: profile, error } = await supabase
                 .from('profiles')
-                .select('role, expires_at')
+                .select('role, expires_at, vmpay_api_key')
                 .eq('id', session.user.id)
                 .single();
 
             if (error) console.error("[Server-Page] Error fetching profile:", error.message);
             initialRole = profile?.role || 'proprietario';
             initialExpiresAt = profile?.expires_at || null;
-            console.log(`[Server-Page] Role resolved: ${initialRole}, ExpiresAt: ${initialExpiresAt}`);
+            initialVmpayApiKey = profile?.vmpay_api_key || null;
         } catch (err) {
             console.error("[Server-Page] Critical catch fetching profile:", err);
         }
     }
 
-    return <DashboardClient initialSession={session} initialRole={initialRole} initialExpiresAt={initialExpiresAt} />;
+    return <DashboardClient initialSession={session} initialRole={initialRole} initialExpiresAt={initialExpiresAt} initialVmpayApiKey={initialVmpayApiKey} />;
 }

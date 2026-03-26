@@ -23,11 +23,11 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children, initialSession, initialRole, initialExpiresAt }: { children: ReactNode, initialSession?: any, initialRole?: Role | null, initialExpiresAt?: string | null }) {
+export function AuthProvider({ children, initialSession, initialRole, initialExpiresAt, initialVmpayApiKey }: { children: ReactNode, initialSession?: any, initialRole?: Role | null, initialExpiresAt?: string | null, initialVmpayApiKey?: string | null }) {
     const [user, setUser] = useState<User | null>(initialSession?.user ?? null);
     const [role, setRole] = useState<Role | null>(initialRole ?? null);
     const [expiresAt, setExpiresAt] = useState<string | null>(initialExpiresAt ?? null);
-    const [vmpayApiKey, setVmpayApiKey] = useState<string | null>(null);
+    const [vmpayApiKey, setVmpayApiKey] = useState<string | null>(initialVmpayApiKey ?? null);
     const [token, setToken] = useState<string | null>(initialSession?.access_token ?? null);
     const [isLoading, setIsLoading] = useState(!initialSession || (initialSession.user && !initialRole));
 

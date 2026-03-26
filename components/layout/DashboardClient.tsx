@@ -662,7 +662,7 @@ function AppContent({
   );
 }
 
-export default function DashboardClient({ initialSession, initialRole, initialExpiresAt }: { initialSession?: any, initialRole?: any, initialExpiresAt?: string | null }) {
+export default function DashboardClient({ initialSession, initialRole, initialExpiresAt, initialVmpayApiKey }: { initialSession?: any, initialRole?: any, initialExpiresAt?: string | null, initialVmpayApiKey?: string | null }) {
   const [activeTab, setActiveTab] = useState("financial");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [status, setStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
@@ -1497,7 +1497,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
 
   return (
     <SettingsProvider>
-      <AuthProvider initialSession={initialSession} initialRole={initialRole} initialExpiresAt={initialExpiresAt}>
+      <AuthProvider initialSession={initialSession} initialRole={initialRole} initialExpiresAt={initialExpiresAt} initialVmpayApiKey={initialVmpayApiKey}>
         <SubscriptionProvider>
           <CustomerProvider>
             <AppContent
