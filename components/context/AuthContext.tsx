@@ -127,7 +127,7 @@ export function AuthProvider({ children, initialSession, initialRole, initialExp
     const logout = async () => {
         try {
             const { clear } = await import('idb-keyval');
-            await clear();
+            await Promise.race([clear(), new Promise(resolve => setTimeout(resolve, 1500))]);
             console.log("[Auth] Local cache cleared.");
         } catch (e) {
             console.error("[Auth] Failed to clear local cache:", e);

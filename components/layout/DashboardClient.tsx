@@ -770,21 +770,6 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       const { get, set, clear } = await import('idb-keyval');
       setLogs(prev => [...prev, "[System] Verificando cache offline de altíssima velocidade..."]);
 
-      // Verify that this cache belongs to the CURRENT user. If not, blow it away to prevent Cross-Account Data Leaks!
-      const cachedUserId = await get('lavly_cached_user_id');
-      const currentUserId = (await supabase.auth.getSession()).data.session?.user?.id;
-      
-      const hasLegacyCache = !cachedUserId && (await get('lavly_sales'))?.length > 0;
-
-      if ((cachedUserId && currentUserId && cachedUserId !== currentUserId) || hasLegacyCache) {
-          console.warn("[Security] Cross-account cache detected! User changed without explicit logout. Wiping cache...");
-          setLogs(prev => [...prev, "[Segurança] Troca de Conta detectada. Destruindo cache do usuário antigo..."]);
-          await clear();
-      }
-      if (currentUserId) {
-          await set('lavly_cached_user_id', currentUserId);
-      }
-
       const withLocalTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> => {
         let timeoutId: NodeJS.Timeout;
         const timeoutPromise = new Promise<T>((resolve) => {
@@ -793,7 +778,28 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         return Promise.race([promise.catch(() => fallback), timeoutPromise]).finally(() => clearTimeout(timeoutId));
       };
 
-      let cachedSales = await withLocalTimeout(get('lavly_sales'), 2000, []) || [];
+      // Verify that this cache belongs to the CURRENT user. If not, blow it away to prevent Cross-Account Data Leaks!
+      const currentUserId = (await supabase.auth.getSession()).data.session?.user?.id;
+      const cachedUserId = await withLocalTimeout(get('lavly_cached_user_id'), 1000, null);
+      
+      const legacySales = await withLocalTimeout(get('lavly_sales'), 1000, null);
+      const hasLegacyCache = !cachedUserId && legacySales && (legacySales as any[]).length > 0;
+
+      if ((cachedUserId && currentUserId && cachedUserId !== currentUserId) || hasLegacyCache) {
+          console.warn("[Security] Cross-account cache detected! User changed without explicit logout. Wiping cache...");
+          setLogs(prev => [...prev, "[Segurança] Troca de Conta detectada. Destruindo cache do usuário antigo..."]);
+          await withLocalTimeout(clear(), 2000, undefined);
+      }
+      if (currentUserId) {
+          await withLocalTimeout(set('lavly_cached_user_id', currentUserId), 1000, undefined);
+      }
+
+      let cachedSales = legacySales || [];
+      if ((cachedUserId && currentUserId && cachedUserId !== currentUserId) || hasLegacyCache) {
+          cachedSales = []; // We just cleared it
+      } else if (!legacySales) {
+          cachedSales = await withLocalTimeout(get('lavly_sales'), 2000, []) || [];
+      }
       let cachedOrders = await withLocalTimeout(get('lavly_orders'), 2000, []) || [];
       let cachedCustomers = await withLocalTimeout(get('lavly_customers'), 2000, []) || [];
 
