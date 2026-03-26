@@ -44,13 +44,16 @@ export async function POST(req: Request) {
             console.log(`[Admin Invite] Validating ${apiKeys.length} API Key(s) for ${email}...`);
 
             for (const key of apiKeys) {
-                const vmpayUrl = `${VMPAY_API_BASE_URL}/lavanderias?pagina=0&quantidade=1000`;
+                // Cache busting guarantees: NO-STORE + dynamic timestamp param to bypass strict Vercel Edge caching
+                const vmpayUrl = `${VMPAY_API_BASE_URL}/lavanderias?pagina=0&quantidade=1000&_t=${Date.now()}`;
                 const vmpayResponse = await fetch(vmpayUrl, {
                     method: 'GET',
                     headers: {
                         'x-api-key': key,
                         'Content-Type': 'application/json',
                     },
+                    cache: 'no-store',
+                    next: { revalidate: 0 }
                 });
 
                 if (!vmpayResponse.ok) {
