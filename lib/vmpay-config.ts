@@ -43,7 +43,21 @@ export const STORE_NAME_MAP: Record<string, string> = {
     "LAVATERIA SHOPPING SOLARES": "Lavateria SHOPPING SOLARES",
     "SOLARES": "Lavateria SHOPPING SOLARES",
     "LAVATERIA JOQUEI": "Lavateria JOQUEI",
-    "JOQUEI": "Lavateria JOQUEI"
+    "JOQUEI": "Lavateria JOQUEI",
+    
+    // Leandro Stores (Multi-Store Mapping)
+    "Lavateria JARDIM VETORASSO": "Lavateria Jardim Vetorasso",
+    "Lavateria JARDIM ALTO ALEGRE": "Lavateria Jardim Alto Alegre",
+    "Lavateria JARDIM SORAIA": "Lavateria Jardim Soraia",
+    "LAVATERIA FAST ANALIA FRANCO": "Lavateria Analia Franco",
+    "Lavateria UNIVERSITARIO": "Lavateria Universitario",
+    "Lavateria ESTORIL": "Lavateria Estoril",
+    "Lavateria Itinerante": "Lavateria Itinerante",
+    "Lavateria LOURDES": "Lavateria Lourdes",
+    "Lavateria VILA AMÉLIA": "Lavateria Vila Amelia",
+    "Lavateria VILLAGE MALL": "Lavateria Village Mall",
+    "Lavateria trailer": "Lavateria Trailer",
+    "LAVATERIA POSTO BRAZILIAN": "Lavateria Posto Brazilian"
 };
 
 export interface VMPayMasterAccount {

@@ -216,8 +216,23 @@ export function AdminUserDetailsModal({ isOpen, onClose, payer }: AdminUserDetai
                                 {Array.from(new Set(payer.assigned_stores.map(storeId => 
                                     storeId.toLowerCase().includes('bezerra de menezes') ? 'Lavateria Cascavel' : storeId
                                 ))).map(storeId => (
-                                    <div key={storeId} className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-medium rounded-lg">
-                                        {storeId}
+                                    <div key={storeId} className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-medium rounded-lg flex items-center gap-2">
+                                        <span>{storeId}</span>
+                                        <button 
+                                            onClick={async () => {
+                                                if(!confirm(`Remover acesso da loja ${storeId}?`)) return;
+                                                const res = await fetch('/api/admin/profiles/stores', {
+                                                    method: 'DELETE',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ targetId: payer.id, storeName: storeId })
+                                                });
+                                                if(res.ok) window.location.reload();
+                                            }}
+                                            className="hover:text-red-400 transition-colors p-0.5 rounded-full hover:bg-emerald-500/20"
+                                            title="Remover acesso a esta loja"
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
                                     </div>
                                 ))}
                             </div>

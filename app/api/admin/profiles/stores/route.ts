@@ -175,3 +175,52 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: e.message || 'Erro inesperado' }, { status: 500 });
     }
 }
+
+export async function DELETE(req: Request) {
+    try {
+        const cookieStore = await cookies();
+        const authClient = createServerClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+                cookies: {
+                    get(name: string) { return cookieStore.get(name)?.value },
+                    set(name: string, value: string, options: CookieOptions) { 
+                        try { cookieStore.set({ name, value, ...options }) } catch(e) {}
+                    },
+                    remove(name: string, options: CookieOptions) { 
+                        try { cookieStore.set({ name, value: '', ...options }) } catch(e) {}
+                    },
+                },
+            }
+        );
+
+        const { data: { user } } = await authClient.auth.getUser();
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+        const { data: callerProfile } = await authClient.from('profiles').select('role').eq('id', user.id).single();
+        if (callerProfile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+        const body = await req.json();
+        const { targetId, storeName } = body;
+
+        if (!targetId || !storeName) return NextResponse.json({ error: 'targetId e storeName são obrigatórios' }, { status: 400 });
+
+        const { data: targetProfile, error: targetError } = await supabaseAdmin
+            .from('profiles').select('assigned_stores').eq('id', targetId).single();
+
+        if (targetError || !targetProfile) return NextResponse.json({ error: 'Perfil não encontrado' }, { status: 404 });
+
+        const existingStores = Array.isArray(targetProfile.assigned_stores) ? targetProfile.assigned_stores : [];
+        const updatedStores = existingStores.filter((name: string) => name !== storeName);
+
+        const { error: updateError } = await supabaseAdmin
+            .from('profiles').update({ assigned_stores: updatedStores }).eq('id', targetId);
+
+        if (updateError) throw updateError;
+
+        return NextResponse.json({ success: true, message: 'Loja removida com sucesso' });
+    } catch (e: any) {
+        return NextResponse.json({ error: e.message }, { status: 500 });
+    }
+}

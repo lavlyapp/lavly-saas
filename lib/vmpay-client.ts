@@ -196,9 +196,9 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                         }
 
                         const record: SaleRecord = {
-                            id: `${cred.cnpj}-${sale.idVenda}`, // Composite ID to prevent collisions across stores
+                            id: `${sale.documentoEmpresa?.identificador || cred.cnpj}-${sale.idVenda}`, // Composite ID supports multi-store shared keys
                             data: safeDate,
-                            loja: getCanonicalStoreName(cred.name),
+                            loja: getCanonicalStoreName(sale.lavanderia || cred.name),
                             cliente: sale.nomeCliente || "Cliente Não Identificado",
                             customerId: sale.idCliente ? String(sale.idCliente) : undefined,
                             produto: items.length > 0 ? items[0].service : produto,
