@@ -207,6 +207,7 @@ export function CustomerDetails({ isOpen, onClose, profile, periodRecords }: Cus
                                 <thead className="bg-neutral-900 text-neutral-500 uppercase font-bold">
                                     <tr>
                                         <th className="px-4 py-3">Data</th>
+                                        <th className="px-4 py-3">Dia</th>
                                         <th className="px-4 py-3">Turno</th>
                                         <th className="px-4 py-3 text-center" title="Lavagens / Secagens">Uso</th>
                                         <th className="px-4 py-3 text-right">Valor</th>
@@ -217,6 +218,9 @@ export function CustomerDetails({ isOpen, onClose, profile, periodRecords }: Cus
                                         <tr key={i} className="hover:bg-neutral-800/50">
                                             <td className="px-4 py-3 font-mono">
                                                 {format(visit.date, "dd/MM/yy")}
+                                            </td>
+                                            <td className="px-4 py-3 font-medium text-indigo-300">
+                                                {['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'][visit.date.getDay()]}
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-2">
