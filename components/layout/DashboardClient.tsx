@@ -865,8 +865,9 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       const fetchAllParallel = async (tableName: string, columns: string, orderBy: string, targetStores: string[]) => {
         let totalCount = 0;
         
-        const shouldFilterByStore = targetStores.length > 0;
-        const storeColumnName = tableName === 'customers' ? 'favorite_store' : 'loja';
+        // Customers are global to the tenant, they do not have a 'loja' column
+        const shouldFilterByStore = targetStores.length > 0 && tableName !== 'customers';
+        const storeColumnName = 'loja';
         
         if (shouldFilterByStore) {
            const { count } = await rawSupabase.from(tableName).select('id', { count: 'exact', head: true }).in(storeColumnName, targetStores);
