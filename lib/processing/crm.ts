@@ -444,10 +444,10 @@ export function calculateCrmMetrics(records: SaleRecord[], customerRegistry?: Cu
         }
 
         // Fallback: Infer gender if not in registry (or if registry didn't have it)
-        // UPDATE: User requested to strictly use VMPay data. No manual inference.
-        // if (gender === 'U') {
-        //     gender = inferGender(name);
-        // }
+        // Restored: User requested UI heuristics to be enabled since VMPay lacks this field.
+        if (gender === 'U') {
+            gender = inferGender(name);
+        }
 
         // Correct Start Date: Use Registration Date if earlier than First Visit
         let finalFirstVisit = firstVisitDate;
