@@ -175,8 +175,18 @@ export function MachineAnalysis({ data, selectedStore }: MachineAnalysisProps) {
 
             {/* 1. Machine Gantt Chart (Moved here) */}
             <div className="mb-8">
-                {/* We pass filteredOrders, translated to items for the Gantt component which expects sale-like items format or items array */}
-                <MachineGanttChart records={[{ items: filteredOrders, data: new Date() }] as any} />
+                <MachineGanttChart records={filteredOrders.map((o: any) => ({
+                    data: o.data instanceof Date ? o.data : new Date(o.data),
+                    cliente: o.cliente || '',
+                    valor: o.valor || o.value,
+                    produto: o.service,
+                    items: [{
+                        machine: o.machine,
+                        service: o.service,
+                        startTime: o.data instanceof Date ? o.data : new Date(o.data),
+                        value: o.valor || o.value
+                    }]
+                })) as any} />
             </div>
 
             {/* KPI Cards */}
