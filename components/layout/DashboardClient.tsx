@@ -847,84 +847,28 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         return Array.from(uniqueMap.values());
       };
 
-      // --- PHASE 1: FAST-TRACK HYDRATION (LAST 60 DAYS) ---
-      setLogs(prev => [...prev, "[System] Fase 1 (Fast-Track): Baixando últimos 60 dias para acesso imediato..."]);
-      const newSales = await fetchAllParallel('sales', 'id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age', 'data', configuredNames, 2, 0);
-      const newOrders = await fetchAllParallel('orders', 'data, loja, cliente, machine, service, status, valor, customer_id, sale_id', 'data', configuredNames, 2, 0);
-      const newCustomers = await fetchAllParallel('customers', 'id, cpf, name, phone, email, gender, registration_date', 'id', configuredNames);
+      // --- CLOUD-NATIVE ARCHITECTURE MIGRATION ---
+      // We no longer download 'sales' and 'orders' to the local browser memory!
+      // The individual tabs (FinancialDashboard, CRM, etc) are responsible for fetching
+      // their own aggregated JSON payloads directly from Next.js Serverless APIs.
 
-      // Hydrate & Normalize Data strictly inside Browser RAM memory (Sem IndexedDB)
-      const hydrateSales = (salesArr: any[]) => salesArr.sort((a: any, b: any) => new Date(b.data).getTime() - new Date(a.data).getTime()).map((s: any) => ({
-        ...s,
-        data: s.data ? new Date(s.data) : new Date(),
-        loja: getCanonicalStoreName(s.loja),
-        produto: s.produto || s.service || '',
-        formaPagamento: s.formaPagamento || s.forma_pagamento || "Outros",
-        tipoCartao: s.tipoCartao || s.tipo_cartao || "",
-        categoriaVoucher: s.categoriaVoucher || s.categoria_voucher || "",
-        customerId: s.customerId || s.customer_id,
-        birthDate: s.birthDate || s.birth_date ? new Date(s.birthDate || s.birth_date) : undefined,
-        items: s.items ? s.items.map((i: any) => ({ ...i, startTime: i.startTime ? new Date(i.startTime) : new Date() })) : []
-      }));
+      setLogs(prev => [...prev, "[System] Baixando metadados de clientes..."]);
+      const newCustomers = await fetchAllParallel('customers', 'id, cpf, name, phone, email, gender, registration_date', 'id', configuredNames, 1, 0);
 
-      const hydrateOrders = (ordersArr: any[]) => ordersArr.sort((a: any, b: any) => new Date(b.data).getTime() - new Date(a.data).getTime()).map((o: any) => ({
-        ...o,
-        data: o.data ? new Date(o.data) : new Date(),
-        loja: getCanonicalStoreName(o.loja)
-      }));
-
-      const hydratedSales = hydrateSales(newSales);
-      const hydratedOrders = hydrateOrders(newOrders);
       const hydratedCustomers = newCustomers.map((c: any) => ({
         ...c,
         registrationDate: c.registration_date ? new Date(c.registration_date) : undefined
       }));
 
-      setAllRecords(hydratedSales);
-      setAllOrders(hydratedOrders);
+      // Flush massive memory state arrays to 0 to prevent RAM ballooning!
+      setAllRecords([]);
+      setAllOrders([]);
+      
       if (hydratedCustomers.length > 0) setAllCustomers(hydratedCustomers);
       
-      setLogs(prev => [...prev, `[System] Fase 1 Concluída. Painel liberado! (${hydratedSales.length} vendas recentes).`]);
+      setLogs(prev => [...prev, `[System] Cliente UI inicializado. Delegando cálculos para a Borda AWS.`]);
       setStatus("idle");
       isInitializing.current = false;
-
-      // --- PHASE 2: BACKGROUND HISTORICAL HYDRATION (MONTHS 3 TO 12) ---
-      setTimeout(async () => {
-          try {
-              setLogs(prev => [...prev, "[System] Fase 2 (Background): Baixando histórico antigo (Até 12 Meses)..."]);
-              const bgSales = await fetchAllParallel('sales', 'id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age', 'data', configuredNames, 10, 2);
-              const bgOrders = await fetchAllParallel('orders', 'data, loja, cliente, machine, service, status, valor, customer_id, sale_id', 'data', configuredNames, 10, 2);
-              
-              const hydratedBgSales = hydrateSales(bgSales);
-              const hydratedBgOrders = hydrateOrders(bgOrders);
-              
-              setAllRecords(prev => {
-                  const uniqueMap = new Map();
-                  prev.forEach(p => uniqueMap.set(p.id, p));
-                  hydratedBgSales.forEach(s => uniqueMap.set(s.id, s));
-                  return Array.from(uniqueMap.values()).sort((a: any, b: any) => b.data.getTime() - a.data.getTime());
-              });
-              
-              setAllOrders(prev => {
-                  const uniqueMap = new Map();
-                  prev.forEach(p => {
-                      const key = `${p.sale_id}-${p.machine}-${p.data.getTime()}`;
-                      uniqueMap.set(key, p);
-                  });
-                  hydratedBgOrders.forEach(o => {
-                      const key = `${o.sale_id}-${o.machine}-${o.data.getTime()}`;
-                      uniqueMap.set(key, o);
-                  });
-                  return Array.from(uniqueMap.values()).sort((a: any, b: any) => b.data.getTime() - a.data.getTime());
-              });
-              
-              setLogs(prev => [...prev, `[System] Histórico Silencioso Completo! (Integrados ${bgSales.length} registros profundos)`]);
-          } catch (bgErr) {
-              console.error("[Home] Background Fetch Failed:", bgErr);
-              setLogs(prev => [...prev, "[Erro DB] Falha ao puxar dados profundos em segundo plano."]);
-          }
-      }, 1000);
-
 
     } catch (error: any) {
       console.error("[Home] Error reloading data:", error);
