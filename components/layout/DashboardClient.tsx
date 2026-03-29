@@ -753,10 +753,13 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         { global: { headers: { Authorization: `Bearer ${authToken || ''}` } } }
       );
 
-      // 2. Load active stores and config
-      const { getVMPayCredentials, getCanonicalStoreName } = await import("@/lib/vmpay-config");
-      const activeStores = await getVMPayCredentials();
-      const configuredNames = activeStores.map(s => getCanonicalStoreName(s.name));
+      // 2. Load active stores and config via Secure API (Bypass client DB lock)
+      const { getCanonicalStoreName } = await import("@/lib/vmpay-config");
+      
+      const resStores = await fetch('/api/force-sync/stores');
+      const dataStores = await resStores.json();
+      const activeStores = dataStores.stores || [];
+      const configuredNames = activeStores.map((s: any) => getCanonicalStoreName(s.name));
       setDbStores(configuredNames);
 
       // Check if any of these active stores are missing a CNPJ
