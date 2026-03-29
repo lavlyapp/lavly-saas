@@ -777,16 +777,24 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       const fetchAllParallel = async (tableName: string, columns: string, orderBy: string, targetStores: string[]) => {
         let totalCount = 0;
         const countColumn = tableName === 'orders' ? 'sale_id' : 'id';
+        const storeColumnName = 'loja';
+        const shouldFilterByStore = targetStores.length > 0 && tableName !== 'customers';
         
-        // Removed .in() filter to bypass PostgREST URI Length Limits.
-        // Row Level Security (RLS) automatically restricts the data to what the user owns.
-        const { count, error } = await rawSupabase.from(tableName).select(countColumn, { count: 'exact', head: true });
-        
-        if (error) {
-           console.error(`[System] Count Error on ${tableName}:`, error);
-           setLogs(prev => [...prev, `[Erro DB] Falha na contagem de ${tableName} (${error.code || 'HTTP URI Limit'}): ${error.message}`]);
+        if (shouldFilterByStore) {
+           const { count, error } = await rawSupabase.from(tableName).select(countColumn, { count: 'exact', head: true }).in(storeColumnName, targetStores);
+           if (error) {
+               console.error(`[System] Count Error on ${tableName}:`, error);
+               setLogs(prev => [...prev, `[Erro DB] Falha na contagem de ${tableName} (${error.code || 'Timeout/Limit'}): ${error.message}`]);
+           }
+           totalCount = count || 0;
+        } else {
+           const { count, error } = await rawSupabase.from(tableName).select(countColumn, { count: 'exact', head: true });
+           if (error) {
+               console.error(`[System] Count Error on ${tableName}:`, error);
+               setLogs(prev => [...prev, `[Erro DB] Falha na contagem de ${tableName} (${error.code || 'Timeout/Limit'}): ${error.message}`]);
+           }
+           totalCount = count || 0;
         }
-        totalCount = count || 0;
 
         if (totalCount === 0) return [];
 
@@ -802,6 +810,9 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
           for (let j = 0; j < maxConcurrent && (i + j) < pages; j++) {
             const pageIndex = i + j;
             let query = rawSupabase.from(tableName).select(columns).order(orderBy, { ascending: false }).range(pageIndex * pageSize, (pageIndex + 1) * pageSize - 1);
+            if (shouldFilterByStore) {
+                query = query.in(storeColumnName, targetStores);
+            }
             batchPromises.push(query);
           }
           
