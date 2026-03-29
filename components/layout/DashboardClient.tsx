@@ -763,9 +763,9 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       setDbStores(configuredNames);
 
       // Check if any of these active stores are missing a CNPJ
-      const missingCnpjStores = activeStores.filter(s => !s.cnpj || s.cnpj.trim() === "");
+      const missingCnpjStores = activeStores.filter((s: any) => !s.cnpj || s.cnpj.trim() === "");
       if (missingCnpjStores.length > 0) {
-        setNeedsOnboardingStores(missingCnpjStores.map(s => ({ name: s.name })));
+        setNeedsOnboardingStores(missingCnpjStores.map((s: any) => ({ name: s.name })));
         setStatus("idle");
         isInitializing.current = false;
         return; // Halt data loading until CNPJs are provided
@@ -783,7 +783,8 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       };
 
       // Verify that this cache belongs to the CURRENT user. If not, blow it away to prevent Cross-Account Data Leaks!
-      const currentUserId = (await supabase.auth.getSession()).data.session?.user?.id;
+      // Using synchronous initialSession to prevent Next.js/Supabase browser client deadlocks
+      const currentUserId = initialSession?.user?.id;
       const cachedUserId = await withLocalTimeout(get('lavly_cached_user_id'), 1000, null);
       
       const legacySales = await withLocalTimeout(get('lavly_sales'), 1000, null);
@@ -1459,10 +1460,8 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       setMessage("Preparando sincronização...");
       setLogs(prev => [...prev, "[VMPay] Verificando sessão segura..."]);
       let token = passedToken;
-      if (!token) {
-        const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
-        if (sessionErr) setLogs(prev => [...prev, `[Aviso] Erro de sessão: ${sessionErr.message}`]);
-        token = sessionData?.session?.access_token || null;
+      if (!token && initialSession?.access_token) {
+        token = initialSession.access_token;
       }
 
       setLogs(prev => [...prev, "[VMPay] Buscando lista de lojas cadastradas..."]);
@@ -1574,7 +1573,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         stores={needsOnboardingStores}
         onComplete={async () => {
           setNeedsOnboardingStores([]);
-          const currentToken = (await supabase.auth.getSession()).data.session?.access_token || null;
+          const currentToken = initialSession?.access_token || null;
           await reloadAllData("Onboarding Complete", currentToken);
         }}
       />
