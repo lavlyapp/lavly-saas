@@ -198,15 +198,6 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
 
         if (filteredOrders.length > 0) {
             filteredOrders.forEach((o: any) => {
-                // Determine a safe composite key that ignores Supabase 'id' AND 'timestamp'
-                // and works pure functionally based on business context. 
-                // A single VMPay receipt (sale_id) CANNOT trigger the exact same machine twice, so this is 100% unique.
-                const safeKey = `${o.sale_id}-${o.machine}`;
-
-                // If we've already counted this exact basket (cache collision), skip
-                if (uniqueKeys.has(safeKey)) return;
-                uniqueKeys.add(safeKey);
-
                 const service = (o.service || o.produto || '').toLowerCase();
                 const machine = (o.machine || '').toLowerCase();
 
@@ -258,7 +249,7 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
             });
         }
 
-        return { totalBaskets: uniqueKeys.size, totalWashes, totalDries, totalOthers, unclassifiedList };
+        return { totalBaskets: filteredOrders.length, totalWashes, totalDries, totalOthers, unclassifiedList };
     }, [filteredOrders]);
 
     const summary = useMemo(() => {
