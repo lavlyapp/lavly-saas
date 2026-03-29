@@ -33,9 +33,15 @@ export async function GET(request: Request) {
         const startDate = new Date(endDate);
         startDate.setDate(startDate.getDate() - chunkDays);
 
+        const cnpj = searchParams.get('cnpj');
+        
         // SECURITY ISOLATION: Fetch credentials specifically for the authenticated user
         const { getVMPayCredentials, getCanonicalStoreName } = await import("@/lib/vmpay-config");
-        const activeStores = await getVMPayCredentials(supabase);
+        let activeStores = await getVMPayCredentials(supabase);
+        
+        if (cnpj) {
+            activeStores = activeStores.filter(s => s.cnpj === cnpj);
+        }
         
         if (activeStores.length === 0) {
             return NextResponse.json({ success: true, count: 0, startDate, endDate });

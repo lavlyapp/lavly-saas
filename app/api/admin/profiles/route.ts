@@ -136,15 +136,20 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
     try {
         const body = await request.json();
-        const { id, admin_alias } = body;
+        const { id, admin_alias, expires_at, is_lifetime_access } = body;
 
         if (!id) {
              return NextResponse.json({ success: false, error: 'User ID is required' }, { status: 400 });
         }
 
+        const updateData: any = {};
+        if (admin_alias !== undefined) updateData.admin_alias = admin_alias;
+        if (expires_at !== undefined) updateData.expires_at = expires_at;
+        if (is_lifetime_access !== undefined) updateData.is_lifetime_access = is_lifetime_access;
+
         const { error } = await supabaseAdmin
             .from('profiles')
-            .update({ admin_alias })
+            .update(updateData)
             .eq('id', id);
 
         if (error) throw error;

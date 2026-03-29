@@ -102,15 +102,12 @@ export function MachineMonitor({ allRecords, allOrders, selectedStore }: Machine
             if (machineName === "Desconhecida") return;
 
             // --- FILTERS ---
-            const isPhantom = (
-                (canonicalStore === 'Lavateria SANTOS DUMONT' || canonicalStore === 'Lavateria Cascavel') &&
-                (machineName.includes('30') || machineName.includes('45'))
-            );
+            // Removed legacy isPhantom filter for Leandro's stores (Santos Dumont/Cascavel) as it was hiding real machines.
 
             // Limit inactivity: Exclude machines not seen in > 120 days
             const daysSinceSeen = differenceInMinutes(now, record.data) / (24 * 60);
 
-            if (isPhantom || daysSinceSeen > 120) return;
+            if (daysSinceSeen > 120) return;
 
             const existing = machineMap.get(machineName);
             if (!existing || record.data > existing.data) {

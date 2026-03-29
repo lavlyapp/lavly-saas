@@ -11,6 +11,7 @@ interface AuthContextType {
     user: User | null;
     role: Role | null;
     expiresAt: string | null;
+    isLifetimeAccess: boolean;
     isExpired: boolean;
     token: string | null;
     vmpayApiKey: string | null;
@@ -28,6 +29,7 @@ export function AuthProvider({ children, initialSession, initialRole, initialExp
     const [user, setUser] = useState<User | null>(initialSession?.user ?? null);
     const [role, setRole] = useState<Role | null>(initialRole ?? null);
     const [expiresAt, setExpiresAt] = useState<string | null>(initialExpiresAt ?? null);
+    const [isLifetimeAccess, setIsLifetimeAccess] = useState<boolean>(false);
     const [vmpayApiKey, setVmpayApiKey] = useState<string | null>(initialVmpayApiKey ?? null);
     const [token, setToken] = useState<string | null>(initialSession?.access_token ?? null);
     const [isLoading, setIsLoading] = useState(!initialSession || (initialSession.user && !initialRole));
@@ -37,17 +39,19 @@ export function AuthProvider({ children, initialSession, initialRole, initialExp
             try {
                 const { data, error } = await supabase
                     .from('profiles')
-                    .select('role, expires_at, vmpay_api_key')
+                    .select('role, expires_at, vmpay_api_key, is_lifetime_access')
                     .eq('id', userId)
                     .single();
 
                 if (data) {
                     setRole(data.role as Role);
                     setExpiresAt(data.expires_at);
+                    setIsLifetimeAccess(data.is_lifetime_access || false);
                     setVmpayApiKey(data.vmpay_api_key);
                 } else if (error) {
                     setRole("proprietario");
                     setExpiresAt(null);
+                    setIsLifetimeAccess(false);
                 }
             } finally {
                 setIsLoading(false);
@@ -135,13 +139,14 @@ export function AuthProvider({ children, initialSession, initialRole, initialExp
         await supabase.auth.signOut();
     };
 
-    const isExpired = expiresAt ? new Date() > new Date(expiresAt) : false;
+    const isExpired = isLifetimeAccess ? false : (expiresAt ? new Date() > new Date(expiresAt) : false);
 
     return (
         <AuthContext.Provider value={{
             user,
             role,
             expiresAt,
+            isLifetimeAccess,
             isExpired,
             token,
             vmpayApiKey,

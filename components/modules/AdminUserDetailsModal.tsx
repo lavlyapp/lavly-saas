@@ -21,6 +21,7 @@ interface PayerProfile {
     assigned_stores: string[];
     max_stores: number;
     admin_alias: string | null;
+    is_lifetime_access?: boolean;
     subUsers: SubUser[];
     status?: string;
 }
@@ -39,6 +40,10 @@ export function AdminUserDetailsModal({ isOpen, onClose, payer }: AdminUserDetai
     const [syncError, setSyncError] = useState<string | null>(null);
     const [syncSuccess, setSyncSuccess] = useState<string | null>(null);
 
+    const [editExpiresAt, setEditExpiresAt] = useState(payer?.expires_at ? payer.expires_at.split('T')[0] : '');
+    const [editLifetime, setEditLifetime] = useState(!!payer?.is_lifetime_access);
+    const [isSavingSub, setIsSavingSub] = useState(false);
+
     // Reset sync state when modal closes/opens
     React.useEffect(() => {
         if (!isOpen) { 
@@ -46,8 +51,11 @@ export function AdminUserDetailsModal({ isOpen, onClose, payer }: AdminUserDetai
             setSyncKey(''); 
             setSyncError(null); 
             setSyncSuccess(null); 
+        } else if (payer) {
+            setEditExpiresAt(payer.expires_at ? payer.expires_at.split('T')[0] : '');
+            setEditLifetime(!!payer.is_lifetime_access);
         }
-    }, [isOpen]);
+    }, [isOpen, payer]);
 
     if (!isOpen || !payer) return null;
 
@@ -114,7 +122,32 @@ export function AdminUserDetailsModal({ isOpen, onClose, payer }: AdminUserDetai
         });
     };
 
-    const isVencido = payer.expires_at ? new Date() > new Date(payer.expires_at) : false;
+    const handleSaveSubscription = async () => {
+        setIsSavingSub(true);
+        try {
+            const ISOExpiresAt = editExpiresAt ? new Date(editExpiresAt + 'T23:59:59Z').toISOString() : null;
+            const res = await fetch('/api/admin/profiles', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    id: payer.id, 
+                    expires_at: ISOExpiresAt, 
+                    is_lifetime_access: editLifetime 
+                })
+            });
+            if (res.ok) {
+                window.location.reload();
+            } else {
+                alert("Erro ao salvar assinatura.");
+            }
+        } catch (e) {
+            alert("Erro de conexão ao salvar assinatura.");
+        } finally {
+            setIsSavingSub(false);
+        }
+    };
+
+    const isVencido = payer.is_lifetime_access ? false : (payer.expires_at ? new Date() > new Date(payer.expires_at) : false);
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
@@ -154,6 +187,8 @@ export function AdminUserDetailsModal({ isOpen, onClose, payer }: AdminUserDetai
                             <div className="text-sm text-white font-medium mb-1">
                                 {isVencido ? (
                                     <span className="text-red-500">Vencida</span>
+                                ) : payer.is_lifetime_access ? (
+                                    <span className="text-emerald-400">Vitalícia</span>
                                 ) : payer.subscription_status === 'active' ? (
                                     <span className="text-emerald-400">Ativa (Gold)</span>
                                 ) : (
@@ -161,7 +196,7 @@ export function AdminUserDetailsModal({ isOpen, onClose, payer }: AdminUserDetai
                                 )}
                             </div>
                             <div className="text-xs text-neutral-500">
-                                Expira: {payer.expires_at ? new Date(payer.expires_at).toLocaleDateString('pt-BR') : 'Vitalício'}
+                                Expira: {payer.is_lifetime_access ? 'Vitalício' : (payer.expires_at ? new Date(payer.expires_at).toLocaleDateString('pt-BR') : 'Sem data')}
                             </div>
                         </div>
 
@@ -319,6 +354,47 @@ export function AdminUserDetailsModal({ isOpen, onClose, payer }: AdminUserDetai
                             )}
                         </div>
                     </div>
+
+                    {/* Gerenciamento de Assinatura */}
+                    {payer.status !== 'deleted' && (
+                        <div className="mt-8 pt-6 border-t border-neutral-800">
+                            <h3 className="text-sm font-bold text-neutral-400 flex items-center gap-2 uppercase tracking-wide mb-4">
+                                <Calendar className="w-4 h-4 text-emerald-500" />
+                                Gerenciamento de Assinatura
+                            </h3>
+                            <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-4 flex flex-col md:flex-row gap-4 items-end">
+                                <div className="flex-1 w-full">
+                                    <label className="block text-xs font-semibold text-neutral-400 mb-1">Data de Expiração</label>
+                                    <input 
+                                        type="date" 
+                                        value={editExpiresAt}
+                                        onChange={e => setEditExpiresAt(e.target.value)}
+                                        disabled={editLifetime}
+                                        className="w-full bg-black border border-neutral-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-lg p-2.5 text-white text-sm transition-all disabled:opacity-50"
+                                    />
+                                </div>
+                                <div className="flex items-center gap-3 mb-2 w-full md:w-auto">
+                                    <input 
+                                        type="checkbox" 
+                                        id="lifetime" 
+                                        checked={editLifetime}
+                                        onChange={e => setEditLifetime(e.target.checked)}
+                                        className="w-4 h-4 bg-black border-neutral-700 rounded text-emerald-500 focus:ring-emerald-500 focus:ring-offset-neutral-950"
+                                    />
+                                    <label htmlFor="lifetime" className="text-sm font-medium text-white cursor-pointer select-none">
+                                        Acesso Vitalício
+                                    </label>
+                                </div>
+                                <button 
+                                    onClick={handleSaveSubscription}
+                                    disabled={isSavingSub}
+                                    className="w-full md:w-auto px-6 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2 border border-neutral-700"
+                                >
+                                    {isSavingSub ? 'Salvando...' : 'Atualizar Assinatura'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Security Frame */}
                     {payer.status !== 'deleted' ? (

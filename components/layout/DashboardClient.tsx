@@ -664,7 +664,7 @@ function AppContent({
   );
 }
 
-export default function DashboardClient({ initialSession, initialRole, initialExpiresAt, initialVmpayApiKey }: { initialSession?: any, initialRole?: any, initialExpiresAt?: string | null, initialVmpayApiKey?: string | null }) {
+export default function DashboardClient({ initialSession, initialRole, initialExpiresAt, initialLifetimeAccess, initialVmpayApiKey }: { initialSession?: any, initialRole?: any, initialExpiresAt?: string | null, initialLifetimeAccess?: boolean, initialVmpayApiKey?: string | null }) {
   const [activeTab, setActiveTab] = useState("financial");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [status, setStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
@@ -908,7 +908,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       let newOrders: any[] = [];
       let newCustomers: any[] = [];
 
-      if (!lastCachedDate || cachedSales.length === 0 || forceFullSync) {
+      if (!lastCachedDate || cachedSales.length === 0 || cachedOrders.length === 0 || forceFullSync) {
         // FULL LOAD using parallel approach ONLY ONCE for new devices OR when forcing history resync
         setLogs(prev => [...prev, `[System] Reconstruindo base de dados completa a partir da nuvem...`]);
         
@@ -923,7 +923,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         let salesQuery: any = rawSupabase.from('sales').select('id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age').gte('data', offsetDate.toISOString()).order('data', { ascending: false });
         if (configuredNames.length > 0) salesQuery = salesQuery.in('loja', configuredNames);
 
-        let ordersQuery: any = rawSupabase.from('orders').select('id, data, loja, cliente, machine, service, status, valor, customer_id, sale_id').order('data', { ascending: false }).limit(2000);
+        let ordersQuery: any = rawSupabase.from('orders').select('id, data, loja, cliente, machine, service, status, valor, customer_id, sale_id').order('data', { ascending: false });
         if (lastCachedOrderDate) {
           const offsetOrderDate = new Date(lastCachedOrderDate.getTime() + 1000);
           ordersQuery = ordersQuery.gte('data', offsetOrderDate.toISOString());
@@ -1352,27 +1352,62 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
     let totalFetched = 0;
     const errors = [];
 
-    for (let i = 0; i < chunks; i++) {
-      const offsetStart = i * chunkSize;
-      const offsetEnd = (i + 1) * chunkSize;
-      setMessage(`Resgatando vendas passadas... Quinzena ${i + 1} de 12 (${offsetStart} a ${offsetEnd} dias atrás)`);
+    try {
+      const resStores = await fetch('/api/force-sync/stores');
+      const dataStores = await resStores.json();
       
-      try {
-        const response = await fetch(`/api/force-sync?chunk=${chunkSize}&offset=${offsetStart}&_=${Date.now()}`);
-        if (!response.ok) throw new Error(`HTTP error ${response.status}`);
-        const result = await response.json();
-
-        if (result.success) {
-          totalFetched += result.count;
-          setLogs(prev => [...prev, `[System] Quinzena ${i + 1}/12 (${offsetStart}-${offsetEnd} dias) concluída: ${result.count} vendas resgatadas.`]);
-        } else {
-          setLogs(prev => [...prev, `[Erro] Quinzena ${i + 1}/12 falhou: ${result.error}`]);
-          errors.push(result.error);
-        }
-      } catch (err: any) {
-        setLogs(prev => [...prev, `[Erro] Falha na rede durante a Quinzena ${i + 1}: ${err.message}`]);
-        errors.push(err.message);
+      if (!resStores.ok || !dataStores.success) {
+          throw new Error(dataStores.error || `HTTP error ${resStores.status}`);
       }
+      
+      const credentials = dataStores.stores || [];
+      const totalStores = credentials.length;
+      
+      if (totalStores === 0) {
+          setMessage("Nenhuma loja configurada para resgate.");
+          setStatus("error");
+          return;
+      }
+
+      for (let s = 0; s < totalStores; s++) {
+        const cred = credentials[s];
+        setLogs(prev => [...prev, `[System] Iniciando resgate da loja ${cred.name}...`]);
+
+        for (let i = 0; i < chunks; i++) {
+          const offsetStart = i * chunkSize;
+          const offsetEnd = (i + 1) * chunkSize;
+          
+          const storeProgress = (s / totalStores) * 100;
+          const chunkProgress = ((i + 1) / chunks) * (100 / totalStores);
+          setSyncProgress(Math.round(storeProgress + chunkProgress));
+
+          if (totalStores > 1) {
+              setMessage(`Resgatando ${cred.name} (Q${i + 1}/12)... ${offsetStart} a ${offsetEnd} dias atrás`);
+          } else {
+              setMessage(`Resgatando vendas passadas... Quinzena ${i + 1} de 12 (${offsetStart} a ${offsetEnd} dias atrás)`);
+          }
+          
+          try {
+            const response = await fetch(`/api/force-sync?chunk=${chunkSize}&offset=${offsetStart}&cnpj=${cred.cnpj}&_=${Date.now()}`);
+            if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+            const result = await response.json();
+
+            if (result.success) {
+              totalFetched += result.count;
+              setLogs(prev => [...prev, `[System] ${cred.name} Q${i + 1}/12 concluída: ${result.count} vendas resgatadas.`]);
+            } else {
+              setLogs(prev => [...prev, `[Erro] ${cred.name} Q${i + 1}/12 falhou: ${result.error}`]);
+              errors.push(result.error);
+            }
+          } catch (err: any) {
+            setLogs(prev => [...prev, `[Erro] Falha na rede (${cred.name} Q${i + 1}): ${err.message}`]);
+            errors.push(err.message);
+          }
+        }
+      }
+    } catch (configErr) {
+        setLogs(prev => [...prev, `[Erro] Falha ao ler configurações de lojas: ${String(configErr)}`]);
+        errors.push(String(configErr));
     }
 
     if (errors.length < chunks) {
@@ -1428,8 +1463,14 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       }
 
       setLogs(prev => [...prev, "[VMPay] Buscando lista de lojas cadastradas..."]);
-      // 1. Get available store credentials first
-      const credentials = await getVMPayCredentials();
+      // 1. Get available store credentials first via secure API route (bypassing client-side DB lock)
+      const resStores = await fetch('/api/force-sync/stores');
+      const dataStores = await resStores.json();
+      
+      if (!resStores.ok || !dataStores.success) {
+          throw new Error(dataStores.error || `HTTP error ${resStores.status}`);
+      }
+      const credentials = dataStores.stores || [];
       setLogs(prev => [...prev, `[VMPay] ${credentials.length} lojas identificadas. Iniciando ciclo...`]);
 
       const isFirstSync = allRecords.length === 0;

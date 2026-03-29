@@ -13,8 +13,13 @@ export async function upsertSales(records: SaleRecord[], supabaseClient?: any) {
     try {
         console.log(`[Persistence] Upserting ${records.length} sales...`);
 
+        // Deduplicate records to prevent PostgreSQL array duplicate ON CONFLICT errors
+        const uniqueSalesMap = new Map();
+        records.forEach(r => uniqueSalesMap.set(r.id, r));
+        const uniqueRecords: SaleRecord[] = Array.from(uniqueSalesMap.values());
+
         // 1. Prepare Sales for DB (Snake Case)
-        const salesToUpsert = records.map(r => ({
+        const salesToUpsert = uniqueRecords.map(r => ({
             id: r.id,
             // r.data is currently a Date object, correctly mapped to Local Time.
             // We pass standard UTC ISO strings to Supabase to let PostgreSQL timestamptz handle it normally.
@@ -59,7 +64,7 @@ export async function upsertSales(records: SaleRecord[], supabaseClient?: any) {
 
         // 2. Prepare Orders for DB
         // We flat map items from sales to ensure relationship
-        const ordersToUpsert = records.flatMap(r =>
+        const rawOrdersToUpsert = uniqueRecords.flatMap(r =>
             (r.items || []).map(item => ({
                 sale_id: r.id,
                 data: item.startTime ? item.startTime.toISOString() : r.data.toISOString(),
@@ -72,6 +77,14 @@ export async function upsertSales(records: SaleRecord[], supabaseClient?: any) {
                 customer_id: r.customerId
             }))
         );
+
+        // Deduplicate orders to prevent PostgreSQL array duplicate ON CONFLICT errors
+        const uniqueOrdersMap = new Map();
+        rawOrdersToUpsert.forEach(o => {
+            const key = `${o.sale_id}_${o.machine}_${o.data}`;
+            uniqueOrdersMap.set(key, o);
+        });
+        const ordersToUpsert = Array.from(uniqueOrdersMap.values());
 
         if (ordersToUpsert.length > 0) {
             console.log(`[Persistence] Upserting ${ordersToUpsert.length} related orders...`);

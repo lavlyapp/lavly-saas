@@ -1,7 +1,6 @@
-import { createClient } from "@supabase/supabase-js";
-import * as dotenv from "dotenv";
-
-dotenv.config({ path: ".env.local" });
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -9,13 +8,10 @@ const supabaseAdmin = createClient(
 );
 
 async function checkStores() {
-    const { data: stores, error } = await supabaseAdmin.from("stores").select("*");
-    if (error) {
-        console.error("Error reading stores:", error);
-    } else {
-        console.log("Total stores in DB:", stores.length);
-        console.log(stores.map(s => ({ id: s.id, name: s.name, cnpj: s.cnpj })));
+    const { data: stores, error } = await supabaseAdmin.from('stores').select('*').ilike('name', '%Lavateria%');
+    console.log("Found stores:", stores?.length);
+    if (stores) {
+        stores.forEach(s => console.log(s.id, s.name, s.is_active));
     }
 }
-
-checkStores();
+checkStores().catch(console.error);
