@@ -775,62 +775,70 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       );
 
       const fetchAllParallel = async (tableName: string, columns: string, orderBy: string, targetStores: string[]) => {
-        let totalCount = 0;
-        const countColumn = tableName === 'orders' ? 'sale_id' : 'id';
-        const storeColumnName = 'loja';
+        setLogs(prev => [...prev, `[System] Iniciando streaming temporal de ${tableName}...`]);
         const shouldFilterByStore = targetStores.length > 0 && tableName !== 'customers';
-        
-        if (shouldFilterByStore) {
-           const { count, error } = await rawSupabase.from(tableName).select(countColumn, { count: 'exact', head: true }).in(storeColumnName, targetStores);
-           if (error) {
-               console.error(`[System] Count Error on ${tableName}:`, error);
-               setLogs(prev => [...prev, `[Erro DB] Falha na contagem de ${tableName} (${error.code || 'Timeout/Limit'}): ${error.message}`]);
-           }
-           totalCount = count || 0;
-        } else {
-           const { count, error } = await rawSupabase.from(tableName).select(countColumn, { count: 'exact', head: true });
-           if (error) {
-               console.error(`[System] Count Error on ${tableName}:`, error);
-               setLogs(prev => [...prev, `[Erro DB] Falha na contagem de ${tableName} (${error.code || 'Timeout/Limit'}): ${error.message}`]);
-           }
-           totalCount = count || 0;
-        }
-
-        if (totalCount === 0) return [];
-
         const pageSize = 1000;
-        const pages = Math.ceil(totalCount / pageSize);
-        setLogs(prev => [...prev, `[System] Transmitindo ${totalCount} registros de ${tableName} (${pages} blocos paralelos)...`]);
-
-        const maxConcurrent = 5;
-        const allData: any[] = [];
+        let allData: any[] = [];
         
-        for (let i = 0; i < pages; i += maxConcurrent) {
-          const batchPromises = [];
-          for (let j = 0; j < maxConcurrent && (i + j) < pages; j++) {
-            const pageIndex = i + j;
-            let query = rawSupabase.from(tableName).select(columns).order(orderBy, { ascending: false }).range(pageIndex * pageSize, (pageIndex + 1) * pageSize - 1);
-            if (shouldFilterByStore) {
-                query = query.in(storeColumnName, targetStores);
-            }
-            batchPromises.push(query);
-          }
-          
-          const batchResults = await Promise.all(batchPromises);
-          allData.push(...batchResults.flatMap(r => {
-             if (r.error) {
-                 console.error(`[System] Fetch Error on ${tableName}:`, r.error);
-                 setLogs(prev => [...prev, `[Erro BATCH] Falha ao baixar dados de ${tableName}: ${r.error.message}`]);
+        const fetchPartition = async (startIso: string | null, endIso: string | null, partName: string) => {
+             let chunkOffset = 0;
+             let partitionData: any[] = [];
+             while (true) {
+                 let query = rawSupabase.from(tableName).select(columns).order(orderBy, { ascending: false }).range(chunkOffset, chunkOffset + pageSize - 1);
+                 
+                 // Apply date bounds if available (sales & orders)
+                 if (startIso && endIso) {
+                     query = query.gte(orderBy, startIso).lt(orderBy, endIso);
+                 }
+                 if (shouldFilterByStore) {
+                     query = query.in('loja', targetStores);
+                 }
+                 
+                 const { data, error } = await query;
+                 if (error) {
+                      console.error(`[Erro BATCH] Falha na partição ${partName} offset ${chunkOffset}:`, error);
+                      setLogs(prev => [...prev, `[Erro DB] Falha na partição ${partName} de ${tableName} (${error.code || 'Timeout'}): ${error.message}`]);
+                      break; 
+                 }
+                 
+                 const records = data || [];
+                 partitionData.push(...records);
+                 if (records.length < pageSize) break; // Exhausted this partition
+                 chunkOffset += pageSize;
              }
-             return r.data || [];
-          }));
-          
-          if (pages > 10 && (i + maxConcurrent) % 15 === 0) {
-             setLogs(prev => [...prev, `[System] Progresso ${tableName}: ${Math.min(i + maxConcurrent, pages)}/${pages} blocos concluídos.`]);
-          }
+             return partitionData;
+        };
+
+        if (orderBy === 'data') {
+            // TIME-PARTITIONING for giant tables (sales, orders) ~ 12 blocks of 30 days = 360 days
+            const numPartitions = 12;
+            const partitions = [];
+            for (let i = 0; i < numPartitions; i++) {
+                const end = new Date(); end.setDate(end.getDate() - (i * 30));
+                const start = new Date(); start.setDate(start.getDate() - ((i + 1) * 30));
+                partitions.push({ start: start.toISOString(), end: end.toISOString(), name: `Mês -${i+1}` });
+            }
+
+            const maxConcurrent = 3;
+            for (let i = 0; i < numPartitions; i += maxConcurrent) {
+               const batchPromises = [];
+               for (let j = 0; j < maxConcurrent && (i + j) < numPartitions; j++) {
+                   const p = partitions[i + j];
+                   batchPromises.push(fetchPartition(p.start, p.end, p.name));
+               }
+               const batchResults = await Promise.all(batchPromises);
+               allData.push(...batchResults.flat());
+               setLogs(prev => [...prev, `[System] Progresso ${tableName}: ${Math.min(i + maxConcurrent, numPartitions)}/${numPartitions} blocos mensais analisados.`]);
+            }
+        } else {
+            // Fallback for smaller/non-time tables (customers)
+            // Just sequential offset sweep since it's super fast without RLS timeouts
+            setLogs(prev => [...prev, `[System] Baixando ${tableName} de forma sequencial leve...`]);
+            const results = await fetchPartition(null, null, "Global");
+            allData.push(...results);
         }
-        
-        // Local memory deduplication during cloud fetch
+
+        // Local memory deduplication to keep UI arrays identical to real DB
         const uniqueMap = new Map();
         allData.forEach((item: any) => {
           const key = item.id || `${item.sale_id || Math.random()}-${item.data}`;
