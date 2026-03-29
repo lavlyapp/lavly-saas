@@ -419,6 +419,12 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
+            {/* INJECT DEBUG UI TO DIAGNOSE CESTOS */}
+            <div className="bg-red-900/40 p-2 text-red-200 font-mono text-xs border border-red-500 rounded-md">
+                DEBUG [Orders Fetch]: Raw Orders = {data.orders?.length || 0} | Filtered Orders = {filteredOrders.length} | Baskets Calculated = {basketsMetrics.totalBaskets} <br/>
+                DEBUG [Sales Fetch]: Raw Sales = {data.records?.length || 0} | Filtered Sales = {filteredRecords.length}
+            </div>
+
             {/* Filter Bar */}
             <div className="bg-neutral-900/50 p-2 rounded-xl border border-neutral-800 flex flex-wrap gap-2 items-center">
                 <div className="flex items-center gap-2 px-3 text-neutral-400 border-r border-neutral-800 mr-2">
