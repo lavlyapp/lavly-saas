@@ -782,10 +782,12 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         const storeColumnName = 'loja';
         
         if (shouldFilterByStore) {
-           const { count } = await rawSupabase.from(tableName).select('id', { count: 'exact', head: true }).in(storeColumnName, targetStores);
+           const { count, error } = await rawSupabase.from(tableName).select('*', { count: 'exact', head: true }).in(storeColumnName, targetStores);
+           if (error) console.error(`[System] Count Error on ${tableName}:`, error);
            totalCount = count || 0;
         } else {
-           const { count } = await rawSupabase.from(tableName).select('id', { count: 'exact', head: true });
+           const { count, error } = await rawSupabase.from(tableName).select('*', { count: 'exact', head: true });
+           if (error) console.error(`[System] Count Error on ${tableName}:`, error);
            totalCount = count || 0;
         }
 
@@ -810,7 +812,10 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
           }
           
           const batchResults = await Promise.all(batchPromises);
-          allData.push(...batchResults.flatMap(r => r.data || []));
+          allData.push(...batchResults.flatMap(r => {
+             if (r.error) console.error(`[System] Fetch Error on ${tableName}:`, r.error);
+             return r.data || [];
+          }));
           
           if (pages > 10 && (i + maxConcurrent) % 15 === 0) {
              setLogs(prev => [...prev, `[System] Progresso ${tableName}: ${Math.min(i + maxConcurrent, pages)}/${pages} blocos concluídos.`]);
@@ -828,7 +833,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       };
 
       const newSales = await fetchAllParallel('sales', 'id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age', 'data', configuredNames);
-      const newOrders = await fetchAllParallel('orders', 'id, data, loja, cliente, machine, service, status, valor, customer_id, sale_id', 'data', configuredNames);
+      const newOrders = await fetchAllParallel('orders', 'data, loja, cliente, machine, service, status, valor, customer_id, sale_id', 'data', configuredNames);
       const newCustomers = await fetchAllParallel('customers', 'id, cpf, name, phone, email, gender, registration_date', 'id', configuredNames);
 
       // Hydrate & Normalize Data strictly inside Browser RAM memory (Sem IndexedDB)
