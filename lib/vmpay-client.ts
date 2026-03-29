@@ -142,7 +142,7 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                         // Parse ALL items
                         let items: any[] = [];
                         if (sale.pedido?.itens && Array.isArray(sale.pedido.itens)) {
-                            items = sale.pedido.itens.map((i: any) => {
+                            items = sale.pedido.itens.map((i: any, index: number) => {
                                 const iMachine = i.maquina || i.equipamento || "Desconhecido";
                                 const iMapObj = machineMap[String(iMachine)];
                                 const iName = iMapObj ? iMapObj.name : iMachine;
@@ -155,11 +155,15 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                                     iService = "SECAGEM";
                                 }
 
+                                // Offset the timestamp by +1 second per index to guarantee PostgreSQL Upsert survival
+                                // against the (sale_id, machine, data) UNIQUE constraint for multi-cycle identical purchases.
+                                const uniqueStartTime = new Date(safeDate.getTime() + index * 1000);
+
                                 return {
                                     machine: iName,
                                     service: iService,
                                     status: sale.status,
-                                    startTime: safeDate,
+                                    startTime: uniqueStartTime,
                                     value: i.valor || 0
                                 };
                             });
