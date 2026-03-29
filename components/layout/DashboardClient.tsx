@@ -1066,9 +1066,11 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
 
               if (bestMatch) {
                 if (!bestMatch.items) bestMatch.items = [];
-                const alreadyAdded = bestMatch.items.some((it: any) => it.id === order.id);
+                const orderUniqueKey = order.id || `${order.sale_id}_${order.machine}_${new Date(order.data).getTime()}`;
+                const alreadyAdded = bestMatch.items.some((it: any) => (it.key || it.id) === orderUniqueKey);
                 if (!alreadyAdded) {
                   bestMatch.items.push({
+                    key: orderUniqueKey,
                     id: order.id,
                     machine: order.machine,
                     service: order.service || order.produto,
