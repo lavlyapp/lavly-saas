@@ -780,14 +780,21 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         // Customers are global to the tenant, they do not have a 'loja' column
         const shouldFilterByStore = targetStores.length > 0 && tableName !== 'customers';
         const storeColumnName = 'loja';
+        const countColumn = tableName === 'orders' ? 'sale_id' : 'id';
         
         if (shouldFilterByStore) {
-           const { count, error } = await rawSupabase.from(tableName).select('*', { count: 'exact', head: true }).in(storeColumnName, targetStores);
-           if (error) console.error(`[System] Count Error on ${tableName}:`, error);
+           const { count, error } = await rawSupabase.from(tableName).select(countColumn, { count: 'exact', head: true }).in(storeColumnName, targetStores);
+           if (error) {
+               console.error(`[System] Count Error on ${tableName}:`, error);
+               setLogs(prev => [...prev, `[Erro DB] Falha na contagem de ${tableName} (${error.code}): ${error.message}`]);
+           }
            totalCount = count || 0;
         } else {
-           const { count, error } = await rawSupabase.from(tableName).select('*', { count: 'exact', head: true });
-           if (error) console.error(`[System] Count Error on ${tableName}:`, error);
+           const { count, error } = await rawSupabase.from(tableName).select(countColumn, { count: 'exact', head: true });
+           if (error) {
+               console.error(`[System] Count Error on ${tableName}:`, error);
+               setLogs(prev => [...prev, `[Erro DB] Falha na contagem de ${tableName} (${error.code}): ${error.message}`]);
+           }
            totalCount = count || 0;
         }
 
@@ -813,7 +820,10 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
           
           const batchResults = await Promise.all(batchPromises);
           allData.push(...batchResults.flatMap(r => {
-             if (r.error) console.error(`[System] Fetch Error on ${tableName}:`, r.error);
+             if (r.error) {
+                 console.error(`[System] Fetch Error on ${tableName}:`, r.error);
+                 setLogs(prev => [...prev, `[Erro BATCH] Falha ao baixar dados de ${tableName}: ${r.error.message}`]);
+             }
              return r.data || [];
           }));
           
