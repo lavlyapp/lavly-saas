@@ -14,7 +14,7 @@ import { SaleRecord, OrderRecord, CustomerRecord } from "@/lib/processing/etl";
 import { CustomerProvider, useCustomerContext } from "@/components/context/CustomerContext";
 import { getProfile } from "@/lib/processing/crm";
 import { CustomerDetails } from "@/components/modules/CustomerDetails";
-import { get, set, clear } from 'idb-keyval';
+// Cache offline IndexedDB Removido. A plataforma agora é 100% Nuvem.
 import { getVMPayCredentials, getCanonicalStoreName } from "@/lib/vmpay-config";
 import { mergeOrders } from "@/lib/processing/merger";
 import { SubscriptionProvider } from "@/components/context/SubscriptionContext";
@@ -149,7 +149,7 @@ interface AppContentProps {
   setSelectedStore: (store: string | null) => void;
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
   handleSyncVMPay: (token: string | null) => Promise<void>;
-  handleForceSync: (token: string | null) => Promise<void>;
+
   stableInitialLoad: (token: string | null) => void;
   stableFullRefresh: (token: string | null) => void;
   syncProgress: number;
@@ -172,7 +172,7 @@ function AppContent({
   setSelectedStore,
   handleFileUpload,
   handleSyncVMPay,
-  handleForceSync,
+
   stableInitialLoad,
   stableFullRefresh,
   syncProgress
@@ -520,18 +520,7 @@ function AppContent({
               <span className="relative z-10">{status === 'uploading' ? 'Sincronizando...' : 'Sync VMPay'}</span>
             </button>
 
-            <button
-              onClick={() => handleForceSync(token)}
-              disabled={status === 'uploading'}
-              title="Baixar todos os milhares de cestos dos últimos 180 dias"
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
-                status === 'uploading' ? "bg-neutral-800 text-neutral-400" : "bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-500/20"
-              )}
-            >
-              <FileUp className={cn("w-4 h-4", status === 'uploading' && "animate-bounce")} />
-              <span>Resgatar Cestos (180d)</span>
-            </button>
+
 
             <button
               onClick={() => stableFullRefresh(token)}
@@ -771,89 +760,8 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         return; // Halt data loading until CNPJs are provided
       }
 
-      // 2. Carregar dados Híbridos (Cache Rápido + Delta Sync na Nuvem)
-      setLogs(prev => [...prev, "[System] Verificando cache offline de altíssima velocidade..."]);
-
-      const withLocalTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> => {
-        let timeoutId: NodeJS.Timeout;
-        const timeoutPromise = new Promise<T>((resolve) => {
-          timeoutId = setTimeout(() => resolve(fallback), timeoutMs);
-        });
-        return Promise.race([promise.catch(() => fallback), timeoutPromise]).finally(() => clearTimeout(timeoutId));
-      };
-
-      // Verify that this cache belongs to the CURRENT user. If not, blow it away to prevent Cross-Account Data Leaks!
-      // Using synchronous initialSession to prevent Next.js/Supabase browser client deadlocks
-      const currentUserId = initialSession?.user?.id;
-      const cachedUserId = await withLocalTimeout(get('lavly_cached_user_id'), 1000, null);
-      
-      const legacySales = await withLocalTimeout(get('lavly_sales'), 1000, null);
-      const hasLegacyCache = !cachedUserId && legacySales && (legacySales as any[]).length > 0;
-
-      if ((cachedUserId && currentUserId && cachedUserId !== currentUserId) || hasLegacyCache || forceFullSync) {
-          if (forceFullSync) {
-             console.warn("[Memory] Force Full Sync requested. Wiping cache...");
-             setLogs(prev => [...prev, "[System] Modo Resgate de Histórico ativo. Reconstruindo memória local..."]);
-          } else {
-             console.warn("[Security] Cross-account cache detected! User changed without explicit logout. Wiping cache...");
-             setLogs(prev => [...prev, "[Segurança] Troca de Conta detectada. Destruindo cache do usuário antigo..."]);
-          }
-          await withLocalTimeout(clear(), 2000, undefined);
-      }
-      if (currentUserId) {
-          await withLocalTimeout(set('lavly_cached_user_id', currentUserId), 1000, undefined);
-      }
-
-      let cachedSales = legacySales || [];
-      if ((cachedUserId && currentUserId && cachedUserId !== currentUserId) || hasLegacyCache || forceFullSync) {
-          cachedSales = []; // We just cleared it
-      } else if (!legacySales) {
-          cachedSales = await withLocalTimeout(get('lavly_sales'), 2000, []) || [];
-      }
-      let cachedOrders = await withLocalTimeout(get('lavly_orders'), 2000, []) || [];
-      if (forceFullSync) cachedOrders = []; // Wipe orders cache too for full sync
-
-      let cachedCustomers = await withLocalTimeout(get('lavly_customers'), 2000, []) || [];
-      if (forceFullSync) cachedCustomers = [];
-
-      let lastCachedDate = null;
-      let lastCachedOrderDate = null;
-
-      if (cachedSales.length > 0) {
-        // Hydrate UI State Instantly
-        const hydratedCachedSales = cachedSales.map((s: any) => ({
-          ...s,
-          data: new Date(s.data),
-          produto: s.produto || s.service || "",
-          formaPagamento: s.formaPagamento || s.forma_pagamento || s.tipoPagamento || "Outros",
-          tipoCartao: s.tipoCartao || s.tipo_cartao || "",
-          categoriaVoucher: s.categoriaVoucher || s.categoria_voucher || "",
-          customerId: s.customerId || s.customer_id,
-          birthDate: s.birthDate || s.birth_date ? new Date(s.birthDate || s.birth_date) : undefined,
-          items: s.items ? s.items.map((i: any) => ({ ...i, startTime: new Date(i.startTime) })) : []
-        }));
-        const hydratedCachedOrders = cachedOrders.map((o: any) => ({ ...o, data: new Date(o.data) }));
-        const hydratedCachedCustomers = cachedCustomers.map((c: any) => ({ ...c, registrationDate: c.registrationDate ? new Date(c.registrationDate) : undefined }));
-
-        setAllRecords(hydratedCachedSales);
-        setAllOrders(hydratedCachedOrders);
-        if (hydratedCachedCustomers.length > 0) setAllCustomers(hydratedCachedCustomers);
-
-        setLogs(prev => [...prev, `[System] Flash Load: ${cachedSales.length} registros restaurados localmente em 0.1s.`]);
-
-        const currentPhysicalTime = new Date().getTime() + 3600000;
-        const validDates = hydratedCachedSales.map((s: any) => s.data.getTime()).filter((ts: number) => ts <= currentPhysicalTime);
-        const maxTimestamp = validDates.length > 0 ? validDates.reduce((max: number, d: number) => Math.max(max, d), validDates[0]) : 0;
-        lastCachedDate = new Date(maxTimestamp || Date.now());
-
-        const orderDates = hydratedCachedOrders.map((o: any) => o.data.getTime()).filter((ts: number) => ts <= currentPhysicalTime);
-        if (orderDates.length > 0) {
-          const maxOrderTs = orderDates.reduce((max: number, d: number) => Math.max(max, d), orderDates[0]);
-          lastCachedOrderDate = new Date(maxOrderTs);
-        }
-      }
-
-      setLogs(prev => [...prev, "[System] Conectando ao Banco de Dados na Nuvem..."]);
+      // 3. Live Cloud Fetch (Sem cache local)
+      setLogs(prev => [...prev, "[System] Carregando histórico geral de vendas direto da nuvem..."]);
 
       const rawSupabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -885,7 +793,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
 
         const pageSize = 1000;
         const pages = Math.ceil(totalCount / pageSize);
-        setLogs(prev => [...prev, `[System] Baixando ${totalCount} registros de ${tableName} em ${pages} lotes paralelos...`]);
+        setLogs(prev => [...prev, `[System] Transmitindo ${totalCount} registros de ${tableName} (${pages} blocos paralelos)...`]);
 
         const promises = [];
         for (let i = 0; i < pages; i++) {
@@ -899,6 +807,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         const results = await Promise.all(promises);
         const allData = results.flatMap(r => r.data || []);
         
+        // Local memory deduplication during cloud fetch
         const uniqueMap = new Map();
         allData.forEach((item: any) => {
           const key = item.id || `${item.sale_id || Math.random()}-${item.data}`;
@@ -908,75 +817,12 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         return Array.from(uniqueMap.values());
       };
 
-      let newSales: any[] = [];
-      let newOrders: any[] = [];
-      let newCustomers: any[] = [];
+      const newSales = await fetchAllParallel('sales', 'id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age', 'data', configuredNames);
+      const newOrders = await fetchAllParallel('orders', 'id, data, loja, cliente, machine, service, status, valor, customer_id, sale_id', 'data', configuredNames);
+      const newCustomers = await fetchAllParallel('customers', 'id, cpf, name, phone, email, gender, registration_date', 'id', configuredNames);
 
-      if (!lastCachedDate || cachedSales.length === 0 || cachedOrders.length === 0 || forceFullSync) {
-        // FULL LOAD using parallel approach ONLY ONCE for new devices OR when forcing history resync
-        setLogs(prev => [...prev, `[System] Reconstruindo base de dados completa a partir da nuvem...`]);
-        
-        newSales = await fetchAllParallel('sales', 'id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age', 'data', configuredNames);
-        newOrders = await fetchAllParallel('orders', 'id, data, loja, cliente, machine, service, status, valor, customer_id, sale_id', 'data', configuredNames);
-        newCustomers = await fetchAllParallel('customers', 'id, cpf, name, phone, email, gender, registration_date', 'id', configuredNames);
-      } else {
-        // DELTA SYNC (Only fetch newer records!)
-        setLogs(prev => [...prev, `[System] Analisando novas vendas na nuvem desde de ${lastCachedDate.toLocaleString()}...`]);
-
-        const offsetDate = new Date(lastCachedDate.getTime() + 1000);
-        let salesQuery: any = rawSupabase.from('sales').select('id, data, loja, cliente, customer_id, produto, valor, forma_pagamento, tipo_cartao, categoria_voucher, desconto, telefone, birth_date, age').gte('data', offsetDate.toISOString()).order('data', { ascending: false });
-        if (configuredNames.length > 0) salesQuery = salesQuery.in('loja', configuredNames);
-
-        let ordersQuery: any = rawSupabase.from('orders').select('id, data, loja, cliente, machine, service, status, valor, customer_id, sale_id').order('data', { ascending: false });
-        if (lastCachedOrderDate) {
-          const offsetOrderDate = new Date(lastCachedOrderDate.getTime() + 1000);
-          ordersQuery = ordersQuery.gte('data', offsetOrderDate.toISOString());
-        }
-        if (configuredNames.length > 0) ordersQuery = ordersQuery.in('loja', configuredNames);
-
-        const [newSalesRes, newOrdersRes] = await Promise.all([
-          salesQuery,
-          ordersQuery
-        ]);
-
-        newSales = newSalesRes.data || [];
-        newOrders = newOrdersRes.data || [];
-
-        // Delta sync for customers is all-or-nothing since gender updates happen retroactively
-        newCustomers = await fetchAllParallel('customers', 'id, cpf, name, phone, email, gender, registration_date', 'id', configuredNames);
-
-        if (newSales.length > 0) setLogs(prev => [...prev, `[System] ${newSales.length} novas vendas integradas da internet.`]);
-        else setLogs(prev => [...prev, "[System] Histórico do painel 100% atualizado."]);
-      }
-
-      // Merge old + new
-      const combinedSales = [...newSales, ...cachedSales];
-      const uniqueSalesMap = new Map();
-      combinedSales.forEach(s => uniqueSalesMap.set(s.id, s));
-      const finalRawSales = Array.from(uniqueSalesMap.values()).sort((a: any, b: any) => new Date(b.data).getTime() - new Date(a.data).getTime());
-
-      // Orders merge
-      const combinedOrders = [...newOrders, ...cachedOrders];
-      const uniqueOrdersMap = new Map();
-      combinedOrders.forEach(o => {
-        if (o.id) uniqueOrdersMap.set(o.id, o);
-        else uniqueOrdersMap.set(`${o.sale_id}-${o.machine}-${new Date(o.data).getTime()}`, o);
-      });
-      const finalRawOrders = Array.from(uniqueOrdersMap.values()).sort((a: any, b: any) => new Date(b.data).getTime() - new Date(a.data).getTime());
-
-      const finalRawCustomers = newCustomers.length > 0 ? newCustomers : cachedCustomers;
-
-      // Persist locally for instant loading next time
-      if (newSales.length > 0 || newOrders.length > 0 || newCustomers.length > 0 || cachedSales.length === 0) {
-        Promise.all([
-          withLocalTimeout(set('lavly_sales', finalRawSales), 5000, undefined),
-          withLocalTimeout(set('lavly_orders', finalRawOrders), 5000, undefined),
-          withLocalTimeout(set('lavly_customers', finalRawCustomers), 5000, undefined)
-        ]).catch(e => console.warn("Failed to cache to IndexedDB", e));
-      }
-
-      // Hydrate & Normalize for UI MUST run to populate the screen
-      const hydratedSales = finalRawSales.map((s: any) => ({
+      // Hydrate & Normalize Data strictly inside Browser RAM memory (Sem IndexedDB)
+      const hydratedSales = newSales.sort((a: any, b: any) => new Date(b.data).getTime() - new Date(a.data).getTime()).map((s: any) => ({
         ...s,
         data: s.data ? new Date(s.data) : new Date(),
         loja: getCanonicalStoreName(s.loja),
@@ -989,41 +835,28 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         items: s.items ? s.items.map((i: any) => ({ ...i, startTime: i.startTime ? new Date(i.startTime) : new Date() })) : []
       }));
 
-      const hydratedOrders = finalRawOrders.map((o: any) => ({
+      const hydratedOrders = newOrders.sort((a: any, b: any) => new Date(b.data).getTime() - new Date(a.data).getTime()).map((o: any) => ({
         ...o,
         data: o.data ? new Date(o.data) : new Date(),
-        loja: getCanonicalStoreName(o.loja),
-        customerId: o.customerId || o.customer_id
+        loja: getCanonicalStoreName(o.loja)
       }));
-
-      const hydratedCustomers = finalRawCustomers.map((c: any) => ({
+      
+      const hydratedCustomers = newCustomers.map((c: any) => ({
         ...c,
-        cpf: c.cpf || '',
-        email: c.email || '',
-        phone: c.phone || c.telefone || '',
-        gender: c.gender || c.genero || 'U',
-        registrationDate: c.registrationDate || c.registration_date ? new Date(c.registrationDate || c.registration_date) : undefined
+        registrationDate: c.registration_date ? new Date(c.registration_date) : undefined
       }));
 
-      // Update State definitively so the UI un-freezes
       setAllRecords(hydratedSales);
       setAllOrders(hydratedOrders);
       if (hydratedCustomers.length > 0) setAllCustomers(hydratedCustomers);
-
-
-      const finalCount = (newSales.length > 0 || cachedSales.length === 0)
-        ? (cachedSales.length + newSales.length)
-        : cachedSales.length;
-
-      setLogs(prev => [...prev, `[System] ${finalCount} registros prontos.`]);
+      
+      setLogs(prev => [...prev, `[System] ${hydratedSales.length} registros prontos.`]);
       setStatus("idle");
-      setMessage("");
-    } catch (err) {
-      console.error("[Home] Error loading data:", err);
-      setLogs(prev => [...prev, `[Erro] Falha ao carregar dados: ${(err as any).message}`]);
+      isInitializing.current = false;
+    } catch (error: any) {
+      console.error("[Home] Error reloading data:", error);
+      setLogs(prev => [...prev, `[Erro Fatal] Falha na rede ao conectar com a nuvem: ${error.message}`]);
       setStatus("error");
-      setMessage("Erro na conexão com o Banco de Dados.");
-    } finally {
       isInitializing.current = false;
     }
   };
@@ -1346,92 +1179,6 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
 
   }
 
-  async function handleForceSync(passedToken: string | null = null) {
-    setStatus("uploading");
-    setLogs(prev => [...prev, "[System] Iniciando resgate completo do histórico (últimos 6 meses)..."]);
-
-    // Fetch 180 days in 15-day chunks to avoid VMPay Timeouts (12 periods)
-    const chunks = 12;
-    const chunkSize = 15;
-    let totalFetched = 0;
-    const errors = [];
-
-    try {
-      const resStores = await fetch('/api/force-sync/stores');
-      const dataStores = await resStores.json();
-      
-      if (!resStores.ok || !dataStores.success) {
-          throw new Error(dataStores.error || `HTTP error ${resStores.status}`);
-      }
-      
-      const credentials = dataStores.stores || [];
-      const totalStores = credentials.length;
-      
-      if (totalStores === 0) {
-          setMessage("Nenhuma loja configurada para resgate.");
-          setStatus("error");
-          return;
-      }
-
-      for (let s = 0; s < totalStores; s++) {
-        const cred = credentials[s];
-        setLogs(prev => [...prev, `[System] Iniciando resgate da loja ${cred.name}...`]);
-
-        for (let i = 0; i < chunks; i++) {
-          const offsetStart = i * chunkSize;
-          const offsetEnd = (i + 1) * chunkSize;
-          
-          const storeProgress = (s / totalStores) * 100;
-          const chunkProgress = ((i + 1) / chunks) * (100 / totalStores);
-          setSyncProgress(Math.round(storeProgress + chunkProgress));
-
-          if (totalStores > 1) {
-              setMessage(`Resgatando ${cred.name} (Q${i + 1}/12)... ${offsetStart} a ${offsetEnd} dias atrás`);
-          } else {
-              setMessage(`Resgatando vendas passadas... Quinzena ${i + 1} de 12 (${offsetStart} a ${offsetEnd} dias atrás)`);
-          }
-          
-          try {
-            const response = await fetch(`/api/force-sync?chunk=${chunkSize}&offset=${offsetStart}&cnpj=${cred.cnpj}&_=${Date.now()}`);
-            if (!response.ok) throw new Error(`HTTP error ${response.status}`);
-            const result = await response.json();
-
-            if (result.success) {
-              totalFetched += result.count;
-              setLogs(prev => [...prev, `[System] ${cred.name} Q${i + 1}/12 concluída: ${result.count} vendas resgatadas.`]);
-            } else {
-              setLogs(prev => [...prev, `[Erro] ${cred.name} Q${i + 1}/12 falhou: ${result.error}`]);
-              errors.push(result.error);
-            }
-          } catch (err: any) {
-            setLogs(prev => [...prev, `[Erro] Falha na rede (${cred.name} Q${i + 1}): ${err.message}`]);
-            errors.push(err.message);
-          }
-        }
-      }
-    } catch (configErr) {
-        setLogs(prev => [...prev, `[Erro] Falha ao ler configurações de lojas: ${String(configErr)}`]);
-        errors.push(String(configErr));
-    }
-
-    if (errors.length < chunks) {
-      if (errors.length > 0) {
-        setMessage(`Resgate parcial: ${totalFetched} registros salvos, mas houve erros em algumas quinzenas. Atualizando painel...`);
-        setStatus("success");
-        await reloadAllData("resgate_parcial", passedToken, true);
-        setStatus("success"); // Garante que a tela destrave após o recarregamento
-      } else {
-        setMessage(`Sucesso! Histórico de 6 meses recuperado completamente (${totalFetched} vendas). Atualizando tela...`);
-        setStatus("success");
-        await reloadAllData("resgate_total", passedToken, true);
-        setMessage(`Tudo Pronto! O histórico completo já está disponível nos seus relatórios.`);
-        setStatus("success"); // Quebra a trava de tela de carregamento infinita
-      }
-    } else {
-      setMessage("Falha ao resgatar o histórico. VMPay negou a conexão em todas as etapas.");
-      setStatus("error");
-    }
-  }
 
   async function handleSyncVMPay(passedToken: string | null = null) {
     if (status === "uploading") {
@@ -1538,14 +1285,6 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       setLogs(prev => [...prev, `[VMPay] Ciclo completo: ${totalToProcess} novos registros integrados no banco de dados.`]);
       setLogs(prev => [...prev, `[Sistema] Atualizando painel...`]);
 
-      // Destruição do cache corrompido: as vendas locais antigas de hoje tem o timestamp 3 horas no passado devido ao bug +Z.
-      // O sync Delta (.gte('data')) na UI vai ignorá-las porque seus horários são do "passado" da última sincronia.
-      // Forçamos a limpeza do IndexedDB local para que a UI puxe tudo fresco do zero da Nuvem em todos os Syncs Manuais.
-      try {
-        await clear();
-        setLogs(prev => [...prev, `[Sistema] Cache local antigo destruído para forçar novo Fuso Horário.`]);
-      } catch (e) { }
-
       try {
         await reloadAllData("Sincronismo", token);
       } catch (dbErr: any) {
@@ -1602,7 +1341,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
               setSelectedStore={setSelectedStore}
               handleFileUpload={handleFileUpload}
               handleSyncVMPay={handleSyncVMPay}
-              handleForceSync={handleForceSync}
+
               stableInitialLoad={stableInitialLoad}
               stableFullRefresh={stableFullRefresh}
               syncProgress={syncProgress}
