@@ -795,17 +795,27 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         const pages = Math.ceil(totalCount / pageSize);
         setLogs(prev => [...prev, `[System] Transmitindo ${totalCount} registros de ${tableName} (${pages} blocos paralelos)...`]);
 
-        const promises = [];
-        for (let i = 0; i < pages; i++) {
-          let query = rawSupabase.from(tableName).select(columns).order(orderBy, { ascending: false }).range(i * pageSize, (i + 1) * pageSize - 1);
-          if (shouldFilterByStore) {
-              query = query.in(storeColumnName, targetStores);
+        const maxConcurrent = 5;
+        const allData: any[] = [];
+        
+        for (let i = 0; i < pages; i += maxConcurrent) {
+          const batchPromises = [];
+          for (let j = 0; j < maxConcurrent && (i + j) < pages; j++) {
+            const pageIndex = i + j;
+            let query = rawSupabase.from(tableName).select(columns).order(orderBy, { ascending: false }).range(pageIndex * pageSize, (pageIndex + 1) * pageSize - 1);
+            if (shouldFilterByStore) {
+                query = query.in(storeColumnName, targetStores);
+            }
+            batchPromises.push(query);
           }
-          promises.push(query);
+          
+          const batchResults = await Promise.all(batchPromises);
+          allData.push(...batchResults.flatMap(r => r.data || []));
+          
+          if (pages > 10 && (i + maxConcurrent) % 15 === 0) {
+             setLogs(prev => [...prev, `[System] Progresso ${tableName}: ${Math.min(i + maxConcurrent, pages)}/${pages} blocos concluídos.`]);
+          }
         }
-
-        const results = await Promise.all(promises);
-        const allData = results.flatMap(r => r.data || []);
         
         // Local memory deduplication during cloud fetch
         const uniqueMap = new Map();
