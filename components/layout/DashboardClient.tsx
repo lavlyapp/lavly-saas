@@ -882,8 +882,8 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
           
           const { data: recentSales, error: salesErr } = await rawSupabase
               .from('sales')
-              // Only pick columns needed for the machine monitor to minimize payload size
-              .select('id, data, loja, cliente, produto, items')
+              // Fetch only what's needed for the monitor, and join orders to get machine names
+              .select('id, data, loja, cliente, produto, orders(machine, service, status, valor, data)')
               .gte('data', thirtyDaysAgo.toISOString())
               .in('loja', configuredNames)
               .order('data', { ascending: false })
@@ -891,8 +891,19 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
               
           if (recentSales && !salesErr) {
               // We pass "sales" into setAllRecords ONLY for the last 30 days
-              // so the machine monitor has data to work with without crashing memory.
-              setAllRecords(recentSales as unknown as any[]);
+              // mapped with .items so MachineMonitor can read it just like the legacy ETL structure
+              const mappedRecords = recentSales.map((r: any) => ({
+                 ...r,
+                 items: Array.isArray(r.orders) ? r.orders.map((o: any) => ({
+                     machine: o.machine,
+                     service: o.service,
+                     status: o.status,
+                     startTime: new Date(o.data || r.data),
+                     value: o.valor
+                 })) : []
+              }));
+              
+              setAllRecords(mappedRecords as any[]);
               setAllOrders([]);
           } else {
               setAllRecords([]);
