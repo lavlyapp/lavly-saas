@@ -880,21 +880,25 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
           const thirtyDaysAgo = new Date();
           thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
           
-          const { data: recentOrders, error: ordersErr } = await rawSupabase
-              .from('orders')
-              .select('*')
+          const { data: recentSales, error: salesErr } = await rawSupabase
+              .from('sales')
+              // Only pick columns needed for the machine monitor to minimize payload size
+              .select('id, data, loja, cliente, produto, items')
               .gte('data', thirtyDaysAgo.toISOString())
               .in('loja', configuredNames)
               .order('data', { ascending: false })
               .limit(5000);
               
-          if (recentOrders && !ordersErr) {
-              setAllOrders(recentOrders);
-          } else {
+          if (recentSales && !salesErr) {
+              // We pass "sales" into setAllRecords ONLY for the last 30 days
+              // so the machine monitor has data to work with without crashing memory.
+              setAllRecords(recentSales as unknown as any[]);
               setAllOrders([]);
+          } else {
+              setAllRecords([]);
           }
       } catch (err) {
-          setAllOrders([]);
+          setAllRecords([]);
       }
       
       if (hydratedCustomers.length > 0) setAllCustomers(hydratedCustomers);
