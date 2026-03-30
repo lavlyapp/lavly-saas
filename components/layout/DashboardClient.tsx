@@ -684,8 +684,20 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
     setLogs(prev => [...prev, "[System] Processando interface..."]);
   }, []);
 
-  const viewData = useMemo(() => {
-    if (!mounted || allRecords.length === 0) return null;
+    const viewData = useMemo(() => {
+    if (!mounted) return null;
+
+    if (allRecords.length === 0 && dbStores.length > 0) {
+      return {
+        records: [],
+        orders: [],
+        summary: { totalSales: 0, totalValue: 0, startDate: null, endDate: null },
+        errors: [],
+        logs: logs
+      };
+    }
+
+    if (allRecords.length === 0) return null;
 
     console.time("[Page] calculate ViewData");
 
@@ -867,7 +879,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       if (hydratedCustomers.length > 0) setAllCustomers(hydratedCustomers);
       
       setLogs(prev => [...prev, `[System] Cliente UI inicializado. Delegando cálculos para a Borda AWS.`]);
-      setStatus("idle");
+      setStatus("success");
       isInitializing.current = false;
 
     } catch (error: any) {
