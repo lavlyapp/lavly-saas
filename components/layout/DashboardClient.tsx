@@ -873,8 +873,29 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       }));
 
       // Flush massive memory state arrays to 0 to prevent RAM ballooning!
-      setAllRecords([]);
-      setAllOrders([]);
+      setAllRecords([]); // Sales history is no longer downloaded, processed on server.
+      
+      try {
+          setLogs(prev => [...prev, "[System] Baixando status em tempo real das máquinas..."]);
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          
+          const { data: recentOrders, error: ordersErr } = await rawSupabase
+              .from('orders')
+              .select('*')
+              .gte('data', thirtyDaysAgo.toISOString())
+              .in('loja', configuredNames)
+              .order('data', { ascending: false })
+              .limit(5000);
+              
+          if (recentOrders && !ordersErr) {
+              setAllOrders(recentOrders);
+          } else {
+              setAllOrders([]);
+          }
+      } catch (err) {
+          setAllOrders([]);
+      }
       
       if (hydratedCustomers.length > 0) setAllCustomers(hydratedCustomers);
       
