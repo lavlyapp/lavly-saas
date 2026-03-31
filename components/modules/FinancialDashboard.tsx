@@ -114,6 +114,10 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
     useEffect(() => {
         let isMounted = true;
         const fetchMetrics = async () => {
+            const ts = new Date().toISOString().substring(11, 23); // HH:mm:ss.SSS
+            console.log(`[${ts}] [FinancialDashboard] Iniciando fetchMetrics na borda AWS para período: ${period}...`);
+            const startTime = performance.now();
+            
             setIsLoading(true);
             try {
                 // Determine start/end if custom
@@ -122,14 +126,25 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                     params += `&start=${customRange.start}&end=${customRange.end}`;
                 }
 
+                console.log(`[${new Date().toISOString().substring(11, 23)}] [FinancialDashboard] Enviando requisição HTTP: /api/metrics/financial${params}`);
                 const res = await fetch(`/api/metrics/financial${params}`);
+                
+                const jsonStart = performance.now();
+                console.log(`[${new Date().toISOString().substring(11, 23)}] [FinancialDashboard] Resposta HTTP ${res.status} recebida em ${((jsonStart - startTime) / 1000).toFixed(2)}s. Extraindo JSON...`);
                 const json = await res.json();
+                
+                const endTime = performance.now();
+                console.log(`[${new Date().toISOString().substring(11, 23)}] [FinancialDashboard] JSON decodificado. Tempo Total: ${((endTime - startTime) / 1000).toFixed(2)}s.`);
                 
                 if (isMounted && json.success) {
                     setMetrics(json.payload);
+                    console.log(`[${new Date().toISOString().substring(11, 23)}] [FinancialDashboard] O Gráfico foi renderizado e os dados foram aplicados na tela com sucesso.`);
+                } else if (isMounted && !json.success) {
+                    console.error(`[${new Date().toISOString().substring(11, 23)}] [FinancialDashboard] Erro da Borda AWS:`, json.error);
                 }
             } catch (err) {
-                console.error("[FinancialDashboard] Cloud Fetch Failed:", err);
+                const errTime = new Date().toISOString().substring(11, 23);
+                console.error(`[${errTime}] [FinancialDashboard] Falha TRÁGICA no Fetch após ${((performance.now() - startTime) / 1000).toFixed(2)}s.`, err);
             } finally {
                 if (isMounted) setIsLoading(false);
             }

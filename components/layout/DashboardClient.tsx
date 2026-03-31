@@ -1248,6 +1248,12 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
 
 
   async function handleSyncVMPay(passedToken: string | null = null) {
+    const pushLog = (msg: string) => {
+      const ts = new Date().toISOString().substring(11, 23); // HH:mm:ss.SSS
+      setLogs(prev => [...prev, `[${ts}] ${msg}`]);
+    };
+
+    const startTime = performance.now();
     if (status === "uploading") {
       console.warn("[DashboardClient] Sync already in progress. Ignoring request.");
       return;
@@ -1272,13 +1278,13 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       setStatus("uploading");
       setSyncProgress(0);
       setMessage("Preparando sincronização...");
-      setLogs(prev => [...prev, "[VMPay] Verificando sessão segura..."]);
+      pushLog("[VMPay] Verificando sessão segura...");
       let token = passedToken;
       if (!token && initialSession?.access_token) {
         token = initialSession.access_token;
       }
 
-      setLogs(prev => [...prev, "[VMPay] Buscando lista de lojas cadastradas..."]);
+      pushLog("[VMPay] Buscando lista de lojas cadastradas...");
       // 1. Get available store credentials first via secure API route (bypassing client-side DB lock)
       const resStores = await fetch('/api/force-sync/stores');
       const dataStores = await resStores.json();
@@ -1287,14 +1293,14 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
           throw new Error(dataStores.error || `HTTP error ${resStores.status}`);
       }
       const credentials = dataStores.stores || [];
-      setLogs(prev => [...prev, `[VMPay] ${credentials.length} lojas identificadas. Iniciando ciclo...`]);
+      pushLog(`[VMPay] ${credentials.length} lojas identificadas. Iniciando ciclo...`);
 
       const allNewRawRecords: any[] = [];
       const totalStores = credentials.length;
 
       setSyncProgress(25);
       setMessage(`Sincronizando ${totalStores} loja(s) simultaneamente...`);
-      setLogs(prev => [...prev, `[VMPay] Acionando Sincronização Global na Nuvem...`]);
+      pushLog(`[VMPay] Acionando Sincronização Global na Nuvem...`);
 
       const url = `/api/vmpay/sync?manual=true&_=${Date.now()}`;
 
@@ -1302,6 +1308,9 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         const controller = new AbortController();
         // 120s limite global para bater com limites máximos do Vercel caso necessário buscar histórico de 6 meses
         const timeoutId = setTimeout(() => controller.abort(), 120000); 
+
+        const callStart = performance.now();
+        pushLog(`[API] fetch(${url}) enviado.`);
 
         const res = await fetch(url, {
           method: "GET",
@@ -1313,6 +1322,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         clearTimeout(timeoutId);
 
         setSyncProgress(75);
+        pushLog(`[API] Retorno recebido em ${((performance.now() - callStart) / 1000).toFixed(2)}s (HTTP ${res.status}). Lendo JSON...`);
 
         if (!res.ok) {
           const errResult = await res.json().catch(() => ({ error: `Status ${res.status}` }));
@@ -1322,10 +1332,10 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         const result = await res.json();
         if (result.success && result.records) {
           allNewRawRecords.push(...result.records);
-          setLogs(prev => [...prev, `[Sync] Nuvem finalizou agrupamento: ${result.records.length} novas vendas processadas.`]);
+          pushLog(`[Sync] Nuvem finalizou agrupamento: ${result.records.length} novas vendas processadas.`);
         }
       } catch (globalErr: any) {
-        setLogs(prev => [...prev, `[Erro] Sync Global falhou: ${globalErr.message}`]);
+        pushLog(`[Erro] Sync Global falhou: ${globalErr.message}`);
         throw globalErr; // Encaminha o erro para abortar graciosamente
       }
 
@@ -1333,36 +1343,39 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       setMessage("Desenhando Novos Gráficos...");
 
       if (allNewRawRecords.length === 0) {
-        setLogs(prev => [...prev, "[VMPay] Nenhuma venda nova encontrada em nenhuma loja."]);
+        pushLog("[VMPay] Nenhuma venda nova encontrada em nenhuma loja.");
         setStatus("success");
         setMessage("Sincronização concluída (Sem novos dados)");
         setSyncProgress(100);
         setTimeout(() => setSyncProgress(0), 3000);
+        pushLog(`[Finalizado] Tempo total: ${((performance.now() - startTime) / 1000).toFixed(2)}s.`);
         return;
       }
 
       const rawRecords = allNewRawRecords;
       const totalToProcess = rawRecords.length;
 
-      setLogs(prev => [...prev, `[VMPay] Ciclo completo: ${totalToProcess} novos registros integrados no banco de dados.`]);
-      setLogs(prev => [...prev, `[Sistema] Atualizando painel...`]);
+      pushLog(`[VMPay] Ciclo completo: ${totalToProcess} novos registros integrados no banco de dados.`);
+      pushLog(`[Sistema] Atualizando painel...`);
 
       try {
         await reloadAllData("Sincronismo", token);
       } catch (dbErr: any) {
-        setLogs(prev => [...prev, `[Aviso] Falha ao recarregar a tela automaticamente: ${dbErr.message}`]);
+        pushLog(`[Aviso] Falha ao recarregar a tela automaticamente: ${dbErr.message}`);
       }
 
       setSyncProgress(100);
       setStatus("success");
       setMessage("Sincronização concluída com sucesso!");
       setTimeout(() => setSyncProgress(0), 3000);
+      pushLog(`[Finalizado] Tempo total de Sincronização + Recarga: ${((performance.now() - startTime) / 1000).toFixed(2)}s.`);
     } catch (e: any) {
       console.error(e);
       setSyncProgress(0);
       setStatus("error");
       setMessage(`Erro: ${e.message}`);
-      setLogs(prev => [...prev, `[Erro Fatal] ${e.message}`]);
+      const ts = new Date().toISOString().substring(11, 23);
+      setLogs(prev => [...prev, `[${ts}] [Erro Fatal] ${e.message}`]);
     }
   }
 
