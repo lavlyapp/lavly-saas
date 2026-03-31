@@ -294,7 +294,7 @@ export async function GET(request: Request) {
         if (globalCount) {
             const limit = 1000;
             const numChunks = Math.ceil(globalCount / limit);
-            const maxConcurrency = 5;
+            const maxConcurrency = 3;
             for (let i = 0; i < numChunks; i += maxConcurrency) {
                 const promises = [];
                 for (let j = 0; j < maxConcurrency && (i + j) < numChunks; j++) {

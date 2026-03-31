@@ -1289,7 +1289,6 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       const credentials = dataStores.stores || [];
       setLogs(prev => [...prev, `[VMPay] ${credentials.length} lojas identificadas. Iniciando ciclo...`]);
 
-      const isFirstSync = allRecords.length === 0;
       const allNewRawRecords: any[] = [];
       const totalStores = credentials.length;
 
@@ -1297,7 +1296,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       setMessage(`Sincronizando ${totalStores} loja(s) simultaneamente...`);
       setLogs(prev => [...prev, `[VMPay] Acionando Sincronização Global na Nuvem...`]);
 
-      const url = `/api/vmpay/sync?manual=true${isFirstSync ? "&force=true" : ""}&_=${Date.now()}`;
+      const url = `/api/vmpay/sync?manual=true&_=${Date.now()}`;
 
       try {
         const controller = new AbortController();
