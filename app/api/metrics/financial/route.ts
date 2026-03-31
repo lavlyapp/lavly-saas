@@ -95,41 +95,24 @@ export async function GET(request: Request) {
         // --- 2. Fetch Data ---
         console.log(`[API Metrics] Fetching ${period} for ${store}...`);
         
-        const applyFilters = (q: any) => {
+        const fetchFiltered = async (table: string, columns: string) => {
+            let q = supabase.from(table).select(columns);
             if (store !== 'Todas') q = q.eq('loja', store);
             if (queryStartIso && queryEndIso && period !== 'allTime') {
                 q = q.gte('data', queryStartIso).lte('data', queryEndIso);
             }
-            return q;
-        };
-
-        const fetchFiltered = async (table: string, columns: string) => {
-            // First pass: Quick HEAD request to get exact bounds
-            const qCount = applyFilters(supabase.from(table).select('*', { count: 'exact', head: true }));
-            const { count, error: countErr } = await qCount;
             
-            if (countErr) throw countErr;
-            if (!count) return [];
-
-            // Second pass: Fetch chunks in bounded parallel streams
-            const allData: any[] = [];
+            // Handle pagination safely for massive stores (>1000 rows in a month)
+            let allData: any[] = [];
+            let offset = 0;
             const limit = 1000;
-            const numChunks = Math.ceil(count / limit);
-            const maxConcurrency = 5; // Limita a 5 requisições paralelas para evitar Timeout/Error no Pool
-            
-            for (let i = 0; i < numChunks; i += maxConcurrency) {
-                const promises = [];
-                for (let j = 0; j < maxConcurrency && (i + j) < numChunks; j++) {
-                    const offset = (i + j) * limit;
-                    const qData = applyFilters(supabase.from(table).select(columns));
-                    promises.push(qData.range(offset, offset + limit - 1));
-                }
-                
-                const results = await Promise.all(promises);
-                for (const res of results) {
-                    if (res.error) throw res.error;
-                    if (res.data) allData.push(...res.data);
-                }
+            while(true) {
+                const { data, error } = await q.range(offset, offset + limit - 1);
+                if (error) throw error;
+                if (!data || data.length === 0) break;
+                allData.push(...data);
+                if (data.length < limit) break;
+                offset += limit;
             }
             return allData;
         };
@@ -284,33 +267,17 @@ export async function GET(request: Request) {
         let daysInViewMonth = 30;
         
         // We do a specific separate quick-query for global averages to not inflate payload
-        const thirtyDaysAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-        const applyGlobalFilters = (q: any) => store !== 'Todas' ? q.eq('loja', store).gte('data', thirtyDaysAgoIso) : q.gte('data', thirtyDaysAgoIso);
-
-        const qCountGlobal = applyGlobalFilters(supabase.from('sales').select('*', { count: 'exact', head: true }));
-        const { count: globalCount } = await qCountGlobal;
-        
-        let last30Revenue = 0;
-        if (globalCount) {
-            const limit = 1000;
-            const numChunks = Math.ceil(globalCount / limit);
-            const maxConcurrency = 5;
-            for (let i = 0; i < numChunks; i += maxConcurrency) {
-                const promises = [];
-                for (let j = 0; j < maxConcurrency && (i + j) < numChunks; j++) {
-                    const offset = (i + j) * limit;
-                    const qData = applyGlobalFilters(supabase.from('sales').select('valor'));
-                    promises.push(qData.range(offset, offset + limit - 1));
-                }
-                const results = await Promise.all(promises);
-                for (const res of results) {
-                    if (res.data) {
-                        last30Revenue += res.data.reduce((acc: number, r: any) => acc + (r.valor || 0), 0);
-                    }
-                }
-            }
+        if (store !== 'Todas') {
+             const thirtyDaysAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+             const { data: globalSales } = await supabase.from('sales').select('valor').eq('loja', store).gte('data', thirtyDaysAgoIso);
+             const last30Revenue = (globalSales || []).reduce((acc, r) => acc + (r.valor || 0), 0);
+             last30DaysAvg = last30Revenue / 30;
+        } else {
+             const thirtyDaysAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+             const { data: globalSales } = await supabase.from('sales').select('valor').gte('data', thirtyDaysAgoIso);
+             const last30Revenue = (globalSales || []).reduce((acc, r) => acc + (r.valor || 0), 0);
+             last30DaysAvg = last30Revenue / 30;
         }
-        last30DaysAvg = last30Revenue / 30;
 
         const viewDate = minTime !== Infinity ? new Date(minTime) : new Date();
         daysInViewMonth = getDaysInMonth(viewDate);
