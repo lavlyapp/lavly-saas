@@ -49,9 +49,18 @@ import { formatInTimeZone } from 'date-fns-tz';
 export async function syncVMPaySales(startDate: Date, endDate: Date, specificCred?: VMPayCredential): Promise<SaleRecord[]> {
     const salesMap = new Map<string, SaleRecord>(); // Dedup by CNPJ + ID
 
-    const credentials = specificCred ? [specificCred] : await getVMPayCredentials();
+    const allCreds = specificCred ? [specificCred] : await getVMPayCredentials();
+    // Group by API key to prevent redundant data fetching for users with multiple stores on a single key
+    const uniqueCredentials = new Map<string, VMPayCredential>();
+    for (const c of allCreds) {
+        if (!uniqueCredentials.has(c.apiKey)) {
+            // Aggregate multiple names for logging if needed, or simply take the first one
+            uniqueCredentials.set(c.apiKey, c);
+        }
+    }
+    const credentials = Array.from(uniqueCredentials.values());
 
-    // We process each credential in sequence to avoid rate limiting
+    // We process each unique API key in sequence to avoid rate limiting
     for (const cred of credentials) {
         try {
             console.log(`[VMPay Client] Processing store: ${cred.name} (${cred.cnpj})`);
@@ -238,7 +247,14 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
 export async function syncVMPayCustomers(): Promise<CustomerRecord[]> {
     const customersMap = new Map<string, CustomerRecord>(); // Dedup by ID
 
-    const credentials = await getVMPayCredentials();
+    const allCreds = await getVMPayCredentials();
+    const uniqueCredentials = new Map<string, VMPayCredential>();
+    for (const c of allCreds) {
+        if (!uniqueCredentials.has(c.apiKey)) {
+            uniqueCredentials.set(c.apiKey, c);
+        }
+    }
+    const credentials = Array.from(uniqueCredentials.values());
 
     for (const cred of credentials) {
         try {

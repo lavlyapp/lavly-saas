@@ -42,7 +42,7 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
         .single();
 
     const now = new Date();
-    const fallbackDate = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000); // 10 dias de histórico
+    const fallbackDate = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000); // 180 dias (6 meses) de histórico inicial
     let lastSync = storeData?.last_sync_sales ? new Date(storeData.last_sync_sales) : null;
 
     // Se o lastSync for null ou estiver obsoleto, consultamos a tabela sales diretamente como fonte da verdade (Bypass Inteligente de RLS)
@@ -70,7 +70,7 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
     // Se a tabela estiver 100% vazia ou forçando (10 dias)
     if (force || (!lastSync && isManual)) {
         lastSync = fallbackDate;
-        console.log(`[Sync Manager] No last sync found OR force=true for ${cred.name}. Fetching 10-day history: ${lastSync.toISOString()}`);
+        console.log(`[Sync Manager] No last sync found OR force=true for ${cred.name}. Fetching 180-day history: ${lastSync.toISOString()}`);
     }
 
     // Métrica Inteligente de Janela Segura (Delta-Sync Window)
