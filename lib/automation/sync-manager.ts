@@ -209,16 +209,115 @@ export async function runGlobalSync(isManual: boolean = false, force: boolean = 
         return [];
     }
 
-    console.log(`[Sync Manager] Processing ${credentials.length} stores sequentially...`);
+    if (!isManual) {
+        console.log(`[Sync Manager] ⛔ Sincronização automática para grupo ignorada (Configuração de Plataforma).`);
+        return [];
+    }
 
+    console.log(`[Sync Manager] Processing ${credentials.length} stores. Agrupando por API Key para max performance...`);
+
+    const groupsByApiKey = new Map<string, VMPayCredential[]>();
     for (const cred of credentials) {
+        let arr = groupsByApiKey.get(cred.apiKey);
+        if (!arr) {
+            arr = [];
+            groupsByApiKey.set(cred.apiKey, arr);
+        }
+        arr.push(cred);
+    }
+
+    const { upsertSales } = await import("../persistence");
+    const db = supabaseClient || supabase;
+
+    for (const [apiKey, groupCreds] of groupsByApiKey.entries()) {
         try {
-            const sales = await processStoreSync(cred, isManual, force, supabaseClient);
-            if (sales && sales.length > 0) {
-                allNewSales.push(...sales);
+            console.log(`\n[Sync Manager] --- Iniciando Grupo API: ${apiKey.substring(0, 6)}... (${groupCreds.length} lojas) ---`);
+            
+            const storeCnpjs = groupCreds.map(c => c.cnpj);
+            const { data: storesInfo } = await db.from('stores')
+                .select('cnpj, last_sync_sales')
+                .in('cnpj', storeCnpjs);
+                
+            const syncMap = new Map();
+            if (storesInfo) storesInfo.forEach((s: any) => syncMap.set(s.cnpj, s.last_sync_sales));
+
+            const now = new Date();
+            const fallbackDateStr = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000).toISOString();
+            
+            let minDateObj: Date | null = null;
+            for (const c of groupCreds) {
+                let sSync = syncMap.get(c.cnpj);
+                if (!sSync || force) sSync = fallbackDateStr;
+                const sd = new Date(sSync);
+                if (!minDateObj || sd < minDateObj) {
+                    minDateObj = sd;
+                }
             }
-        } catch (storeError) {
-            console.error(`[Sync Manager] Store sync failed for ${cred.name}`, storeError);
+
+            if (!minDateObj) minDateObj = new Date(fallbackDateStr);
+
+            // Janela de Cura Restrita (72h para sanar bugs do hardware da VMPay)
+            if (!force && isManual) {
+                const safeDate = new Date(now.getTime() - 72 * 60 * 60 * 1000);
+                if (minDateObj > safeDate) minDateObj = safeDate;
+            }
+
+            console.log(`[Sync Manager] Data limiar conjunta da Rede: ${minDateObj.toISOString()}`);
+            console.log(`[Sync Manager] Extraindo banco da VMPay de uma só vez para ${groupCreds.length} CNPJs...`);
+            
+            // SINGLE NETWORK CALL FOR ALL STORES IN THIS API KEY!
+            const sales = await syncVMPaySales(minDateObj, now, groupCreds[0]);
+
+            if (sales && sales.length > 0) {
+                console.log(`[Sync Manager] Inserindo ${sales.length} vendas consolidadas no Banco Lavly...`);
+                const persistenceRes = await upsertSales(sales, db);
+                if (persistenceRes && !persistenceRes.success) {
+                    throw new Error("Falha no Upsert: " + persistenceRes.error);
+                }
+                allNewSales.push(...sales);
+
+                console.log(`[Sync Manager] Upsert finalizado. Acionando Automações Locais e Atualizando Clientes...`);
+                for (const cred of groupCreds) {
+                    await db.from('stores').upsert({
+                        cnpj: cred.cnpj,
+                        name: getCanonicalStoreName(cred.name),
+                        api_key: cred.apiKey,
+                        is_active: true,
+                        updated_at: now.toISOString(),
+                        last_sync_sales: now.toISOString()
+                    }, { onConflict: 'cnpj' });
+
+                    if (cred.hasAcSubscription) {
+                        const storeName = getCanonicalStoreName(cred.name);
+                        const storeSales = sales.filter((s: any) => s.loja === storeName);
+                        
+                        if (storeSales.length > 0) {
+                            let maxEndTime = now;
+                            for (const sale of storeSales) {
+                                const isDry = sale.produto?.toUpperCase().includes("SEC") || 
+                                              sale.items?.some((i: any) => i.service.toUpperCase().includes("SEC"));
+                                const duration = isDry ? 70 : 50;
+                                const saleEndTime = new Date(sale.data.getTime() + duration * 60000);
+                                if (saleEndTime > maxEndTime) maxEndTime = saleEndTime;
+                            }
+                            if (maxEndTime > now) {
+                                await updateTargetTimeDB(maxEndTime, cred.cnpj, cred);
+                            }
+                        }
+                    }
+                }
+                console.log(`[Sync Manager] Grupo de ${groupCreds.length} lojas Sincronizado integralmente!`);
+            } else {
+                 console.log(`[Sync Manager] Nenhuma venda nova localizada no grupo.`);
+                 for (const cred of groupCreds) {
+                    await db.from('stores').update({ 
+                        last_sync_sales: now.toISOString(),
+                        updated_at: now.toISOString() 
+                    }).eq('cnpj', cred.cnpj);
+                 }
+            }
+        } catch (groupError) {
+            console.error(`[Sync Manager] Falha Crítica na Malha Principal API Key ${apiKey}`, groupError);
         }
     }
 
