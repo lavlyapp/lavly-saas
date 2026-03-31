@@ -70,29 +70,21 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
     // Se a tabela estiver 100% vazia ou forçando (10 dias)
     if (force || (!lastSync && isManual)) {
         lastSync = fallbackDate;
-        console.log(`[Sync Manager] No last sync found OR force=true for ${cred.name}. Fetching 180-day history: ${lastSync.toISOString()}`);
     }
 
-    // Métrica Inteligente de Janela Segura (Delta-Sync Window)
-    // Para evitar perdas por máquinas offline ou delays da VMPay:
-    // - Sync Automático (a cada 30min): Retorna 3 horas (cobre perfeitamente o gap)
-    // - Sync Manual (botão): Retorna 8 horas (dá segurança para ver vendas atrasadas no mesmo dia)
-    // - Sync de Auto-Cura (03:00 da manhã): Retorna 72 horas (3 dias) para fechar caixa perfeito.
-    if (!force) {
+    // Limitador Intransponível: Nunca baixar mais que a safeWindow (Cura)
+    if (!force && lastSync) {
         const currentHour = now.getHours();
-        // Manual Sync fetches 3 days (72h) to heal any possible timezone/machine drops.
-        // Auto Sync fetches 12 hours.
-        let lookbackHours = isManual ? 72 : 12;
+        let lookbackHours = isManual ? 72 : 12; // Auto-Sync: 12h, Manual: 72h
         
-        // Auto-Cura Profunda durante a madrugada
-        if (!isManual && currentHour === 3) {
-            lookbackHours = 120; // 5 days
-        }
+        if (!isManual && currentHour === 3) lookbackHours = 120; // Madrugada extra profundo
         
         const safeWindowDate = new Date(now.getTime() - lookbackHours * 60 * 60 * 1000);
-        if (lastSync > safeWindowDate) {
+        
+        // Se a última sincronização foi MUITO velha (180 dias) e não forçamos, capamos na janela segura (72h)
+        if (lastSync < safeWindowDate) {
             lastSync = safeWindowDate;
-            console.log(`[Sync Manager] Janela de Segurança Ativa (${lookbackHours}h): Ajustando sync para ${lastSync.toISOString()} na loja ${cred.name}`);
+            console.log(`[Sync Manager] Capping lookback para ${lookbackHours}h. Ignorando buraco profundo. Store: ${cred.name}`);
         }
     }
 
