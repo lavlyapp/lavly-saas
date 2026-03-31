@@ -1293,45 +1293,41 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       const allNewRawRecords: any[] = [];
       const totalStores = credentials.length;
 
-      for (let i = 0; i < totalStores; i++) {
-        const cred = credentials[i];
+      setSyncProgress(25);
+      setMessage(`Sincronizando ${totalStores} loja(s) simultaneamente...`);
+      setLogs(prev => [...prev, `[VMPay] Acionando Sincronização Global na Nuvem...`]);
 
-        // Update numerical progress bar (starting at 10% just for UI feel, distributing the rest)
-        const progressPercentage = Math.max(10, Math.round(((i) / totalStores) * 100));
-        setSyncProgress(progressPercentage);
+      const url = `/api/vmpay/sync?manual=true${isFirstSync ? "&force=true" : ""}&_=${Date.now()}`;
 
-        setMessage(`Sincronizando ${cred.name} (${i + 1} de ${totalStores})...`);
-        setLogs(prev => [...prev, `[VMPay] Sincronizando ${cred.name} (${cred.cnpj})...`]);
+      try {
+        const controller = new AbortController();
+        // 120s limite global para bater com limites máximos do Vercel caso necessário buscar histórico de 6 meses
+        const timeoutId = setTimeout(() => controller.abort(), 120000); 
 
-        const url = `/api/vmpay/sync?manual=true&cnpj=${cred.cnpj}${isFirstSync ? "&force=true" : ""}&_=${Date.now()}`;
+        const res = await fetch(url, {
+          method: "GET",
+          headers: {
+            ...(token ? { "Authorization": `Bearer ${token}` } : {})
+          },
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
 
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s per store
+        setSyncProgress(75);
 
-          const res = await fetch(url, {
-            method: "GET",
-            headers: {
-              ...(token ? { "Authorization": `Bearer ${token}` } : {})
-            },
-            signal: controller.signal
-          });
-          clearTimeout(timeoutId);
-
-          if (!res.ok) {
-            const errResult = await res.json().catch(() => ({ error: `Status ${res.status}` }));
-            setLogs(prev => [...prev, `[Aviso] Falha na Loja ${cred.name}: ${errResult.error || 'Erro desconhecido'}`]);
-            continue;
-          }
-
-          const result = await res.json();
-          if (result.success && result.records) {
-            allNewRawRecords.push(...result.records);
-            setLogs(prev => [...prev, `[Sync] ${cred.name}: ${result.records.length} novas vendas.`]);
-          }
-        } catch (storeErr: any) {
-          setLogs(prev => [...prev, `[Erro] Loja ${cred.name} falhou: ${storeErr.message}`]);
+        if (!res.ok) {
+          const errResult = await res.json().catch(() => ({ error: `Status ${res.status}` }));
+          throw new Error(errResult.error || 'Erro na sincronização global');
         }
+
+        const result = await res.json();
+        if (result.success && result.records) {
+          allNewRawRecords.push(...result.records);
+          setLogs(prev => [...prev, `[Sync] Nuvem finalizou agrupamento: ${result.records.length} novas vendas processadas.`]);
+        }
+      } catch (globalErr: any) {
+        setLogs(prev => [...prev, `[Erro] Sync Global falhou: ${globalErr.message}`]);
+        throw globalErr; // Encaminha o erro para abortar graciosamente
       }
 
       setSyncProgress(90); // Finished downloading, now re-rendering
