@@ -61,35 +61,28 @@ export async function GET(request: Request) {
         let queryEndIso: string | null = null;
 
         // Convert boundary strings to ISO boundaries for PostgreSQL
-        if (period === 'today') {
-            queryStartIso = `${todayStr}T00:00:00.000Z`;
-            queryEndIso = `${todayStr}T23:59:59.999Z`;
-        } else if (period === 'yesterday') {
-            queryStartIso = `${yesterdayStr}T00:00:00.000Z`;
-            queryEndIso = `${yesterdayStr}T23:59:59.999Z`;
-        } else if (period === 'thisMonth') {
-            queryStartIso = `${targetMonthStr}-01T00:00:00.000Z`;
-            queryEndIso = `${targetMonthStr}-${String(getDaysInMonth(nowBrt)).padStart(2, '0')}T23:59:59.999Z`;
-        } else if (period === 'lastMonth') {
-            queryStartIso = `${lastMonthStr}-01T00:00:00.000Z`;
-            queryEndIso = `${lastMonthStr}-${String(getDaysInMonth(new Date(nowBrt.getFullYear(), nowBrt.getMonth() - 1, 1))).padStart(2, '0')}T23:59:59.999Z`;
-        } else if (period === 'custom' && startCustom && endCustom) {
-            queryStartIso = `${startCustom}T00:00:00.000Z`;
-            queryEndIso = `${endCustom}T23:59:59.999Z`;
+        function getBrtIsoStart(dateStr) {
+            return new Date(`${dateStr}T00:00:00-03:00`).toISOString();
+        }
+        function getBrtIsoEnd(dateStr) {
+            return new Date(`${dateStr}T23:59:59.999-03:00`).toISOString();
         }
 
-        // Force a tiny offset for BRT translation if we want pure matching, 
-        // but since we query by absolute DB rows, let's pull loosely and filter perfectly in JS
-        // to match 100% of the legacy frontend logic.
-        if (queryStartIso) {
-            // Expand pulling window to account for -3h BRT difference to prevent dropping edge records
-            const startD = new Date(queryStartIso);
-            startD.setHours(startD.getHours() - 4);
-            queryStartIso = startD.toISOString();
-            
-            const endD = new Date(queryEndIso!);
-            endD.setHours(endD.getHours() + 4);
-            queryEndIso = endD.toISOString();
+        if (period === 'today') {
+            queryStartIso = getBrtIsoStart(todayStr);
+            queryEndIso = getBrtIsoEnd(todayStr);
+        } else if (period === 'yesterday') {
+            queryStartIso = getBrtIsoStart(yesterdayStr);
+            queryEndIso = getBrtIsoEnd(yesterdayStr);
+        } else if (period === 'thisMonth') {
+            queryStartIso = getBrtIsoStart(`${targetMonthStr}-01`);
+            queryEndIso = getBrtIsoEnd(`${targetMonthStr}-${String(getDaysInMonth(nowBrt)).padStart(2, '0')}`);
+        } else if (period === 'lastMonth') {
+            queryStartIso = getBrtIsoStart(`${lastMonthStr}-01`);
+            queryEndIso = getBrtIsoEnd(`${lastMonthStr}-${String(getDaysInMonth(new Date(nowBrt.getFullYear(), nowBrt.getMonth() - 1, 1))).padStart(2, '0')}`);
+        } else if (period === 'custom' && startCustom && endCustom) {
+            queryStartIso = getBrtIsoStart(startCustom);
+            queryEndIso = getBrtIsoEnd(endCustom);
         }
 
         // --- 2. Call Native Database RPC (Supabase Backend) ---
