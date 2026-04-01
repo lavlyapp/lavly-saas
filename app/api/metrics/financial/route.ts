@@ -69,10 +69,10 @@ export async function GET(request: Request) {
             queryEndIso = `${yesterdayStr}T23:59:59.999Z`;
         } else if (period === 'thisMonth') {
             queryStartIso = `${targetMonthStr}-01T00:00:00.000Z`;
-            queryEndIso = `${targetMonthStr}-31T23:59:59.999Z`;
+            queryEndIso = `${targetMonthStr}-${String(getDaysInMonth(nowBrt)).padStart(2, '0')}T23:59:59.999Z`;
         } else if (period === 'lastMonth') {
             queryStartIso = `${lastMonthStr}-01T00:00:00.000Z`;
-            queryEndIso = `${lastMonthStr}-31T23:59:59.999Z`;
+            queryEndIso = `${lastMonthStr}-${String(getDaysInMonth(new Date(nowBrt.getFullYear(), nowBrt.getMonth() - 1, 1))).padStart(2, '0')}T23:59:59.999Z`;
         } else if (period === 'custom' && startCustom && endCustom) {
             queryStartIso = `${startCustom}T00:00:00.000Z`;
             queryEndIso = `${endCustom}T23:59:59.999Z`;
@@ -131,17 +131,24 @@ export async function GET(request: Request) {
 
         const qLast30 = baseQuery.gte('data', thirtyDaysAgoIso);
         
-        const [couponsRes, last30Res] = await Promise.all([
-            qCoupons,
-            supabase.rpc('get_financial_dashboard_metrics', { p_store: store, p_start_date: thirtyDaysAgoIso, p_end_date: now.toISOString() })
-        ]);
-
-        paymentStats.coupons = couponsRes.count || 0;
-        
+        let couponsRes = { count: 0 };
         let last30DaysAvg = 0;
-        if (last30Res.data && last30Res.data.salesMetrics) {
-            last30DaysAvg = last30Res.data.salesMetrics.totalRevenue / 30;
+        
+        if (period === 'thisMonth' || period === 'today') {
+            const [cR, l30] = await Promise.all([
+                qCoupons,
+                supabase.rpc('get_financial_dashboard_metrics', { p_store: store, p_start_date: thirtyDaysAgoIso, p_end_date: now.toISOString() })
+            ]);
+            couponsRes = cR;
+            if (l30.data && l30.data.salesMetrics) {
+                last30DaysAvg = l30.data.salesMetrics.totalRevenue / 30;
+            }
+        } else {
+            const cR = await qCoupons;
+            couponsRes = cR;
         }
+        
+        paymentStats.coupons = couponsRes.count || 0;
 
         const viewDate = metrics.period?.startDate ? new Date(metrics.period.startDate) : new Date();
         const daysInViewMonth = getDaysInMonth(viewDate);

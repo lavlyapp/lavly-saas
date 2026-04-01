@@ -156,9 +156,7 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
 
     const ticketAverage = useMemo(() => {
         if (!metrics) return 0;
-        // Simple heuristic for tickets matching legacy calculateVisitCount output magnitude
-        const estimatedVisits = Math.max(1, Math.floor(metrics.summary.totalSales * 0.85));
-        return metrics.summary.totalValue / estimatedVisits;
+        return metrics.summary.ticketMedio || 0;
     }, [metrics]);
 
     if (!data) return null;
