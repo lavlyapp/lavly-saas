@@ -659,7 +659,20 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
   const [status, setStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
   const [syncProgress, setSyncProgress] = useState(0); // Progress Bar (0 to 100)
-  const [logs, setLogs] = useState<string[]>([]); // Debug Logs
+  const [logs, setRawLogs] = useState<string[]>([]); // Debug Logs
+  const setLogs = useCallback((updater: any) => {
+    setRawLogs((prev) => {
+      const newLogsArgs = typeof updater === 'function' ? updater(prev) : updater;
+      if (Array.isArray(newLogsArgs)) {
+         const ts = new Date().toISOString().substring(11, 23);
+         return newLogsArgs.map(l => {
+             if (typeof l === 'string' && /^\[\d{2}:\d{2}:\d{2}\.\d{3}\]/.test(l)) return l;
+             return `[${ts}] ${l}`;
+         });
+      }
+      return newLogsArgs;
+    });
+  }, []);
 
   // Data States
   const [allRecords, setAllRecords] = useState<SaleRecord[]>([]);
@@ -887,7 +900,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
               .gte('data', thirtyDaysAgo.toISOString())
               .in('loja', configuredNames)
               .order('data', { ascending: false })
-              .limit(5000);
+              .limit(1500);
               
           if (recentSales && !salesErr) {
               // We pass "sales" into setAllRecords ONLY for the last 30 days

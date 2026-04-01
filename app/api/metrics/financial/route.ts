@@ -133,15 +133,14 @@ export async function GET(request: Request) {
         
         const [couponsRes, last30Res] = await Promise.all([
             qCoupons,
-            qLast30.limit(5000)
+            supabase.rpc('get_financial_dashboard_metrics', { p_store: store, p_start_date: thirtyDaysAgoIso, p_end_date: now.toISOString() })
         ]);
 
         paymentStats.coupons = couponsRes.count || 0;
         
         let last30DaysAvg = 0;
-        if (last30Res.data && last30Res.data.length > 0) {
-            const sum30 = last30Res.data.reduce((acc, sale) => acc + (sale.valor || 0), 0);
-            last30DaysAvg = sum30 / 30;
+        if (last30Res.data && last30Res.data.salesMetrics) {
+            last30DaysAvg = last30Res.data.salesMetrics.totalRevenue / 30;
         }
 
         const viewDate = metrics.period?.startDate ? new Date(metrics.period.startDate) : new Date();
