@@ -119,6 +119,7 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
             console.log(`[${ts}] [FinancialDashboard] Iniciando fetchMetrics na borda AWS para período: ${period}...`);
             const startTime = performance.now();
             
+            setFetchError(null);
             setIsLoading(true);
             try {
                 // Determine start/end if custom
@@ -126,6 +127,7 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                 if (period === 'custom') {
                     params += `&start=${customRange.start}&end=${customRange.end}`;
                 }
+                params += `&t=${Date.now()}`;
 
                 console.log(`[${new Date().toISOString().substring(11, 23)}] [FinancialDashboard] Enviando requisição HTTP: /api/metrics/financial${params}`);
                 const res = await fetch(`/api/metrics/financial${params}`);
@@ -137,13 +139,16 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                 const endTime = performance.now();
                 console.log(`[${new Date().toISOString().substring(11, 23)}] [FinancialDashboard] JSON decodificado. Tempo Total: ${((endTime - startTime) / 1000).toFixed(2)}s.`);
                 
-                if (isMounted && json.success) {
-                    setMetrics(json.payload);
-                    console.log(`[${new Date().toISOString().substring(11, 23)}] [FinancialDashboard] O Gráfico foi renderizado e os dados foram aplicados na tela com sucesso.`);
-                } else if (isMounted && !json.success) {
-                    console.error(`[${new Date().toISOString().substring(11, 23)}] [FinancialDashboard] Erro da Borda AWS:`, json.error);
+                if (isMounted) {
+                    if (json.success) {
+                        setMetrics(json.payload);
+                        console.log(`[${new Date().toISOString().substring(11, 23)}] [FinancialDashboard] O Gráfico foi renderizado e os dados foram aplicados na tela com sucesso.`);
+                    } else {
+                        setFetchError(`Vercel API falhou: ${json.error}`);
+                    }
                 }
-            } catch (err) {
+            } catch (err: any) {
+                if (isMounted) setFetchError(`Falha TRÁGICA no Fetch: ${err.message}`);
                 const errTime = new Date().toISOString().substring(11, 23);
                 console.error(`[${errTime}] [FinancialDashboard] Falha TRÁGICA no Fetch após ${((performance.now() - startTime) / 1000).toFixed(2)}s.`, err);
             } finally {
@@ -161,6 +166,21 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
     }, [metrics]);
 
     if (!data) return null;
+
+    if (fetchError) {
+        return (
+            <div className="space-y-6 animate-in fade-in duration-500 min-h-[500px] flex flex-col items-center justify-center border border-red-500/20 bg-red-500/5 rounded-xl p-8">
+                <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-4">
+                    <span className="text-red-500 font-bold text-2xl">X</span>
+                </div>
+                <h3 className="text-xl font-bold font-mono text-red-400">Erro Fatal na Borda AWS</h3>
+                <p className="text-neutral-400 text-center max-w-lg mb-4">{fetchError}</p>
+                <div className="group">
+                    <p className="text-neutral-500 text-sm">Parece que a API Serverless bloqueou a operação. Verifique o problema ou contate o suporte.</p>
+                </div>
+            </div>
+        );
+    }
 
     if (isLoading || !metrics) {
         return (
