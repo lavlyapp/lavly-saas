@@ -135,6 +135,12 @@ export async function GET(request: Request) {
                 last30DaysAvg = l30.data.salesMetrics.totalRevenue / 30;
             }
         } else {
+            // Para períodos passados, Faturamento Médio Dia = Faturamento do Período / Dias do Mês Visto
+            const vDate = metrics.period?.startDate ? new Date(metrics.period.startDate) : new Date();
+            const daysInMonth = getDaysInMonth(vDate);
+            if (metrics.salesMetrics && metrics.salesMetrics.totalRevenue) {
+                last30DaysAvg = metrics.salesMetrics.totalRevenue / (daysInMonth || 30);
+            }
             // qCoupons.count has been temporarily disabled because doing COUNT(*) on raw sales table bypasses materialized views
             couponsRes = { count: 0 };
         }

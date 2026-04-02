@@ -664,7 +664,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
     setRawLogs((prev) => {
       const newLogsArgs = typeof updater === 'function' ? updater(prev) : updater;
       if (Array.isArray(newLogsArgs)) {
-         const ts = new Date().toISOString().substring(11, 23);
+         const ts = new Date(new Date().getTime() - 3 * 3600 * 1000).toISOString().substring(11, 23);
          return newLogsArgs.map(l => {
              if (typeof l === 'string' && /^\[\d{2}:\d{2}:\d{2}\.\d{3}\]/.test(l)) return l;
              return `[${ts}] ${l}`;
@@ -885,45 +885,17 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         registrationDate: c.registration_date ? new Date(c.registration_date) : undefined
       }));
 
-      // Flush massive memory state arrays to 0 to prevent RAM ballooning!
-      setAllRecords([]); // Sales history is no longer downloaded, processed on server.
-      
+      // Restore massive memory state arrays so CRM, Gantt, and Churn work fully.
       try {
-          setLogs(prev => [...prev, "[System] Baixando status em tempo real das máquinas..."]);
-          const thirtyDaysAgo = new Date();
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          const newSales = await fetchAllParallel('sales', 'id, data, loja, valor, desconto, cliente, produto', 'data', configuredNames, 24, 0);
+          const newOrders = await fetchAllParallel('orders', 'id, sale_id, machine, service, status, data, valor, loja', 'data', configuredNames, 24, 0);
           
-          const { data: recentSales, error: salesErr } = await rawSupabase
-              .from('sales')
-              // Fetch only what's needed for the monitor, and join orders to get machine names
-              .select('id, data, loja, cliente, produto, orders(machine, service, status, valor, data)')
-              .gte('data', thirtyDaysAgo.toISOString())
-              .in('loja', configuredNames)
-              .order('data', { ascending: false })
-              .limit(1500);
-              
-          if (recentSales && !salesErr) {
-              // We pass "sales" into setAllRecords ONLY for the last 30 days
-              // mapped with .items so MachineMonitor can read it just like the legacy ETL structure
-              const mappedRecords = recentSales.map((r: any) => ({
-                 ...r,
-                 data: new Date(r.data), // FIX: Hydrate ISO string to Date object for CRM
-                 items: Array.isArray(r.orders) ? r.orders.map((o: any) => ({
-                     machine: o.machine,
-                     service: o.service,
-                     status: o.status,
-                     startTime: new Date(o.data || r.data),
-                     value: o.valor
-                 })) : []
-              }));
-              
-              setAllRecords(mappedRecords as any[]);
-              setAllOrders([]);
-          } else {
-              setAllRecords([]);
-          }
+          setAllRecords(newSales.map((r: any) => ({ ...r, data: new Date(r.data) })) as any[]);
+          setAllOrders(newOrders.map((o: any) => ({ ...o, data: new Date(o.data) })) as any[]);
       } catch (err) {
+          console.error("Failed fetching legacy lists:", err);
           setAllRecords([]);
+          setAllOrders([]);
       }
       
       if (hydratedCustomers.length > 0) setAllCustomers(hydratedCustomers);
