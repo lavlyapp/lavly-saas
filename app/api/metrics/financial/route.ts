@@ -159,7 +159,8 @@ export async function GET(request: Request) {
                     totalValue: metrics.salesMetrics.totalRevenue,
                     startDate: metrics.period.startDate,
                     endDate: metrics.period.endDate,
-                    uniqueCustomers: metrics.period.uniqueCustomers
+                    uniqueCustomers: metrics.period.uniqueCustomers,
+                    ticketMedio: metrics.salesMetrics.averageTicket
                 },
                 basketsMetrics: metrics.basketsMetrics,
                 dailyData: metrics.dailyData,
