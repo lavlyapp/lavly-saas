@@ -907,6 +907,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
               // mapped with .items so MachineMonitor can read it just like the legacy ETL structure
               const mappedRecords = recentSales.map((r: any) => ({
                  ...r,
+                 data: new Date(r.data), // FIX: Hydrate ISO string to Date object for CRM
                  items: Array.isArray(r.orders) ? r.orders.map((o: any) => ({
                      machine: o.machine,
                      service: o.service,
