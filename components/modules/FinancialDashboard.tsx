@@ -35,6 +35,43 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
     }, [data, allRecords, allOrders]);
 
     // DEBUG: Inject precise length check
+'use client';
+
+import { useMemo, useState, useEffect } from 'react';
+import { ArrowUpRight, DollarSign, Calendar, TrendingUp, CreditCard, Filter, Users, Activity, BarChart3, ShoppingBasket, Waves, Wind, RefreshCw } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, subMonths, format, getDaysInMonth, differenceInCalendarDays } from 'date-fns';
+import { MachineMonitor } from './MachineMonitor';
+import { calculateCrmMetrics, calculateVisitCount } from '@/lib/processing/crm';
+import { useAuth } from '@/components/context/AuthContext';
+
+// Add OrderRecord type or import if shared (currently relying on any for data.orders)
+// Better to import OrderRecord from etl if possible, but let's stick to props interface for now.
+
+interface FinancialDashboardProps {
+    data: {
+        records: any[];
+        orders?: any[]; // New: Orders list
+        summary: any;
+        errors?: any[];
+        logs?: any[];
+    };
+    allRecords?: any[];
+    allOrders?: any[];
+    selectedStore?: string;
+}
+
+type PeriodOption = 'today' | 'yesterday' | 'thisMonth' | 'lastMonth' | 'custom' | 'allTime';
+
+export function FinancialDashboard({ data, allRecords, allOrders, selectedStore = 'Todas' }: FinancialDashboardProps) {
+    const { role } = useAuth();
+    
+    const [renderTime, setRenderTime] = useState<string>("");
+    useEffect(() => {
+        setRenderTime(format(new Date(), "dd/MM/yyyy HH:mm"));
+    }, [data, allRecords, allOrders]);
+
+    // DEBUG: Inject precise length check
     console.log(`[DEBUG-FinancialDashboard] Mounted. Stores: ${selectedStore}`);
     console.log(`[DEBUG-FinancialDashboard] data.records: ${data?.records?.length} | data.orders: ${data?.orders?.length}`);
     console.log(`[DEBUG-FinancialDashboard] allRecords: ${allRecords?.length} | allOrders: ${allOrders?.length}`);
@@ -44,34 +81,19 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
     const [period, setPeriod] = useState<PeriodOption>(() => {
         if (role === 'atendente') return 'today';
         if (!data?.records || data.records.length === 0) return 'thisMonth';
-
-        // DEBUG: Check first record
-        const first = data.records[0];
-        console.log(`[FinancialDashboard] First record store: "${first.loja}" | Selected: "${selectedStore}" | Records: ${data.records.length}`);
-
+        
+        // If we have records, calculate default based on presence of current month data
         const now = new Date();
-        const startOfCurrentMonth = startOfMonth(now);
-
-        // Check for data in current month
-        const hasDataThisMonth = data.records.some((r: any) => {
-            const d = new Date(r.data);
-            return d >= startOfCurrentMonth && d <= endOfMonth(now);
-        });
-
-        if (hasDataThisMonth) return 'thisMonth';
-
-        // If no data this month, but we have data, maybe 'allTime' is better than 'custom' for initial view?
-        // Or check if Last Month has data?
-        const startOfLastMonth = startOfMonth(subMonths(now, 1));
-        const hasDataLastMonth = data.records.some((r: any) => {
-            const d = new Date(r.data);
-            return d >= startOfLastMonth && d <= endOfMonth(subMonths(now, 1));
-        });
-
-        if (hasDataLastMonth) return 'lastMonth';
-
-        return 'allTime';
+        const thisMonthStart = startOfMonth(now);
+        const thisMonthEnd = endOfMonth(now);
+        const hasCurrentMonth = data.records.some(r => new Date(r.data) >= thisMonthStart && new Date(r.data) <= thisMonthEnd);
+        
+        return hasCurrentMonth ? 'thisMonth' : 'lastMonth';
     });
+    
+    const [isLoading, setIsLoading] = useState(false);
+    const [metrics, setMetrics] = useState<any>(null);
+    const [fetchError, setFetchError] = useState<string | null>(null);
 
     const [customRange, setCustomRange] = useState(() => {
         const nowTimeStamp = new Date().getTime();
@@ -107,48 +129,38 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
     // Removed useEffect that caused race conditions
     // const [hasAutoSelected, setHasAutoSelected] = useState(false);
 
-
-    const [metrics, setMetrics] = useState<any>(null);
-    const [isLoading, setIsLoading] = useState(true);
-
     useEffect(() => {
         let isMounted = true;
-        const fetchMetrics = async () => {
-            const ts = new Date().toISOString().substring(11, 23); // HH:mm:ss.SSS
-            console.log(`[${ts}] [FinancialDashboard] Iniciando fetchMetrics na borda AWS para período: ${period}...`);
-            const startTime = performance.now();
-            
+        async function fetchMetrics() {
+            setFetchError(null);
             setIsLoading(true);
+            const startTime = performance.now();
             try {
-                // Determine start/end if custom
                 let params = `?store=${encodeURIComponent(selectedStore)}&period=${period}`;
                 if (period === 'custom') {
                     params += `&start=${customRange.start}&end=${customRange.end}`;
                 }
-
+                
                 console.log(`[${new Date().toISOString().substring(11, 23)}] [FinancialDashboard] Enviando requisição HTTP: /api/metrics/financial${params}`);
                 const res = await fetch(`/api/metrics/financial${params}`);
-                
-                const jsonStart = performance.now();
-                console.log(`[${new Date().toISOString().substring(11, 23)}] [FinancialDashboard] Resposta HTTP ${res.status} recebida em ${((jsonStart - startTime) / 1000).toFixed(2)}s. Extraindo JSON...`);
+
                 const json = await res.json();
                 
-                const endTime = performance.now();
-                console.log(`[${new Date().toISOString().substring(11, 23)}] [FinancialDashboard] JSON decodificado. Tempo Total: ${((endTime - startTime) / 1000).toFixed(2)}s.`);
-                
-                if (isMounted && json.success) {
-                    setMetrics(json.payload);
-                    console.log(`[${new Date().toISOString().substring(11, 23)}] [FinancialDashboard] O Gráfico foi renderizado e os dados foram aplicados na tela com sucesso.`);
-                } else if (isMounted && !json.success) {
-                    console.error(`[${new Date().toISOString().substring(11, 23)}] [FinancialDashboard] Erro da Borda AWS:`, json.error);
+                if (isMounted) {
+                    if (json.success) {
+                        setMetrics(json.payload);
+                    } else {
+                        setFetchError(`Vercel API falhou: ${json.error}`);
+                    }
                 }
-            } catch (err) {
+            } catch (err: any) {
+                if (isMounted) setFetchError(`Falha TRÁGICA no Fetch: ${err.message}`);
                 const errTime = new Date().toISOString().substring(11, 23);
-                console.error(`[${errTime}] [FinancialDashboard] Falha TRÁGICA no Fetch após ${((performance.now() - startTime) / 1000).toFixed(2)}s.`, err);
+                console.error(`[${errTime}] [FinancialDashboard] Falha TRÁGICA`, err);
             } finally {
                 if (isMounted) setIsLoading(false);
             }
-        };
+        }
 
         fetchMetrics();
         return () => { isMounted = false; };
@@ -157,24 +169,6 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
     const ticketAverage = useMemo(() => {
         if (!metrics) return 0;
         return metrics.summary.ticketMedio || 0;
-    }, [metrics]);
-
-    if (!data) return null;
-
-    if (isLoading || !metrics) {
-        return (
-            <div className="space-y-6 animate-in fade-in duration-500 min-h-[500px] flex flex-col items-center justify-center">
-                <RefreshCw className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
-                <p className="text-neutral-400 font-medium">Buscando métricas na borda da AWS...</p>
-                <p className="text-neutral-600 text-sm">Calculando centenas de milhares de linhas instantaneamente.</p>
-            </div>
-        );
-    }
-
-    const { summary, basketsMetrics, dailyData, storeData, uniqueStoreCount, paymentStats, globalMetrics } = metrics;
-    const isMultiStoreView = uniqueStoreCount > 1;
-
-    return (
         <div className="space-y-6 animate-in fade-in duration-500">
 
             {/* Filter Bar */}
@@ -278,20 +272,6 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                 </div>
 
                 {/* 5. Clientes */}
-                {role !== 'atendente' && (
-                    <>
-                        <div className="bg-neutral-900/50 p-6 rounded-xl border border-neutral-800 flex flex-col justify-between">
-                            <div className="flex items-center gap-3 text-neutral-500 mb-2">
-                                <div className="p-2 bg-pink-500/10 rounded-lg"><Users className="w-4 h-4 text-pink-400" /></div>
-                                <span className="text-sm font-medium">Clientes Atendidos</span>
-                            </div>
-                            <div className="text-3xl font-bold text-neutral-100">{summary.uniqueCustomers}</div>
-                            <p className="text-xs text-neutral-500">
-                                {summary.uniqueCustomers > 0 ? (basketsMetrics.totalBaskets / summary.uniqueCustomers).toFixed(1) : 0} cestos / cliente
-                            </p>
-                        </div>
-
-                        {/* 6. Fat. Médio Dia */}
                         <div className="bg-neutral-900/50 p-6 rounded-xl border border-neutral-800 flex flex-col justify-between">
                             <div className="flex items-center gap-3 text-neutral-500 mb-2">
                                 <div className="p-2 bg-cyan-500/10 rounded-lg"><Activity className="w-4 h-4 text-cyan-400" /></div>
