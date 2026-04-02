@@ -128,17 +128,15 @@ export async function GET(request: Request) {
         let last30DaysAvg = 0;
         
         if (period === 'thisMonth' || period === 'today') {
-            const [cR, l30] = await Promise.all([
-                qCoupons,
+            const [l30] = await Promise.all([
                 supabase.rpc('get_financial_dashboard_metrics', { p_store: store, p_start_date: thirtyDaysAgoIso, p_end_date: now.toISOString() })
             ]);
-            couponsRes = cR;
             if (l30.data && l30.data.salesMetrics) {
                 last30DaysAvg = l30.data.salesMetrics.totalRevenue / 30;
             }
         } else {
-            const cR = await qCoupons;
-            couponsRes = cR;
+            // qCoupons.count has been temporarily disabled because doing COUNT(*) on raw sales table bypasses materialized views
+            couponsRes = { count: 0 };
         }
         
         paymentStats.coupons = couponsRes.count || 0;
