@@ -887,8 +887,9 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
 
       // Restore massive memory state arrays so CRM, Gantt, and Churn work fully.
       try {
-          const newSales = await fetchAllParallel('sales', 'id, data, loja, valor, desconto, cliente, produto', 'data', configuredNames, 24, 0);
-          const newOrders = await fetchAllParallel('orders', 'id, sale_id, machine, service, status, data, valor, loja', 'data', configuredNames, 24, 0);
+          // Changed from 24 (2 years) to 3 (90 days) to prevent 1+ minute boot times
+          const newSales = await fetchAllParallel('sales', 'id, data, loja, valor, desconto, cliente, produto', 'data', configuredNames, 3, 0);
+          const newOrders = await fetchAllParallel('orders', 'id, sale_id, machine, service, status, data, valor, loja', 'data', configuredNames, 3, 0);
           
           setAllRecords(newSales.map((r: any) => ({ ...r, data: new Date(r.data) })) as any[]);
           setAllOrders(newOrders.map((o: any) => ({ ...o, data: new Date(o.data) })) as any[]);
