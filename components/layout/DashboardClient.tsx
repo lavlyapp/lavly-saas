@@ -1236,7 +1236,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
 
   async function handleSyncVMPay(passedToken: string | null = null) {
     const pushLog = (msg: string) => {
-      const ts = new Date().toISOString().substring(11, 23); // HH:mm:ss.SSS
+      const ts = new Date().toLocaleTimeString('pt-BR', { hour12: false });
       setLogs(prev => [...prev, `[${ts}] ${msg}`]);
     };
 
