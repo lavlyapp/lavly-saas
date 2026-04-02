@@ -1375,7 +1375,17 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         onComplete={async () => {
           setNeedsOnboardingStores([]);
           const currentToken = initialSession?.access_token || null;
-          await reloadAllData("Onboarding Complete", currentToken);
+      
+      try {
+        const ts = new Date().toISOString().substring(11, 23);
+        setLogs(prev => [...prev, `[${ts}] [System] Consolidando tabelas Cloud-Native de Alta Performance...`]);
+        await supabase.rpc('refresh_dashboard_materialized_views');
+      } catch (dbErr: any) {
+        const ts = new Date().toISOString().substring(11, 23);
+        setLogs(prev => [...prev, `[${ts}] [Aviso] Falha ao refreshar cache do sistema: ${dbErr.message}`]);
+      }
+
+      await reloadAllData("Manual Sync Completion", currentToken);
         }}
       />
     );
