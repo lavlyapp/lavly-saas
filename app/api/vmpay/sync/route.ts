@@ -7,8 +7,6 @@ import { logActivity } from '@/lib/logger';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
-export const maxDuration = 300; // 5 minutes for Vercel Hobby
-
 export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
