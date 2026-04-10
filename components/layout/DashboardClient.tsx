@@ -349,8 +349,15 @@ function AppContent({
     }
 
     // 3. Dashboard Rendering (Strictly if Data Exists)
-    if (activeTab === 'financial' && viewData) {
-      return <FinancialDashboard data={viewData} selectedStore={selectedStore || undefined} />;
+    if (activeTab === 'financial') {
+      const dummyViewData = viewData || {
+        records: [],
+        orders: [],
+        summary: { totalSales: 0, totalValue: 0, startDate: null, endDate: null },
+        errors: [],
+        logs: logs
+      };
+      return <FinancialDashboard data={dummyViewData} selectedStore={selectedStore || undefined} />;
     }
 
     if (activeTab === 'comparative' && viewData) {
