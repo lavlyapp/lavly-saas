@@ -91,7 +91,7 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                 console.log(`[VMPay Client] Syncing ${cred.name} chunk: ${startStr} to ${endStr}`);
 
                 while (true) {
-                    const url = `${VMPAY_API_BASE_URL}/vendas?dataInicio=${startStr}&dataTermino=${endStr}&pagina=${page}&quantidade=${size}`;
+                    const url = `${VMPAY_API_BASE_URL}/vendas?dataInicio=${startStr}&dataTermino=${endStr}&somenteSucesso=true&pagina=${page}&quantidade=${size}`;
 
                     let res;
                     try {
