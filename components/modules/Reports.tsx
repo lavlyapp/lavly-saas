@@ -17,98 +17,53 @@ import { useSubscription } from "@/components/context/SubscriptionContext";
 import { Lock } from "lucide-react";
 
 interface ReportsProps {
-    data: { records: SaleRecord[] };
+    data?: any; // Compatability ignored
+    selectedStore?: string;
 }
 
-export function Reports({ data }: ReportsProps) {
+export function Reports({ selectedStore }: ReportsProps) {
     const { canAccess } = useSubscription();
     const { openCustomerDetails } = useCustomerContext();
     const [reportType, setReportType] = useState<'recovery' | 'opportunity' | 'machine'>('recovery');
+    
+    const [isLoading, setIsLoading] = useState(true);
+    const [payload, setPayload] = useState<any>(null);
 
-    const metrics = useMemo(() => {
-        if (!data?.records) return null;
-        return calculateCrmMetrics(data.records, undefined, (data as any).orders);
-    }, [data?.records, (data as any)?.orders]);
-
-    const periodStats = useMemo(() => {
-        if (!data?.records) return null;
-        return calculatePeriodStats(data.records, data.records, (data as any).orders);
-    }, [data?.records, (data as any)?.orders]);
-
-    // 1. Recovery Logic: High LTV customers, inactive > 30 days
-    const recoveryList = useMemo(() => {
-        if (!metrics?.profiles) return [];
-        return metrics.profiles
-            .filter(p => p.recency > 30 && p.totalSpent > 100) // Valuable and inactive
-            .sort((a, b) => b.totalSpent - a.totalSpent)
-            .slice(0, 20);
-    }, [metrics?.profiles]);
-
-    const estimatedMonthlyLoss = useMemo(() => {
-        if (!metrics?.profiles) return 0;
-        const inactivePrecious = metrics.profiles.filter(p => p.recency > 20 && p.totalSpent > 50);
-        return inactivePrecious.reduce((acc, p) => acc + (p.totalSpent / Math.max(differenceInDays(new Date(), p.firstVisitDate) / 30, 1)), 0);
-    }, [metrics?.profiles]);
-
-    // 2. Opportunities: Only Wash / Only Dry
-    const opportunities = useMemo(() => {
-        if (!periodStats) return null;
-        return {
-            onlyWash: periodStats.onlyWashList.slice(0, 10),
-            onlyDry: periodStats.onlyDryList.slice(0, 10)
-        };
-    }, [periodStats]);
-
-    // 3. Machine BI: Advanced stats
-    const machineBI = useMemo(() => {
-        if (!data?.records || data.records.length === 0) return [];
-
-        const machineMap = new Map<string, {
-            id: string;
-            type: string;
-            totalMinutes: number;
-            totalRevenue: number;
-            cycles: number;
-        }>();
-
-        // Optimize: we don't need to process 35k records just to show top 5 machines on the frontend.
-        // We take the last 5000 records (most recent) to get a statistically significant snapshot without crashing the browser tab.
-        const recentRecords = data.records.slice(-5000);
-
-        for (let i = 0; i < recentRecords.length; i++) {
-            const r = recentRecords[i];
-            if (!r.items || r.items.length === 0) continue;
-
-            for (let j = 0; j < r.items.length; j++) {
-                const item = r.items[j];
-                const mId = item.machine;
-                if (!mId) continue;
-
-                let curr = machineMap.get(mId);
-                if (!curr) {
-                    curr = { id: mId, type: '', totalMinutes: 0, totalRevenue: 0, cycles: 0 };
-                    machineMap.set(mId, curr);
+    React.useEffect(() => {
+        let isMounted = true;
+        const fetchReports = async () => {
+            setIsLoading(true);
+            try {
+                const res = await fetch(`/api/metrics/reports?store=${encodeURIComponent(selectedStore || 'Todas')}`);
+                const json = await res.json();
+                if (isMounted && json.success) {
+                    setPayload(json.payload);
                 }
-
-                const svcString = (item.service || '').toLowerCase();
-                const machString = (item.machine || '').toLowerCase();
-
-                const isWash = svcString.includes('lav') || machString.includes('lav');
-                curr.type = isWash ? 'Lavadora' : 'Secadora';
-                curr.cycles++;
-                curr.totalRevenue += (item.value || 0);
-                curr.totalMinutes += isWash ? 33.5 : 49;
+            } catch (err) {
+                console.error("Failed to load reports data", err);
+            } finally {
+                if (isMounted) setIsLoading(false);
             }
-        }
+        };
+        fetchReports();
+        return () => { isMounted = false; };
+    }, [selectedStore]);
 
-        return Array.from(machineMap.values()).map(m => ({
-            ...m,
-            revenuePerHour: m.totalMinutes > 0 ? (m.totalRevenue / (m.totalMinutes / 60)) : 0,
-            maintenanceScore: Math.min(100, (m.cycles / 500) * 100) // Arbitrary scale for demo
-        })).sort((a, b) => b.revenuePerHour - a.revenuePerHour);
-    }, [data?.records]);
+    if (isLoading) {
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                <div className="h-12 w-full max-w-xl bg-neutral-900 rounded-xl animate-pulse"></div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="h-32 bg-neutral-900/40 rounded-xl animate-pulse"></div>
+                    <div className="h-32 bg-neutral-900/40 rounded-xl animate-pulse"></div>
+                    <div className="h-32 bg-neutral-900/40 rounded-xl animate-pulse"></div>
+                </div>
+                <div className="h-96 w-full bg-neutral-900/40 rounded-xl animate-pulse mt-6"></div>
+            </div>
+        );
+    }
 
-    if (!data || !metrics) {
+    if (!payload?.recoveryList) {
         return (
             <div className="flex flex-col items-center justify-center p-12 bg-neutral-900 border border-neutral-800 rounded-xl text-neutral-500 gap-4">
                 <AlertCircle className="w-12 h-12 text-neutral-600" />
@@ -116,6 +71,8 @@ export function Reports({ data }: ReportsProps) {
             </div>
         );
     }
+
+    const { recoveryList, estimatedMonthlyLoss, opportunities, machineBI, inactive30, globalAverageTicket } = payload;
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -161,7 +118,7 @@ export function Reports({ data }: ReportsProps) {
                                 <CardTitle className="text-sm font-medium text-amber-400">Clientes "Sumidos"</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold text-amber-500">{metrics.customerStats.inactive30}</div>
+                                <div className="text-2xl font-bold text-amber-500">{inactive30}</div>
                                 <p className="text-xs text-neutral-500 mt-1">Inativos entre 30 e 60 dias</p>
                             </CardContent>
                         </Card>
@@ -230,7 +187,7 @@ export function Reports({ data }: ReportsProps) {
                                                     {p.totalSpent.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                                 </TableCell>
                                                 <TableCell className="text-right text-neutral-500">
-                                                    {format(p.lastVisitDate, "dd/MM/yy")}
+                                                    {(p.lastVisitDate ? format(new Date(p.lastVisitDate), "dd/MM/yy") : "-")}
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <span className="text-red-400 font-bold">{p.recency} dias</span>
@@ -327,7 +284,7 @@ export function Reports({ data }: ReportsProps) {
                                         <p className="text-xs text-emerald-600/80">Ocupação &gt; 90% às 10h. Considere tarifa diferenciada ou sinalização de espera.</p>
                                     </div>
                                     <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-                                        <p className="text-sm font-bold text-blue-400 mb-1">Ticket Médio atual: {metrics.globalAverageTicket.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                        <p className="text-sm font-bold text-blue-400 mb-1">Ticket Médio atual: {globalAverageTicket.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                                         <p className="text-xs text-blue-500/80">Meta sugerida: R$ 45,00. Estimulado por vendas de cestas ou serviços premium.</p>
                                     </div>
                                 </div>

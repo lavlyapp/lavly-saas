@@ -13,14 +13,8 @@ import { CustomerRecord, SaleRecord } from '@/lib/processing/etl';
 import { getCanonicalStoreName } from '@/lib/vmpay-config';
 
 interface ComparativeDashboardProps {
-    data: {
-        records: SaleRecord[];
-        orders?: any[];
-        summary: any;
-        errors?: any[];
-        logs?: any[];
-    };
-    customers: CustomerRecord[];
+    data?: any; // Mantido para compatibilidade, mas ignorado
+    customers?: CustomerRecord[];
     selectedStore?: string;
 }
 
@@ -40,278 +34,55 @@ export function ComparativeDashboard({ data, customers, selectedStore = 'Todas' 
 
     const canonicalSelected = getCanonicalStoreName(selectedStore);
 
-    // --- Store Filter Logic ---
-    const filteredRecords = useMemo(() => {
-        if (!data?.records) return [];
-        if (!selectedStore || selectedStore === 'Todas' || canonicalSelected === 'Todas') return data.records;
-        return data.records.filter((r: any) => getCanonicalStoreName(r.loja) === canonicalSelected);
-    }, [data?.records, selectedStore, canonicalSelected]);
+    const canonicalSelected = getCanonicalStoreName(selectedStore || 'Todas');
 
-    const filteredOrders = useMemo(() => {
-        if (!data?.orders) return [];
-        if (!selectedStore || selectedStore === 'Todas' || canonicalSelected === 'Todas') return data.orders;
-        return data.orders.filter((o: any) => getCanonicalStoreName(o.loja) === canonicalSelected);
-    }, [data?.orders, selectedStore, canonicalSelected]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [monthlyStats, setMonthlyStats] = useState<any[]>([]);
+    const [heatmapData, setHeatmapData] = useState<{ daysChart: any[], weeksChart: any[] }>({ daysChart: [], weeksChart: [] });
+    const [fetchError, setFetchError] = useState<string | null>(null);
 
-
-    // --- 12-Month Array Generator ---
-    const last12Months = useMemo(() => {
-        const now = new Date();
-        const months = [];
-        for (let i = 11; i >= 0; i--) {
-            const d = subMonths(now, i);
-            months.push({
-                start: startOfMonth(d),
-                end: endOfMonth(d),
-                // @ts-ignore
-                label: format(d, 'MMM yy', { locale: ptBR }),
-                yearMonth: format(d, 'yyyy-MM')
-            });
-        }
-        return months;
-    }, []);
-
-
-    // --- Core Aggregations ---
-    const monthlyStats = useMemo(() => {
-        // PERFORMANCE FIX: Pre-process global data ONCE instead of 12 times
-        // 1. Pre-group visits (180 mins) across all filteredRecords to avoid slow CRM calculation in each month
-        const customerVisitsList: { date: Date, totalValue: number }[] = [];
-        const customerRecordsMap = new Map<string, SaleRecord[]>();
-
-        filteredRecords.forEach(r => {
-            const client = r.cliente && r.cliente !== 'Consumidor Final' ? r.cliente : 'ANON_' + Math.random();
-            if (!customerRecordsMap.has(client)) customerRecordsMap.set(client, []);
-            customerRecordsMap.get(client)!.push(r);
-        });
-
-        customerRecordsMap.forEach((sales) => {
-            sales.sort((a, b) => a.data.getTime() - b.data.getTime());
-            const visits: { date: Date, totalValue: number }[] = [];
-            sales.forEach(r => {
-                const lastVisit = visits.length > 0 ? visits[visits.length - 1] : null;
-                // 180 mins = 10800000 ms
-                if (lastVisit && (r.data.getTime() - lastVisit.date.getTime()) <= 10800000 && (r.data.getTime() - lastVisit.date.getTime()) >= 0) {
-                    lastVisit.totalValue += r.valor;
-                } else {
-                    visits.push({ date: r.data, totalValue: r.valor });
+    React.useEffect(() => {
+        let isMounted = true;
+        const fetchData = async () => {
+            setIsLoading(true);
+            try {
+                const res = await fetch(`/api/metrics/comparative?store=${encodeURIComponent(selectedStore || 'Todas')}`);
+                const json = await res.json();
+                if (isMounted && json.success) {
+                    setMonthlyStats(json.payload.monthlyStats);
+                    setHeatmapData(json.payload.heatmapData);
+                } else if (isMounted) {
+                    setFetchError(json.error || 'Erro Vercel');
                 }
-            });
-            customerVisitsList.push(...visits);
-        });
-
-        // 2. Pre-build Gender Map for FAST loop lookups
-        const maleIdentifiers = [' SR ', ' SENHOR '];
-        const femaleIdentifiers = [' SRA ', ' SENHORA ', ' DRA '];
-        const genderCache = new Map<string, string>(); // 'M' | 'F'
-
-        customers.forEach(c => {
-            if (c.name && c.gender) {
-                const g = c.gender.toLowerCase();
-                const n = c.name.trim().toUpperCase().split(' ')[0];
-                if (g === 'm' || g === 'masculino') genderCache.set(n, 'M');
-                if (g === 'f' || g === 'feminino') genderCache.set(n, 'F');
+            } catch (err: any) {
+                if (isMounted) setFetchError(err.message);
+            } finally {
+                if (isMounted) setIsLoading(false);
             }
-        });
-
-        return last12Months.map(month => {
-
-            // 1. Sales & Revenue
-            const monthSales = filteredRecords.filter(r => {
-                if (!r.data) return false;
-                const rTime = typeof r.data === 'string' ? new Date(r.data).getTime() : r.data.getTime();
-                const d = new Date(rTime - (3 * 3600 * 1000));
-                return d >= month.start && d <= month.end;
-            });
-
-            const totalRevenue = monthSales.reduce((sum, r) => sum + (r.valor || 0), 0);
-            const uniqueCustomers = new Set(monthSales.map(r => r.cliente || 'Anonimo')).size;
-
-            // 1.5. CRM Metrics Equivalent (Fast Calculation based on pre-processed visits)
-            const monthVisits = customerVisitsList.filter(v => {
-                const vTime = typeof v.date === 'string' ? new Date(v.date).getTime() : v.date.getTime();
-                const d = new Date(vTime - (3 * 3600 * 1000));
-                return d >= month.start && d <= month.end;
-            });
-            const ticketAverage = monthVisits.length > 0 ? totalRevenue / monthVisits.length : 0;
-
-            // 2. Orders & Services (Baskets, Washes, Dries)
-            const monthOrders = filteredOrders.filter(o => {
-                if (!o.data) return false;
-                const oTime = typeof o.data === 'string' ? new Date(o.data).getTime() : o.data.getTime();
-                const d = new Date(oTime - (3 * 3600 * 1000));
-                return d >= month.start && d <= month.end;
-            });
-
-            let washes = 0;
-            let dries = 0;
-
-            monthOrders.forEach(o => {
-                const service = (o.service || o.produto || '').toLowerCase();
-                const machine = (o.machine || '').toLowerCase();
-                let isWash = false;
-                let isDry = false;
-
-                // Exact same methodology as FinancialDashboard basketsMetrics
-                // 1. Explicit Machine Name Override (High Priority)
-                if (machine.includes('secadora') || machine.includes('secar')) {
-                    isDry = true;
-                } else if (machine.includes('lavadora') || machine.includes('lavar')) {
-                    isWash = true;
-                }
-
-                // 2. Explicit Service Description (Column L)
-                if (!isWash && !isDry) {
-                    if (service === 'lavagem' || service.includes('lavagem') || service.includes('lavar')) isWash = true;
-                    else if (service === 'secagem' || service.includes('secagem') || service.includes('secar')) isDry = true;
-                }
-
-                // 3. Machine Number Parity Rule (Lavateria Standard: Odd=Dry, Even=Wash)
-                if (!isWash && !isDry) {
-                    const machineNumberMatch = machine.match(/\d+/);
-                    if (machineNumberMatch) {
-                        const num = parseInt(machineNumberMatch[0], 10);
-                        if (!isNaN(num)) {
-                            if (num % 2 === 0) isWash = true; // Even = Wash
-                            else isDry = true; // Odd = Dry
-                        }
-                    }
-                }
-
-                // 4. Fallback Keywords (Legacy)
-                if (!isWash && !isDry) {
-                    if (service.includes('agua') || service.includes('lave') || service.includes('quente') || service.includes('frio') || service.includes('super') || service.includes('edredom') || service.includes('delicado')) {
-                        isWash = true;
-                    } else if (service.includes('seque') || service.includes('vento') || service.includes('bem seco')) {
-                        isDry = true;
-                    }
-                }
-
-                if (isWash) washes++;
-                if (isDry) dries++;
-            });
-
-            // 3. Gender Demographics Breakdown
-            let maleCount = 0;
-            let femaleCount = 0;
-
-            // For gender, we count unique customers in that month, not raw sales.
-            const monthCustomerMap = new Map();
-            monthSales.forEach(r => {
-                if (r.cliente && r.cliente !== 'Consumidor Final') {
-                    if (!monthCustomerMap.has(r.cliente)) {
-                        monthCustomerMap.set(r.cliente, true);
-                    }
-                }
-            });
-
-            monthCustomerMap.forEach((_, clientName) => {
-                const normalizedName = clientName.toUpperCase();
-                let isMale = false;
-                let isFemale = false;
-
-                if (maleIdentifiers.some(id => normalizedName.includes(id))) isMale = true;
-                if (femaleIdentifiers.some(id => normalizedName.includes(id))) isFemale = true;
-
-                // Fast Pre-Built Fallback to Customer Registry
-                if (!isMale && !isFemale) {
-                    const firstName = normalizedName.split(' ')[0];
-                    const g = genderCache.get(firstName);
-                    if (g === 'M') isMale = true;
-                    if (g === 'F') isFemale = true;
-                }
-
-                if (isMale) maleCount++;
-                else if (isFemale) femaleCount++;
-            });
-
-            const totalGenderClassified = maleCount + femaleCount;
-            const malePct = totalGenderClassified > 0 ? (maleCount / totalGenderClassified) * 100 : 0;
-            const femalePct = totalGenderClassified > 0 ? (femaleCount / totalGenderClassified) * 100 : 0;
-
-            return {
-                name: month.label,
-                revenue: totalRevenue,
-                transactions: monthSales.length,
-                uniqueCustomers: uniqueCustomers,
-                ticket: ticketAverage, // Replicating the robust Visit logic ticket
-                baskets: monthOrders.length,
-                washes: washes,
-                dries: dries,
-                malePct: parseFloat(malePct.toFixed(1)),
-                femalePct: parseFloat(femalePct.toFixed(1))
-            };
-
-        });
-    }, [last12Months, filteredRecords, filteredOrders, customers]);
-
-
-
-    // --- Best Days & Weeks Heatmap Data ---
-    const heatmapData = useMemo(() => {
-        // We look at the entire selected filteredRecords for this aggregate.
-        // Array of 7 days (0=Sunday to 6=Saturday)
-        const dayOfWeekTotals = [0, 0, 0, 0, 0, 0, 0];
-        const dayOfWeekCounts = [0, 0, 0, 0, 0, 0, 0];
-
-        // Week of Month: 1 The first week, 2, 3, 4, 5...
-        // We'll map week 1 to 5.
-        const weekOfMonthTotals = [0, 0, 0, 0, 0, 0]; // Index 1-5 (ignore 0)
-
-        // Count how many months are in the dataset to calculate pure averages if needed
-        const uniqueMonths = new Set<string>();
-
-        filteredRecords.forEach(r => {
-            if (!r.data) return;
-            const rTime = typeof r.data === 'string' ? new Date(r.data).getTime() : r.data.getTime();
-            const val = r.valor || 0;
-
-            const brtDate = new Date(rTime - (3 * 3600 * 1000));
-            const dayOfWeek = brtDate.getUTCDay(); // 0 = Sunday, 1 = Monday...
-            // @ts-ignore
-            const dayName = format(brtDate, 'EEEE', { locale: ptBR }); // Not used in this snippet, but kept as per instruction
-            const weekStr = safeFormatWeek(brtDate); // Not used for indexing, but kept as per instruction
-
-            dayOfWeekTotals[dayOfWeek] += val;
-            dayOfWeekCounts[dayOfWeek]++;
-
-            // Manual calculation for week of month (numeric)
-            const startWeek = getISOWeek(startOfMonth(brtDate));
-            const currentWeek = getISOWeek(brtDate);
-            let week = currentWeek - startWeek + 1;
-            if (week < 1) week = 1; // Fallback for year crossover
-
-            if (week >= 1 && week <= 5) {
-                weekOfMonthTotals[week] += val;
-            }
-
-            uniqueMonths.add(format(brtDate, 'yyyy-MM'));
-        });
-
-        const numMonths = uniqueMonths.size || 1;
-        const daysLabel = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-
-        const daysChart = daysLabel.map((label, index) => ({
-            name: label,
-            revenue: dayOfWeekTotals[index] / numMonths, // Average per month for that day
-            total: dayOfWeekTotals[index]
-        }));
-
-        const weeksChart = [1, 2, 3, 4, 5].map(w => ({
-            name: `Semana ${w}`,
-            revenue: weekOfMonthTotals[w] / numMonths,
-            total: weekOfMonthTotals[w]
-        }));
-
-        return {
-            daysChart,
-            weeksChart
         };
+        fetchData();
+        return () => { isMounted = false; };
+    }, [selectedStore]);
 
-    }, [filteredRecords]);
+    if (isLoading) {
+        return (
+             <div className="space-y-6 animate-in fade-in">
+                <div className="h-10 w-96 bg-neutral-900 animate-pulse rounded-md mb-2"></div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="h-[400px] bg-neutral-900/40 rounded-xl animate-pulse"></div>
+                    <div className="h-[400px] bg-neutral-900/40 rounded-xl animate-pulse"></div>
+                    <div className="h-[350px] bg-neutral-900/40 rounded-xl animate-pulse"></div>
+                    <div className="h-[350px] bg-neutral-900/40 rounded-xl animate-pulse"></div>
+                </div>
+             </div>
+        );
+    }
 
 
-    if (!data?.records || data.records.length === 0) {
+
+
+
+    if (!monthlyStats || monthlyStats.length === 0) {
         return (
             <div className="flex h-[400px] items-center justify-center bg-neutral-900/50 rounded-xl border border-neutral-800">
                 <p className="text-neutral-500">Nenhum dado disponível para Análise Comparativa.</p>

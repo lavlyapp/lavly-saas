@@ -21,10 +21,42 @@ export function ChurnAnalysis({ data, selectedStore }: ChurnAnalysisProps) {
     {/* Content Area */ }
 
     const { openCustomerDetails } = useCustomerContext();
-    const crmData = useMemo(() => {
-        if (!data?.records) return null;
-        return calculateCrmMetrics(data.records, undefined, data.orders);
-    }, [data?.records, data?.orders]);
+    
+    const [crmData, setCrmData] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    React.useEffect(() => {
+        let isMounted = true;
+        const fetchCrm = async () => {
+            setIsLoading(true);
+            try {
+                const res = await fetch(`/api/metrics/crm?store=${encodeURIComponent(selectedStore || 'Todas')}`);
+                const json = await res.json();
+                if (isMounted && json.success) {
+                    setCrmData(json.payload.globalMetrics);
+                }
+            } catch (err) {
+                console.error("Failed to load churn data", err);
+            } finally {
+                if (isMounted) setIsLoading(false);
+            }
+        };
+        fetchCrm();
+        return () => { isMounted = false; };
+    }, [selectedStore]);
+
+    if (isLoading) {
+        return (
+            <div className="flex flex-col h-full space-y-6 animate-in fade-in">
+                <div className="h-10 w-96 bg-neutral-900 animate-pulse rounded-md"></div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+                     <div className="bg-neutral-900/40 rounded-xl h-[500px] animate-pulse"></div>
+                     <div className="bg-neutral-900/40 rounded-xl h-[500px] animate-pulse"></div>
+                     <div className="bg-neutral-900/40 rounded-xl h-[500px] animate-pulse"></div>
+                </div>
+            </div>
+        );
+    }
 
     const handleExport = () => {
         if (!crmData) return;

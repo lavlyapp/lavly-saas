@@ -225,7 +225,8 @@ function AppContent({
     const isActivelyLoading = status === 'uploading' || (logs.length > 0 && status !== 'error' && status !== 'success');
     
     // Bypass loader if we are on the Financial tab (because it is 100% Cloud-Native and doesn't need raw records)
-    if (isActivelyLoading && allRecords.length === 0 && activeTab !== 'financial') {
+    // Removed dependency on allRecords completely to enable 100% Cloud-Native speed
+    if (isActivelyLoading && activeTab !== 'financial') {
       return (
         <div className="flex flex-col items-center justify-center p-8 h-[60vh] w-full bg-neutral-900/50 rounded-3xl border border-neutral-800 animate-in fade-in duration-500">
           <div className="flex flex-col items-center gap-6 w-full max-w-md">
@@ -271,122 +272,47 @@ function AppContent({
       );
     }
 
-    // Default or No Data State
-    if (!viewData && status !== 'uploading' && allRecords.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center h-[60vh] w-full border-2 border-dashed border-neutral-800 rounded-3xl bg-neutral-900/50 relative overflow-hidden">
-          <div className="bg-neutral-900 p-8 rounded-full mb-6 border border-neutral-800 shadow-2xl relative z-10">
-            <Upload className="w-12 h-12 text-blue-500" />
-          </div>
-
-          <h2 className="text-3xl font-bold text-neutral-200 mb-2 relative z-10">Importar Planilha VMPay</h2>
-          <p className="text-lg text-neutral-400 max-w-lg text-center mb-8 relative z-10">
-            Selecione o arquivo Excel de uma Loja para começar.<br />
-            <span className="text-sm text-neutral-500">(Você pode carregar múltiplas lojas em sequência)</span>
-          </p>
-
-          <div className="relative z-10 flex gap-4">
-            <div>
-              <input
-                id="file-upload"
-                type="file"
-                onChange={handleFileUpload}
-                accept=".xlsx,.xls,.csv"
-                className="hidden"
-              />
-              <label
-                htmlFor="file-upload"
-                className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-bold text-lg shadow-lg shadow-blue-500/25 transition-all cursor-pointer flex items-center gap-3"
-              >
-                <FileUp className="w-6 h-6" />
-                Importar Planilha
-              </label>
-            </div>
-
-            <button
-              onClick={() => handleSyncVMPay(token)}
-              className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full font-bold text-lg shadow-lg shadow-emerald-500/25 transition-all cursor-pointer flex items-center gap-3"
-            >
-              <RefreshCw className={`w-6 h-6 ${(status as string) === 'uploading' ? 'animate-spin' : ''}`} />
-              Sincronizar VMPay
-            </button>
-          </div>
-
-          {/* Instructions Area */}
-          <div className="mt-12 max-w-2xl bg-neutral-900/80 border border-neutral-800 p-6 rounded-2xl relative z-10 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-            <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-blue-400" />
-              Instruções de Importação
-            </h3>
-            <div className="space-y-4 text-sm text-neutral-400">
-              <div className="flex gap-3">
-                <div className="flex-shrink-0 w-6 h-6 bg-blue-600/20 text-blue-400 rounded-full flex items-center justify-center font-bold text-xs ring-1 ring-blue-500/30">1</div>
-                <div className="space-y-1">
-                  <p><strong className="text-white">Onde pegar os dados:</strong> No menu do lado esquerdo do painel VMPay, siga:</p>
-                  <ul className="list-disc ml-4 space-y-1 text-xs">
-                    <li><span className="text-blue-400 font-medium">Painel de Controle &gt; Relatórios &gt; Vendas</span></li>
-                    <li><span className="text-blue-400 font-medium">Painel de Controle &gt; Relatórios &gt; Pedidos</span></li>
-                  </ul>
-                  <p className="text-[10px] mt-1 italic">Escolha o período desejado e exporte em formato Excel ou CSV.</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="flex-shrink-0 w-6 h-6 bg-blue-600/20 text-blue-400 rounded-full flex items-center justify-center font-bold text-xs ring-1 ring-blue-500/30">2</div>
-                <p>
-                  <strong className="text-white">Sincronia de Período:</strong> Certifique-se de que ambos os arquivos são relativos ao <span className="text-warning">mesmo período</span> para que o cruzamento de dados seja preciso.
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <div className="flex-shrink-0 w-6 h-6 bg-emerald-600/20 text-emerald-400 rounded-full flex items-center justify-center font-bold text-xs ring-1 ring-emerald-500/30">3</div>
-                <p>
-                  <strong className="text-white">Ordem Correta:</strong> Primeiro faça a <span className="text-white underline">importação</span> do arquivo de <span className="text-white underline">Vendas</span>. Depois que o sistema processar, faça a <span className="text-white underline">importação</span> do arquivo de <span className="text-white underline">Pedidos</span>.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
+    // Empty state block removed. App is now 100% Cloud-Native and dashboards gracefully fetch from Edge.
 
     // 3. Dashboard Rendering (Strictly if Data Exists)
+    const renderData = viewData || {
+      records: [],
+      orders: [],
+      summary: { totalSales: 0, totalValue: 0, startDate: null, endDate: null },
+      errors: [],
+      logs: logs
+    };
+
     if (activeTab === 'financial') {
-      const dummyViewData = viewData || {
-        records: [],
-        orders: [],
-        summary: { totalSales: 0, totalValue: 0, startDate: null, endDate: null },
-        errors: [],
-        logs: logs
-      };
-      return <FinancialDashboard data={dummyViewData} selectedStore={selectedStore || undefined} />;
+      return <FinancialDashboard data={renderData} selectedStore={selectedStore || undefined} />;
     }
 
-    if (activeTab === 'comparative' && viewData) {
-      return <ComparativeDashboard data={viewData} customers={allCustomers} selectedStore={selectedStore || undefined} />;
+    if (activeTab === 'comparative') {
+      return <ComparativeDashboard data={renderData} customers={allCustomers} selectedStore={selectedStore || undefined} />;
     }
 
-    if (activeTab === 'crm' && viewData) {
-      return <CrmDashboard data={viewData} customers={allCustomers} selectedStore={selectedStore || undefined} />;
+    if (activeTab === 'crm') {
+      return <CrmDashboard data={renderData} customers={allCustomers} selectedStore={selectedStore || undefined} />;
     }
 
-    if (activeTab === 'churn' && viewData && viewData.records.length > 0) {
-      return <ChurnAnalysis data={viewData} selectedStore={selectedStore || undefined} />;
+    if (activeTab === 'churn') {
+      return <ChurnAnalysis data={renderData} selectedStore={selectedStore || undefined} />;
     }
 
-    if (activeTab === 'machines' && viewData) {
-      return <MachineAnalysis data={viewData} selectedStore={selectedStore || undefined} />;
+    if (activeTab === 'machines') {
+      return <MachineAnalysis data={renderData} selectedStore={selectedStore || undefined} />;
     }
 
-    if (activeTab === 'queue' && viewData) {
-      return <QueueAnalysis data={viewData.records} selectedStore={selectedStore || undefined} />;
+    if (activeTab === 'queue') {
+      return <QueueAnalysis data={renderData} selectedStore={selectedStore || undefined} />;
     }
 
-    if (activeTab === 'demographics' && viewData) {
-      return <CustomerDemographics records={viewData.records} customers={allCustomers} selectedStore={selectedStore || undefined} orders={viewData.orders} />;
+    if (activeTab === 'demographics') {
+      return <CustomerDemographics selectedStore={selectedStore || undefined} />;
     }
 
     if (activeTab === 'reports') {
-      if (!viewData?.records) return <div className="p-8 text-neutral-500 text-center">Nenhum dado processado para gerar relatórios.</div>;
-      return <Reports data={viewData} />;
+      return <Reports selectedStore={selectedStore || undefined} />;
     }
 
     if (activeTab === 'marketing') {
@@ -719,7 +645,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       };
     }
 
-    if (allRecords.length === 0) return null;
+    if (!mounted || status === 'uploading') return null; // Avoid excessive renders during sync
 
     console.time("[Page] calculate ViewData");
 
@@ -894,19 +820,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         registrationDate: c.registration_date ? new Date(c.registration_date) : undefined
       }));
 
-      // Restore massive memory state arrays so CRM, Gantt, and Churn work fully.
-      try {
-          // Changed from 24 (2 years) to 3 (90 days) to prevent 1+ minute boot times
-          const newSales = await fetchAllParallel('sales', 'id, data, loja, valor, desconto, cliente, produto', 'data', configuredNames, 3, 0);
-          const newOrders = await fetchAllParallel('orders', 'id, sale_id, machine, service, status, data, valor, loja', 'data', configuredNames, 3, 0);
-          
-          setAllRecords(newSales.map((r: any) => ({ ...r, data: new Date(r.data) })) as any[]);
-          setAllOrders(newOrders.map((o: any) => ({ ...o, data: new Date(o.data) })) as any[]);
-      } catch (err) {
-          console.error("Failed fetching legacy lists:", err);
-          setAllRecords([]);
-          setAllOrders([]);
-      }
+      // Cloud-Native mode active: Mass sync arrays eliminated!
       
       if (hydratedCustomers.length > 0) setAllCustomers(hydratedCustomers);
       

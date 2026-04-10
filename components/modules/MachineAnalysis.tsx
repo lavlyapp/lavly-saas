@@ -8,144 +8,58 @@ import { MachineGanttChart } from "./MachineGanttChart";
 import { startOfDay, endOfDay, startOfMonth, endOfMonth, subDays, subMonths } from "date-fns";
 
 interface MachineAnalysisProps {
-    data: {
-        records: SaleRecord[],
-        orders?: any[]
-    };
+    data?: any; // Mantido para compatibilidade, ignorado
     selectedStore?: string;
 }
 
 type PeriodOption = 'today' | 'yesterday' | 'thisMonth' | 'lastMonth';
 
-export function MachineAnalysis({ data, selectedStore }: MachineAnalysisProps) {
+export function MachineAnalysis({ selectedStore }: MachineAnalysisProps) {
     const [period, setPeriod] = useState<PeriodOption>('today');
+    const [isLoading, setIsLoading] = useState(true);
+    const [payload, setPayload] = useState<any>(null);
 
-    // Filter orders based on selected period
-    const filteredOrders = useMemo(() => {
-        if (!data?.orders) return [];
-
-        // Ensure the filter brackets strictly use BRT, dodging browser drifts
-        const now = new Date(new Date().getTime() - (3 * 3600 * 1000));
-        let interval: { start: Date; end: Date };
-
-        switch (period) {
-            case 'today':
-                interval = { start: startOfDay(now), end: endOfDay(now) };
-                break;
-            case 'yesterday':
-                const yesterday = subDays(now, 1);
-                interval = { start: startOfDay(yesterday), end: endOfDay(yesterday) };
-                break;
-            case 'thisMonth':
-                interval = { start: startOfMonth(now), end: endOfMonth(now) };
-                break;
-            case 'lastMonth':
-                const lastMonth = subMonths(now, 1);
-                interval = { start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) };
-                break;
-            default:
-                interval = { start: startOfDay(now), end: endOfDay(now) };
-        }
-
-        return data.orders.filter((o: any) => {
-            if (!o.data) return false;
-            const recordDate = o.data instanceof Date ? o.data : new Date(o.data);
-            return recordDate >= interval.start && recordDate <= interval.end;
-        });
-    }, [data?.orders, period]);
-
-    const { machines, summary, topRevenueMachine, topCyclesMachine } = useMemo(() => {
-        if (!filteredOrders.length) return { machines: [], summary: {}, topRevenueMachine: null, topCyclesMachine: null };
-
-        const machineMap = new Map<string, {
-            id: string;
-            type: 'Lavadora' | 'Secadora' | 'Outro';
-            cycles: number;
-            totalRevenue: number;
-            lastUse: Date;
-        }>();
-
-        let totalRevenueAll = 0;
-        let totalCyclesAll = 0;
-
-        filteredOrders.forEach((item: any) => {
-            const machineId = item.machine;
-            if (!machineId) return;
-
-            let isWash = (item.service || '').toLowerCase().includes('lav') || machineId.toLowerCase().includes('lav') || machineId.toLowerCase().includes('inferior');
-            let isDry = (item.service || '').toLowerCase().includes('sec') || machineId.toLowerCase().includes('sec') || machineId.toLowerCase().includes('superior');
-
-            if (!isWash && !isDry) {
-                const numMatch = machineId.match(/\d+/);
-                if (numMatch) {
-                    const num = parseInt(numMatch[0], 10);
-                    if (num % 2 !== 0) isDry = true;
-                    else isWash = true;
-                } else {
-                    isWash = true; // Fallback
+    React.useEffect(() => {
+        let isMounted = true;
+        const fetchMachines = async () => {
+            setIsLoading(true);
+            try {
+                const res = await fetch(`/api/metrics/machines?store=${encodeURIComponent(selectedStore || 'Todas')}&period=${period}`);
+                const json = await res.json();
+                if (isMounted && json.success) {
+                    setPayload(json.payload);
                 }
+            } catch (err) {
+                console.error("Failed to load machine data", err);
+            } finally {
+                if (isMounted) setIsLoading(false);
             }
-
-            const type = isWash ? 'Lavadora' : (isDry ? 'Secadora' : 'Outro');
-
-            const current = machineMap.get(machineId) || {
-                id: machineId,
-                type,
-                cycles: 0,
-                totalRevenue: 0,
-                lastUse: new Date(0)
-            };
-
-            const val = item.valor || item.value || 0; // fallback to valor from DB
-            current.cycles++;
-            current.totalRevenue += val;
-
-            totalCyclesAll++;
-            totalRevenueAll += val;
-
-            const itemDate = item.data ? (item.data instanceof Date ? item.data : new Date(item.data)) : new Date();
-            if (itemDate > current.lastUse) current.lastUse = itemDate;
-
-            machineMap.set(machineId, current);
-        });
-
-        const machineList = Array.from(machineMap.values()).map(m => ({
-            ...m,
-            revenueShare: totalRevenueAll > 0 ? (m.totalRevenue / totalRevenueAll) : 0,
-            cycleShare: totalCyclesAll > 0 ? (m.cycles / totalCyclesAll) : 0,
-            avgTicket: m.cycles > 0 ? m.totalRevenue / m.cycles : 0
-        }));
-
-        // Sort by Type (Lavadora < Secadora < Outro), then by ID
-        machineList.sort((a, b) => {
-            if (a.type !== b.type) {
-                if (a.type === 'Lavadora') return -1;
-                if (b.type === 'Lavadora') return 1;
-                if (a.type === 'Secadora') return -1;
-                if (b.type === 'Secadora') return 1;
-            }
-            return a.id.localeCompare(b.id, undefined, { numeric: true });
-        });
-
-        const topRev = [...machineList].sort((a, b) => b.totalRevenue - a.totalRevenue)[0];
-        const topCyc = [...machineList].sort((a, b) => b.cycles - a.cycles)[0];
-
-        return {
-            machines: machineList,
-            summary: { totalRevenueAll, totalCyclesAll },
-            topRevenueMachine: topRev,
-            topCyclesMachine: topCyc
         };
+        fetchMachines();
+        return () => { isMounted = false; };
+    }, [selectedStore, period]);
 
-    }, [filteredOrders]);
+    if (isLoading) {
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                <div className="h-12 w-full max-w-2xl bg-neutral-900 rounded-xl animate-pulse"></div>
+                <div className="h-[200px] w-full bg-neutral-900/40 rounded-xl animate-pulse"></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="h-32 bg-neutral-900/40 rounded-xl animate-pulse"></div>
+                    <div className="h-32 bg-neutral-900/40 rounded-xl animate-pulse"></div>
+                </div>
+            </div>
+        );
+    }
 
-    // Show empty state only if NO records exist at all, otherwise show filtered empty state
-    if (!data?.records || data.records.length === 0) {
+    const { machines, summary, topRevenueMachine, topCyclesMachine, rawOrders } = payload || { machines: [], summary: {}, rawOrders: [] };
+
+    // Show empty state only if NO records exist at all
+    if (!machines || machines.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center p-12 text-neutral-500">
                 <Wrench className="w-12 h-12 mb-4 opacity-50" />
-                <p className="text-lg">Nenhum dado de máquina encontrado.</p>
-                <p className="text-sm mt-2">Importe a planilha de "Pedidos" para ver análise detalhada.</p>
+                <p className="text-lg">Nenhum dado de máquina encontrado no período.</p>
             </div>
         );
     }
@@ -175,7 +89,7 @@ export function MachineAnalysis({ data, selectedStore }: MachineAnalysisProps) {
 
             {/* 1. Machine Gantt Chart (Moved here) */}
             <div className="mb-8">
-                <MachineGanttChart records={filteredOrders.map((o: any) => ({
+                <MachineGanttChart records={rawOrders.map((o: any) => ({
                     data: o.data instanceof Date ? o.data : new Date(o.data),
                     cliente: o.cliente || '',
                     valor: o.valor || o.value,

@@ -12,58 +12,81 @@ import {
 } from "lucide-react";
 
 interface QueueAnalysisProps {
-    data: SaleRecord[];
+    data?: any; // Mantido para compatibilidade, ignorado
     selectedStore?: string;
 }
 
 const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
-export function QueueAnalysis({ data, selectedStore }: QueueAnalysisProps) {
-    const metrics = useMemo(() => calculateMachineAvailability(data), [data]);
+export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
     const [selectedHour, setSelectedHour] = useState<{ day: number, hour: number } | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [payload, setPayload] = useState<any>(null);
+
+    React.useEffect(() => {
+        let isMounted = true;
+        const fetchQueue = async () => {
+            setIsLoading(true);
+            try {
+                const res = await fetch(`/api/metrics/queue?store=${encodeURIComponent(selectedStore || 'Todas')}`);
+                const json = await res.json();
+                if (isMounted && json.success) {
+                    setPayload(json.payload);
+                }
+            } catch (err) {
+                console.error("Failed to load queue data", err);
+            } finally {
+                if (isMounted) setIsLoading(false);
+            }
+        };
+        fetchQueue();
+        return () => { isMounted = false; };
+    }, [selectedStore]);
+
+    if (isLoading) {
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                <div className="h-24 w-full bg-indigo-900/20 border border-indigo-500/20 rounded-2xl animate-pulse"></div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2 space-y-6">
+                        <div className="h-64 bg-neutral-900/40 rounded-xl animate-pulse"></div>
+                        <div className="h-64 bg-neutral-900/40 rounded-xl animate-pulse"></div>
+                    </div>
+                    <div className="space-y-6">
+                        <div className="h-32 bg-neutral-900/40 rounded-xl animate-pulse"></div>
+                        <div className="h-32 bg-neutral-900/40 rounded-xl animate-pulse"></div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!payload?.metrics) {
+        return (
+            <div className="flex flex-col items-center justify-center p-12 text-neutral-500">
+                <Clock className="w-12 h-12 mb-4 opacity-50" />
+                <p className="text-lg">Nenhum dado de fila disponível para análise.</p>
+            </div>
+        );
+    }
+
+    const { metrics, visitsHeatmap, flexibleCustomers } = payload;
 
     // Dynamic trimming: only show hours where there is at least some activity
     const activeHours = useMemo(() => {
         const hoursWithData = metrics.saturationByHour
-            .filter(s => s.saturation > 0.05)
-            .map(s => s.hour);
+            .filter((s: any) => s.saturation > 0.05)
+            .map((s: any) => s.hour);
 
         if (hoursWithData.length === 0) return HOURS;
 
-        const minVal = hoursWithData.reduce((a, b) => Math.min(a, b), hoursWithData[0]);
-        const maxVal = hoursWithData.reduce((a, b) => Math.max(a, b), hoursWithData[0]);
+        const minVal = hoursWithData.reduce((a: any, b: any) => Math.min(a, b), hoursWithData[0]);
+        const maxVal = hoursWithData.reduce((a: any, b: any) => Math.max(a, b), hoursWithData[0]);
         const min = Math.max(0, minVal - 1);
         const max = Math.min(23, maxVal + 1);
         return Array.from({ length: max - min + 1 }, (_, i) => min + i);
     }, [metrics.saturationByHour]);
-
-    const visitsHeatmap = useMemo(() => {
-        const matrix = Array.from({ length: 7 }, () => Array(24).fill(0));
-        const processedVisits = new Set<string>();
-
-        data.forEach(r => {
-            if (!r.data) return;
-            try {
-                // Strict BRT localization
-                const brtDate = new Date(r.data.getTime() - (3 * 3600 * 1000));
-                const dayOfWeek = brtDate.getUTCDay();
-                const h = brtDate.getUTCHours();
-                const dateKey = `${brtDate.getUTCFullYear()}-${brtDate.getUTCMonth()}-${brtDate.getUTCDate()}`;
-                const key = `${dateKey}-${h}-${r.cliente || 'anon'}`;
-
-                if (!processedVisits.has(key)) {
-                    matrix[dayOfWeek][h]++;
-                    processedVisits.add(key);
-                }
-            } catch (e) { }
-        });
-        return matrix;
-    }, [data]);
-
-    const flexibleCustomers = useMemo(() => {
-        return findFlexibleCustomers(data, metrics.saturationByHour);
-    }, [data, metrics.saturationByHour]);
 
     const globalMaxVisits = useMemo(() => {
         const flatVisits = visitsHeatmap.flat();

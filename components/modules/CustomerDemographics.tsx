@@ -8,10 +8,10 @@ import { useState, useMemo } from "react";
 import { startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, subMonths, format } from "date-fns";
 
 interface CustomerDemographicsProps {
-    records: SaleRecord[];
-    customers: CustomerRecord[];
+    records?: any;
+    customers?: any;
     selectedStore?: string;
-    orders?: any[];
+    orders?: any;
 }
 
 type PeriodOption = 'today' | 'yesterday' | 'thisMonth' | 'lastMonth' | 'custom' | 'allTime';
@@ -19,71 +19,40 @@ type PeriodOption = 'today' | 'yesterday' | 'thisMonth' | 'lastMonth' | 'custom'
 export function CustomerDemographics({ records, customers, selectedStore, orders }: CustomerDemographicsProps) {
     const { canAccess } = useSubscription();
 
-    // --- Filter State (Copied from FinancialDashboard) ---
-    const [period, setPeriod] = useState<PeriodOption>(() => {
-        if (!records || records.length === 0) return 'allTime';
-        // Default to allTime so CRM metrics like LTV and Churn (which require a long term view) are correct
-        return 'allTime';
-    });
+    const [profiles, setProfiles] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const [customRange, setCustomRange] = useState({
-        start: format(startOfMonth(new Date(new Date().getTime() - (3 * 3600 * 1000))), 'yyyy-MM-dd'),
-        end: format(endOfMonth(new Date(new Date().getTime() - (3 * 3600 * 1000))), 'yyyy-MM-dd')
-    });
-
-    // --- Filter Logic ---
-    const filteredRecords = useMemo(() => {
-        if (!records) return [];
-
-        // Explicit BRT Shift to prevent browser timezone leaks
-        const now = new Date(new Date().getTime() - (3 * 3600 * 1000));
-        let interval: { start: Date; end: Date } | null = null;
-
-        switch (period) {
-            case 'today':
-                interval = { start: startOfDay(now), end: endOfDay(now) };
-                break;
-            case 'yesterday':
-                const yesterday = subDays(now, 1);
-                interval = { start: startOfDay(yesterday), end: endOfDay(yesterday) };
-                break;
-            case 'thisMonth':
-                interval = { start: startOfMonth(now), end: endOfMonth(now) };
-                break;
-            case 'lastMonth':
-                const lastMonth = subMonths(now, 1);
-                interval = { start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) };
-                break;
-            case 'custom':
-                if (customRange.start && customRange.end) {
-                    interval = {
-                        start: startOfDay(new Date(customRange.start)),
-                        end: endOfDay(new Date(customRange.end))
-                    };
+    React.useEffect(() => {
+        let isMounted = true;
+        const fetchCrm = async () => {
+            setIsLoading(true);
+            try {
+                const res = await fetch(`/api/metrics/crm?store=${encodeURIComponent(selectedStore || 'Todas')}`);
+                const json = await res.json();
+                if (isMounted && json.success) {
+                    setProfiles(json.payload.globalMetrics.profiles || []);
                 }
-                break;
-            case 'allTime':
-                interval = null;
-                break;
-            default:
-                interval = { start: startOfMonth(now), end: endOfMonth(now) };
-        }
+            } catch (err) {
+                console.error("Failed to load crm data for demographics", err);
+            } finally {
+                if (isMounted) setIsLoading(false);
+            }
+        };
+        fetchCrm();
+        return () => { isMounted = false; };
+    }, [selectedStore]);
 
-        if (!interval) return records;
-
-        const startTs = interval.start.getTime();
-        const endTs = interval.end.getTime();
-
-        return records.filter((r) => {
-            if (!r.data) return false;
-            const ts = r.data instanceof Date ? r.data.getTime() : new Date(r.data).getTime();
-            return ts >= startTs && ts <= endTs;
-        });
-    }, [records, period, customRange]);
-
-    // --- Metrics Calculation ---
-    const metrics = useMemo(() => calculateCrmMetrics(filteredRecords, customers, orders), [filteredRecords, customers, orders]);
-    const profiles = metrics.profiles;
+    if (isLoading) {
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                <div className="h-20 w-full bg-neutral-900 rounded-xl animate-pulse"></div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="h-64 bg-neutral-900 rounded-xl animate-pulse"></div>
+                    <div className="lg:col-span-2 h-64 bg-neutral-900 rounded-xl animate-pulse"></div>
+                </div>
+            </div>
+        );
+    }
 
 
     // 1. Protection for Non-Ouro Users
@@ -209,29 +178,9 @@ export function CustomerDemographics({ records, customers, selectedStore, orders
 
     return (
         <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-            {/* Filter Bar */}
-            <div className="bg-neutral-900/50 p-2 rounded-xl border border-neutral-800 flex flex-wrap gap-2 items-center">
-                <div className="flex items-center gap-2 px-3 text-neutral-400 border-r border-neutral-800 mr-2">
-                    <Filter className="w-4 h-4" />
-                    <span className="text-sm font-medium">Período</span>
-                </div>
-                {(['today', 'yesterday', 'thisMonth', 'lastMonth', 'allTime', 'custom'] as PeriodOption[]).map((opt) => (
-                    <button key={opt} onClick={() => setPeriod(opt)} className={`px-4 py-2 text-sm rounded-lg transition-colors ${period === opt ? 'bg-indigo-600 text-white font-medium shadow-lg shadow-indigo-500/20' : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800'}`}>
-                        {opt === 'today' && 'Hoje'}
-                        {opt === 'yesterday' && 'Ontem'}
-                        {opt === 'thisMonth' && 'Mês Atual'}
-                        {opt === 'lastMonth' && 'Mês Anterior'}
-                        {opt === 'allTime' && 'Todo o Período'}
-                        {opt === 'custom' && 'Customizado'}
-                    </button>
-                ))}
-                {period === 'custom' && (
-                    <div className="flex items-center gap-2 ml-auto animate-in fade-in slide-in-from-left-4 duration-300">
-                        <input type="date" className="bg-neutral-950 border border-neutral-800 text-neutral-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={customRange.start} onChange={(e) => setCustomRange(prev => ({ ...prev, start: e.target.value }))} />
-                        <span className="text-neutral-600">até</span>
-                        <input type="date" className="bg-neutral-950 border border-neutral-800 text-neutral-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={customRange.end} onChange={(e) => setCustomRange(prev => ({ ...prev, end: e.target.value }))} />
-                    </div>
-                )}
+            {/* Filter Bar Remover, as API fetches full CRM metrics natively */}
+            <div className="bg-neutral-900/50 p-2 rounded-xl border border-neutral-800 flex flex-wrap gap-2 items-center text-sm text-neutral-400">
+                <span className="font-mono">Filtro aplicado:</span> Base de Dados Completa (All Time)
             </div>
 
             <div className="flex items-center gap-3 mb-4">

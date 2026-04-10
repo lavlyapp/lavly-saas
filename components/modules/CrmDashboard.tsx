@@ -74,6 +74,10 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
     const [period, setPeriod] = useState<PeriodOption>(initialPeriod);
     const [customRange, setCustomRange] = useState(initialRange);
 
+    const [metrics, setMetrics] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [fetchError, setFetchError] = useState<string | null>(null);
+
     // Wash/Dry Simulator State (Simplified for just Optimization)
     const [dryPriceSim, setDryPriceSim] = useState<string>("15.00");
     const [newDryPriceSim, setNewDryPriceSim] = useState<string>("");
@@ -85,87 +89,56 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
     const [selectedProfile, setSelectedProfile] = useState<CustomerProfile | null>(null);
     const [weatherAudienceModal, setWeatherAudienceModal] = useState<{ title: string, list: SegmentedCustomer[] } | null>(null);
 
-    // --- Global Data (Always calculates on ALL records) ---
-    // This is vital for Customer Profiles, Churn, LTV, etc.
-    const globalCrmData = useMemo(() => {
-        return calculateCrmMetrics(data.records, customers, data.orders);
-    }, [data.records, customers, data.orders]);
+    // Fetch CRM Metrics from Edge API
+    useEffect(() => {
+        let isMounted = true;
+        const fetchCrm = async () => {
+            setIsLoading(true);
+            setFetchError(null);
+            try {
+                let params = `?store=${encodeURIComponent(selectedStore || 'Todas')}&period=${period}`;
+                if (period === 'custom') {
+                    params += `&start=${customRange.start}&end=${customRange.end}`;
+                }
+
+                const res = await fetch(`/api/metrics/crm${params}`);
+                const json = await res.json();
+
+                if (isMounted) {
+                    if (json.success && json.payload) {
+                        setMetrics(json.payload);
+                    } else {
+                        setFetchError(`Falha Vercel: ${json.error || 'No data'}`);
+                    }
+                }
+            } catch (err: any) {
+                if (isMounted) setFetchError(`Erro de conexão: ${err.message}`);
+            } finally {
+                if (isMounted) setIsLoading(false);
+            }
+        };
+
+        fetchCrm();
+        return () => { isMounted = false; };
+    }, [period, customRange, selectedStore]);
 
     // Search Logic
     const searchResults = useMemo(() => {
-        if (!searchTerm || searchTerm.length < 2) return [];
+        if (!searchTerm || searchTerm.length < 2 || !metrics?.globalMetrics?.profiles) return [];
         const term = searchTerm.toLowerCase();
-        return globalCrmData.profiles.filter(p =>
+        return metrics.globalMetrics.profiles.filter((p: any) =>
             p.name.toLowerCase().includes(term) ||
             (p.phone && p.phone.includes(term))
         ).slice(0, 5);
-    }, [searchTerm, globalCrmData.profiles]);
+    }, [searchTerm, metrics]);
 
-    // --- Filtered Data (Period specific) ---
-    // This is for Heatmap and Drying Optimization (Activity based)
-    const filteredRecords = useMemo(() => {
-        if (!data?.records) return [];
-
-        // Exact match with FinancialDashboard.tsx to ensure totals align perfectly
-        // VMPay's native analytics group by UTC. We extract the exact YYYY-MM-DD from the UTC string.
-        const now = new Date();
-        const yest = new Date(now.getTime() - (24 * 3600 * 1000));
-        
-        const todayStr = now.toISOString().substring(0, 10);
-        const yesterdayStr = yest.toISOString().substring(0, 10);
-        
-        let targetMonthStr = todayStr.substring(0, 7);
-        let lastMonthStr = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().substring(0, 7);
-        
-        if (period === 'lastMonth') {
-            const m = now.getMonth();
-            const y = m === 0 ? now.getFullYear() - 1 : now.getFullYear();
-            const paddedM = m === 0 ? '12' : String(m).padStart(2, '0');
-            lastMonthStr = `${y}-${paddedM}`;
-        }
-
-        return data.records.filter((r) => {
-            if (!r.data) return false;
-            const dataAny = r.data as any;
-            const dbDateStr = typeof dataAny === 'string' ? dataAny.substring(0, 10) : dataAny.toISOString().substring(0, 10);
-            
-            switch (period) {
-                case 'today': return dbDateStr === todayStr;
-                case 'yesterday': return dbDateStr === yesterdayStr;
-                case 'thisMonth': return dbDateStr.startsWith(targetMonthStr);
-                case 'lastMonth': return dbDateStr.startsWith(lastMonthStr);
-                case 'custom': return dbDateStr >= customRange.start && dbDateStr <= customRange.end;
-                default: return dbDateStr.startsWith(targetMonthStr);
-            }
-        });
-    }, [data.records, period, customRange]);
-
-
-    // --- Period specific calculations ---
-    const { visitsHeatmapData, periodWashDryStats, periodStats, filteredMetrics } = useMemo(() => {
-        // --- LIVE DEBUG FOR RAVIDE ---
-        const ravideSales = filteredRecords.filter(r => r.cliente && r.cliente.toUpperCase().includes('RAVIDE'));
-        if (ravideSales.length > 0) {
-            console.log("[DEBUG-RAVIDE] Found sales:", ravideSales);
-            const ravideOrders = (data.orders || []).filter(o => ravideSales.some(s => s.id === o.sale_id));
-            console.log("[DEBUG-RAVIDE] Found orders linked by sale_id:", ravideOrders);
-        }
-        // -----------------------------
-
-        // We re-use calculateCrmMetrics primarily to get the wash/dry stats for the period
-        const periodMetrics = calculateCrmMetrics(filteredRecords, customers, data.orders);
-        // Calculate new Advanced Period Stats (with 180d lookback for new customers)
-        const advPeriodStats = calculatePeriodStats(filteredRecords, data.records);
-
-        console.log("Recalculating CRM Stats...", advPeriodStats.unclassifiedList.length, "unclassified");
-
-        return {
-            visitsHeatmapData: calculateVisitsHeatmap(filteredRecords),
-            periodWashDryStats: periodMetrics.washDryStats,
-            periodStats: advPeriodStats,
-            filteredMetrics: periodMetrics
-        };
-    }, [filteredRecords, data.records]);
+    // Destructure metrics cautiously for rendering
+    const globalCrmData = metrics?.globalMetrics;
+    const filteredMetrics = metrics?.filteredMetrics;
+    const periodStats = metrics?.periodStats;
+    const visitsHeatmapData = metrics?.visitsHeatmapData || [];
+    const periodWashDryStats = filteredMetrics?.washDryStats || { washCount: 0, dryCount: 0, conversionRate: 0, totalBaskets: 0 };
+    const filteredRecords = data.records || []; // Compatibilidade de props até refatorarmos aaba Machines e Availability
 
     // --- Dynamic Store Address ---
     // Extract the active store from the raw data since `filters` is not in this component's direct state
@@ -228,7 +201,41 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
     }
 
     // Top 15 Clients (Always Global)
-    const top15 = globalCrmData.profiles.slice(0, 15);
+    const top15 = globalCrmData?.profiles?.slice(0, 15) || [];
+
+    if (isLoading) {
+        return (
+            <div className="space-y-8 animate-in fade-in">
+                {/* Loader Header */}
+                <div className="bg-neutral-900/50 p-6 rounded-xl border border-neutral-800 flex items-center justify-between">
+                    <div>
+                        <div className="h-6 w-48 bg-neutral-800 rounded-md animate-pulse mb-2"></div>
+                        <div className="h-4 w-32 bg-neutral-800 rounded-md animate-pulse"></div>
+                    </div>
+                    <div className="flex gap-4">
+                        <div className="h-10 w-24 bg-neutral-800 rounded-lg animate-pulse"></div>
+                        <div className="h-10 w-24 bg-neutral-800 rounded-lg animate-pulse"></div>
+                    </div>
+                </div>
+                {/* Loader Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    {[1, 2, 3, 4].map(k => (
+                         <div key={k} className="h-32 bg-neutral-900/40 rounded-xl border border-neutral-800/60 animate-pulse"></div>
+                    ))}
+                </div>
+                <div className="h-[400px] bg-neutral-900/40 rounded-xl border border-neutral-800/60 animate-pulse"></div>
+            </div>
+        );
+    }
+
+    if (fetchError) {
+        return (
+            <div className="p-8 bg-red-900/20 border border-red-500/50 rounded-xl text-center">
+                <h3 className="text-xl font-bold text-red-500 mb-2">Erro ao carregar CRM</h3>
+                <p className="text-neutral-400">{fetchError}</p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8 animate-in fade-in">
