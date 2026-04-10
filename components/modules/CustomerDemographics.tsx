@@ -1,10 +1,12 @@
+"use client";
+
+import React, { useState, useMemo } from "react";
 import { CustomerProfile, calculateCrmMetrics } from "@/lib/processing/crm";
 import { SaleRecord, CustomerRecord } from "@/lib/processing/etl";
 import { useSubscription } from "@/components/context/SubscriptionContext";
 import { Users, User, Fingerprint, Lock, Sparkles, Activity, Clock, Calendar, Filter, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
-import { useState, useMemo } from "react";
 import { startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, subMonths, format } from "date-fns";
 
 interface CustomerDemographicsProps {

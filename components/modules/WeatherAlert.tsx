@@ -1,3 +1,5 @@
+"use client";
+
 import { CloudRain, AlertCircle, TrendingUp, Users, ChevronRight } from "lucide-react";
 import { SegmentedCustomer } from "@/lib/processing/crm";
 

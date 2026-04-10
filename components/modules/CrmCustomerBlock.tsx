@@ -1,5 +1,7 @@
+"use client";
+
 import { PeriodStats, SegmentedCustomer } from "@/lib/processing/crm";
-import { Users, UserPlus, UserMinus, UserCheck, Clock, TrendingUp, AlertCircle, Droplets, Wind, Sparkles, X, Phone, User, Lock } from "lucide-react";
+import { Users, UserPlus, UserMinus, UserCheck, Clock, TrendingUp, AlertCircle, Droplets, Wind, Sparkles, X, Phone, User, Lock, DollarSign } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { generateWhatsAppLink, sendWhatsAppMessage } from "@/lib/whatsapp";
@@ -324,4 +326,3 @@ export function CrmCustomerBlock({ periodStats, totalCustomers, onSelectSegment 
         </div>
     );
 }
-import { DollarSign } from "lucide-react";
