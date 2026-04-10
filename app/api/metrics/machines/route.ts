@@ -23,32 +23,65 @@ export async function GET(request: Request) {
             supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { cookies: { getAll() { return cookieStore.getAll(); }, setAll() {} } });
         }
 
-        // Time boundaries
-        const nowBrt = new Date(Date.now() - (3 * 3600 * 1000));
-        let interval: { start: Date; end: Date };
+        // FIX: The database stores 'data' in UTC. If we want raw chronological bounds independently of local time parsing,
+        // we should just use Date.now() directly for relative lookbacks since machine activity is strictly chronological.
+        const nowUtc = new Date();
+        let startQuery: string;
+        let endQuery: string;
 
         switch (period) {
             case 'today':
-                interval = { start: startOfDay(nowBrt), end: endOfDay(nowBrt) }; break;
+                startQuery = new Date(nowUtc.getTime() - 24 * 3600 * 1000).toISOString();
+                endQuery = nowUtc.toISOString();
+                break;
             case 'yesterday':
-                const yesterday = subDays(nowBrt, 1);
-                interval = { start: startOfDay(yesterday), end: endOfDay(yesterday) }; break;
+                startQuery = new Date(nowUtc.getTime() - 48 * 3600 * 1000).toISOString();
+                endQuery = new Date(nowUtc.getTime() - 24 * 3600 * 1000).toISOString();
+                break;
             case 'thisMonth':
-                interval = { start: startOfMonth(nowBrt), end: endOfMonth(nowBrt) }; break;
+                startQuery = new Date(nowUtc.getTime() - 30 * 24 * 3600 * 1000).toISOString();
+                endQuery = nowUtc.toISOString();
+                break;
             case 'lastMonth':
-                const lastMonth = subMonths(nowBrt, 1);
-                interval = { start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) }; break;
+                startQuery = new Date(nowUtc.getTime() - 60 * 24 * 3600 * 1000).toISOString();
+                endQuery = new Date(nowUtc.getTime() - 30 * 24 * 3600 * 1000).toISOString();
+                break;
+            case 'last48h':
+                startQuery = new Date(nowUtc.getTime() - 48 * 3600 * 1000).toISOString();
+                endQuery = nowUtc.toISOString();
+                break;
             default:
-                interval = { start: startOfDay(nowBrt), end: endOfDay(nowBrt) };
+                startQuery = new Date(nowUtc.getTime() - 24 * 3600 * 1000).toISOString();
+                endQuery = nowUtc.toISOString();
         }
 
-        const startQuery = interval.start.toISOString();
-        const endQuery = interval.end.toISOString();
+        // RBAC Enforcement Feature
+        let accessibleStores: string[] = [];
+        let rbacActive = false;
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session) {
+            const { data: userProfile } = await supabase.from('profiles').select('role, assigned_stores').eq('id', session.user.id).single();
+            if (userProfile && userProfile.role !== 'admin' && userProfile.assigned_stores && userProfile.assigned_stores.length > 0) {
+                accessibleStores = userProfile.assigned_stores;
+                rbacActive = true;
+            }
+        }
 
         // Let's use RPC if available or just raw select
         // 'orders' is smaller, we can fetch all in period
         let q = supabase.from('orders').select('*').gte('data', startQuery).lte('data', endQuery);
-        if (store !== 'Todas') q.eq('loja', store);
+        
+        if (store !== 'Todas') {
+            // Se o usuário pedir uma loja específica e o RBAC estiver ativo, garanta que ele tem acesso a ela.
+            if (rbacActive && !accessibleStores.includes(store)) {
+                return NextResponse.json({ success: true, payload: { machines: [], summary: {}, topRevenueMachine: null, topCyclesMachine: null, rawOrders: [] } });
+            }
+            q.eq('loja', store);
+        } else if (rbacActive) {
+            // Se for "Todas", e não for admin, força in() na sua lista
+            q.in('loja', accessibleStores);
+        }
         
         const { data: filteredOrders, error } = await q.limit(10000); // 10k is way more than enough for a single month config
 

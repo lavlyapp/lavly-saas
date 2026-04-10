@@ -352,7 +352,7 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                                     <XAxis dataKey={isMultiStoreView ? "name" : "date"} stroke="#666" fontSize={12} tickLine={false} axisLine={false} />
                                     <YAxis stroke="#666" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `R$${value}`} />
                                     <Tooltip contentStyle={{ backgroundColor: '#171717', border: '1px solid #333', borderRadius: '8px' }} itemStyle={{ color: '#10b981' }} formatter={(value: any) => [new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value)), 'Receita']} />
-                                    <Bar dataKey="valor" fill="#10b981" radius={[4, 4, 0, 0] as [number, number, number, number]} />
+                                    <Bar dataKey={isMultiStoreView ? "totalRevenue" : "value"} fill="#10b981" radius={[4, 4, 0, 0] as [number, number, number, number]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>

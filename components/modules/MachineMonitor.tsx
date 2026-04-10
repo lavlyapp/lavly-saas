@@ -26,12 +26,51 @@ interface MachineStatus {
 
 export function MachineMonitor({ allRecords, allOrders, selectedStore }: MachineMonitorProps) {
     const [renderTime, setRenderTime] = useState<string>("");
+    const [apiOrders, setApiOrders] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState<boolean>(true);
 
     useEffect(() => {
         setRenderTime(format(new Date(), "HH:mm"));
-    }, [allRecords, allOrders]);
+    }, [allRecords, allOrders, apiOrders]);
 
-    if (!allRecords || allRecords.length === 0) return null;
+    useEffect(() => {
+        let isMounted = true;
+        const fetchOrders = async () => {
+            setIsLoading(true);
+            try {
+                const st = selectedStore && selectedStore !== 'Todas' ? selectedStore : 'Todas';
+                const res = await fetch(`/api/metrics/machines?period=last48h&store=${encodeURIComponent(st)}`);
+                const json = await res.json();
+                if (isMounted && json.success && json.payload && json.payload.rawOrders) {
+                    setApiOrders(json.payload.rawOrders);
+                }
+            } catch (e) {
+                console.error("Failed to fetch machine orders", e);
+            } finally {
+                if (isMounted) setIsLoading(false);
+            }
+        };
+        fetchOrders();
+        return () => { isMounted = false; };
+    }, [selectedStore]);
+
+    // Cloud-native priority: apiOrders
+    const rawTargetArray = apiOrders.length > 0 ? apiOrders : (allOrders && allOrders.length > 0 ? allOrders : (allRecords || []));
+    if (isLoading && rawTargetArray.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center p-8 mt-6 bg-neutral-900/50 rounded-xl border border-neutral-800">
+                <p className="text-neutral-500 flex items-center gap-2"><RefreshCw className="w-4 h-4 animate-spin"/> Mapeando Máquinas Ativas...</p>
+            </div>
+        );
+    }
+    if (!rawTargetArray || rawTargetArray.length === 0) return null;
+
+    // VERY IMPORTANT: Edge APIs flatten Date objects to strings. We must re-hydrate them.
+    const targetArray = rawTargetArray.map((r: any) => ({
+        ...r,
+        data: typeof r.data === 'string' ? new Date(r.data) : r.data,
+        startTime: typeof r.startTime === 'string' ? new Date(r.startTime) : r.startTime
+    }));
 
     const canonicalSelected = getCanonicalStoreName(selectedStore);
 
@@ -51,15 +90,11 @@ export function MachineMonitor({ allRecords, allOrders, selectedStore }: Machine
     let activeWashers = 0;
     let activeDryers = 0;
 
-    const targetArray = allOrders && allOrders.length > 0 ? allOrders : allRecords;
-    if (!targetArray || targetArray.length === 0) return null;
-
+    // Validation passed in earlier hook
     const relevantRecords = isAllStores
         ? targetArray
         : targetArray.filter((r: any) => getCanonicalStoreName(r.loja) === canonicalSelected);
-
-    if (relevantRecords.length === 0) return null;
-
+        
     // Group records by store directly
     const recordsByStore: Record<string, any[]> = {};
     relevantRecords.forEach((r: any) => {

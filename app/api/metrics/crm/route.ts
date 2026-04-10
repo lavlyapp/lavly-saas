@@ -34,103 +34,72 @@ export async function GET(request: Request) {
         console.time('[API CRM] Total Execution');
         console.time('[API CRM] Fetching Data');
 
-        // Parallel Fetch Strategy
-        const PAGE_SIZE = 1000;
-        
-        // 1. Get total count
-        const countQuery = supabase.from('sales').select('*', { count: 'exact', head: true });
-        if (store !== 'Todas') countQuery.eq('loja', store);
-        const { count } = await countQuery;
-        
-        if (!count || count === 0) {
-            return NextResponse.json({ success: true, payload: null });
-        }
-
-        // 2. Fetch all sales natively on backend in chunks
-        const pages = Math.ceil(count / PAGE_SIZE);
-        const chunkPromises = [];
-        
-        for (let i = 0; i < pages; i++) {
-            let q = supabase.from('sales').select('id, data, valor, loja, produto, cliente, telefone').range(i * PAGE_SIZE, (i + 1) * PAGE_SIZE - 1);
-            if (store !== 'Todas') q.eq('loja', store);
-            chunkPromises.push(q);
-        }
-
-        // Fetch Orders mapping
-        const ordersCountQuery = supabase.from('orders').select('*', { count: 'exact', head: true });
-        if (store !== 'Todas') ordersCountQuery.eq('loja', store);
-        const ordersCountRes = await ordersCountQuery;
-        
-        const ordersPages = Math.ceil((ordersCountRes.count || 0) / PAGE_SIZE);
-        for (let i = 0; i < ordersPages; i++) {
-           let qO = supabase.from('orders').select('id, store, sale_id, machine, service').range(i * PAGE_SIZE, (i + 1) * PAGE_SIZE - 1);
-           if (store !== 'Todas') qO.eq('loja', store);
-           chunkPromises.push(qO);
-        }
-        
-        chunkPromises.push(supabase.from('customers').select('*').limit(5000));
-
-        const results = await Promise.all(chunkPromises);
-        console.timeEnd('[API CRM] Fetching Data');
-        
-        let allRecords: SaleRecord[] = [];
-        let allOrders: any[] = [];
-        let allCustomers: any[] = [];
-
-        results.forEach((res, index) => {
-            if (res.data) {
-                if (index < pages) {
-                    allRecords = allRecords.concat(res.data.map((r: any) => ({
-                        ...r, 
-                        data: new Date(r.data)
-                    })));
-                } else if (index < pages + ordersPages) {
-                    allOrders = allOrders.concat(res.data);
-                } else {
-                    allCustomers = res.data;
-                }
-            }
-        });
-
-        console.time('[API CRM] Processing JavaScript Lógica Pesada');
-
+        // 1. Convert period logic to ISO formats for PostgreSQL
         const nowBrt = new Date(Date.now() - (3 * 3600 * 1000));
         const todayStr = nowBrt.toISOString().substring(0, 10);
         const yestBrt = new Date(nowBrt.getTime() - (24 * 3600 * 1000));
         const yesterdayStr = yestBrt.toISOString().substring(0, 10);
-        const targetMonthStr = todayStr.substring(0, 7);
         
-        let lastMonthStr = new Date(nowBrt.getFullYear(), nowBrt.getMonth() - 1, 1).toISOString().substring(0, 7);
-        if (period === 'lastMonth') {
-            const m = nowBrt.getMonth();
-            const y = m === 0 ? nowBrt.getFullYear() - 1 : nowBrt.getFullYear();
-            const paddedM = m === 0 ? '12' : String(m).padStart(2, '0');
-            lastMonthStr = `${y}-${paddedM}`;
+        let queryStartIso = null;
+        let queryEndIso = null;
+        
+        if (period === 'today') {
+            queryStartIso = `${todayStr}T00:00:00.000Z`;
+            queryEndIso = `${todayStr}T23:59:59.999Z`;
+        } else if (period === 'yesterday') {
+            queryStartIso = `${yesterdayStr}T00:00:00.000Z`;
+            queryEndIso = `${yesterdayStr}T23:59:59.999Z`;
+        } else if (period === 'thisMonth') {
+            const y = nowBrt.getFullYear();
+            const m = String(nowBrt.getMonth() + 1).padStart(2, '0');
+            queryStartIso = `${y}-${m}-01T00:00:00.000Z`;
+            queryEndIso = `${todayStr}T23:59:59.999Z`;
+        } else if (period === 'lastMonth') {
+            let m = nowBrt.getMonth();
+            let y = nowBrt.getFullYear();
+            if (m === 0) { m = 12; y -= 1; }
+            const mStr = String(m).padStart(2, '0');
+            const endOfDayLastMonth = new Date(y, m, 0, 23, 59, 59);
+            queryStartIso = `${y}-${mStr}-01T00:00:00.000Z`;
+            queryEndIso = endOfDayLastMonth.toISOString();
+        } else if (period === 'custom') {
+            queryStartIso = startCustom ? `${startCustom}T00:00:00.000Z` : null;
+            queryEndIso = endCustom ? `${endCustom}T23:59:59.999Z` : null;
         }
 
-        const filteredRecords = allRecords.filter((r) => {
-            if (!r.data) return false;
-            const dbDateStr = r.data.toISOString().substring(0, 10);
-            switch (period) {
-                case 'today': return dbDateStr === todayStr;
-                case 'yesterday': return dbDateStr === yesterdayStr;
-                case 'thisMonth': return dbDateStr.startsWith(targetMonthStr);
-                case 'lastMonth': return dbDateStr.startsWith(lastMonthStr);
-                case 'custom': return dbDateStr >= (startCustom || '') && dbDateStr <= (endCustom || '9999-99-99');
-                default: return dbDateStr.startsWith(targetMonthStr);
+        // 2. Edge Direct Fetch logic using V19 Schema
+        const { data: rpcData, error: rpcError } = await supabase.rpc('get_crm_backend_metrics', {
+            p_store: store,
+            p_start_date: queryStartIso,
+            p_end_date: queryEndIso
+        });
+
+        if (rpcError || !rpcData) {
+            console.error("[API CRM] RPC Error:", rpcError);
+            throw new Error(rpcError?.message || "Função RPC get_crm_backend_metrics não instalada no BD!");
+        }
+
+        console.time('[API CRM] Processing Edge JSON Rehydration');
+        
+        const { rehydrateCrmMetrics, rehydratePeriodStats } = await import('@/lib/processing/crm_edge_adapter');
+
+        const globalMetrics = rehydrateCrmMetrics(rpcData.globalProfiles);
+        const filteredMetrics = rehydrateCrmMetrics(rpcData.periodProfiles);
+        const periodStats = rehydratePeriodStats(rpcData.periodProfiles);
+        
+        // Heatmap Translation
+        let visitsHeatmapData = Array.from({length: 7}, () => Array(24).fill(0));
+        rpcData.heatmap?.forEach((h: any) => {
+            if(h.dow >= 0 && h.dow < 7 && h.hod >= 0 && h.hod < 24){
+                 visitsHeatmapData[h.dow][h.hod] = h.count;
             }
         });
 
-        const globalMetrics = calculateCrmMetrics(allRecords, allCustomers, allOrders);
-        const filteredMetrics = calculateCrmMetrics(filteredRecords, allCustomers, allOrders);
-        const periodStats = calculatePeriodStats(filteredRecords, allRecords, allOrders);
-        const visitsHeatmapData = calculateVisitsHeatmap(filteredRecords);
-
         // Strip heavy arrays to optimize JSON transfer
-        const lightGlobal = { ...globalMetrics, profiles: globalMetrics.profiles }; // Kept for Top15 and Searching
+        const lightGlobal = { ...globalMetrics, profiles: globalMetrics.profiles }; 
         const lightFiltered = { ...filteredMetrics, profiles: [] };
 
-        console.timeEnd('[API CRM] Processing JavaScript Lógica Pesada');
+        console.timeEnd('[API CRM] Processing Edge JSON Rehydration');
         console.timeEnd('[API CRM] Total Execution');
 
         return NextResponse.json({
