@@ -223,7 +223,9 @@ function AppContent({
 
     // 2. Initial Loading State (Fix for blank screen "not loading normally")
     const isActivelyLoading = status === 'uploading' || (logs.length > 0 && status !== 'error' && status !== 'success');
-    if (isActivelyLoading && allRecords.length === 0) {
+    
+    // Bypass loader if we are on the Financial tab (because it is 100% Cloud-Native and doesn't need raw records)
+    if (isActivelyLoading && allRecords.length === 0 && activeTab !== 'financial') {
       return (
         <div className="flex flex-col items-center justify-center p-8 h-[60vh] w-full bg-neutral-900/50 rounded-3xl border border-neutral-800 animate-in fade-in duration-500">
           <div className="flex flex-col items-center gap-6 w-full max-w-md">
