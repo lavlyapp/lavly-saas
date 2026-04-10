@@ -182,7 +182,7 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
     }, [visitsHeatmapData]);
 
     // Weather Alerts Hook
-    const weatherAlerts = useWeatherAlerts(filteredMetrics.profiles, storeAddress || '', topDays, storeLat, storeLon);
+    const weatherAlerts = useWeatherAlerts(filteredMetrics?.profiles || [], storeAddress || '', topDays, storeLat, storeLon);
 
 
     // --- Simulator C: Wash/Dry Optimization Logic (using Period Data) ---
