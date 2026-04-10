@@ -53,7 +53,15 @@ export async function GET(request: Request) {
 
         // 2. Sync customers - REMOVED for performance, as requested
 
-        // 3. Log the sync activity
+        // 3. Refresh materialized views to ensure Financial Dashboard shows new sales immediately
+        const { error: refreshError } = await supabaseClient.rpc('refresh_lavly_materialized_views');
+        if (refreshError) {
+            console.error(`[Sync Manager] Error refreshing materialized views: ${refreshError.message}`);
+        } else {
+            console.log(`[Sync Manager] Materialized views refreshed successfully.`);
+        }
+
+        // 4. Log the sync activity
         await logActivity("SYNC_VMPAY", null, {
             newSalesCount: newSales.length,
             message: `Sync completed successfully.`
