@@ -96,7 +96,8 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
             setIsLoading(true);
             setFetchError(null);
             try {
-                let params = `?store=${encodeURIComponent(selectedStore || 'Todas')}&period=${period}`;
+                const storeForApi = (selectedStore === 'Todas as Lojas' || !selectedStore) ? 'Todas' : selectedStore;
+                let params = `?store=${encodeURIComponent(storeForApi)}&period=${period}`;
                 if (period === 'custom') {
                     params += `&start=${customRange.start}&end=${customRange.end}`;
                 }

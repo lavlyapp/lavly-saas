@@ -19,21 +19,17 @@ export async function GET(request: Request) {
         const cookieStore = await cookies();
         const authHeader = request.headers.get('Authorization');
 
-        let supabase;
-        if (authHeader) {
-            const { createClient } = await import('@supabase/supabase-js');
-            supabase = createClient(
-                process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-                { global: { headers: { Authorization: authHeader } } }
-            );
-        } else {
-            supabase = createServerClient(
-                process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-                { cookies: { getAll() { return cookieStore.getAll(); }, setAll() {} } }
-            );
-        }
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+        
+        let supabase = createClient(supabaseUrl, supabaseKey, {
+            auth: {
+                persistSession: false,
+                autoRefreshToken: false,
+                detectSessionInUrl: false
+            }
+        });
 
         console.time('[API CRM] Total Execution');
         console.time('[API CRM] Fetching Data');
