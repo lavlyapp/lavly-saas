@@ -32,8 +32,6 @@ const safeFormatWeek = (date: Date) => {
 
 export function ComparativeDashboard({ data, customers, selectedStore = 'Todas' }: ComparativeDashboardProps) {
 
-    const canonicalSelected = getCanonicalStoreName(selectedStore);
-
     const canonicalSelected = getCanonicalStoreName(selectedStore || 'Todas');
 
     const [isLoading, setIsLoading] = useState(true);
