@@ -2,11 +2,18 @@ import { CrmSummary, PeriodStats, CustomerProfile, SegmentedCustomer } from './c
 import { differenceInDays } from 'date-fns';
 
 function inferGender(name: string): 'M' | 'F' | 'U' {
-    const fn = name.split(' ')[0].toUpperCase();
-    if (fn.endsWith('A') && fn !== 'LUCAS' && fn !== 'JONAS' && fn !== 'MATIAS' && fn !== 'MESSIAS') return 'F';
-    if (fn.endsWith('O') || fn.endsWith('R') || fn.endsWith('L') || fn.endsWith('S') || fn.endsWith('N')) return 'M';
-    if (['MARIA', 'ANA', 'JULIA', 'FRANCISCA', 'ANTONIA'].includes(fn)) return 'F';
-    if (['JOSE', 'JOAO', 'ANTONIO', 'FRANCISCO', 'CARLOS', 'PAULO'].includes(fn)) return 'M';
+    if (!name) return 'U';
+    const normalizedName = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+    const fn = normalizedName.split(' ')[0];
+    
+    if (['LUCA', 'JEAN', 'ANDRE'].includes(fn)) return 'M';
+    
+    if (fn.endsWith('A') && !['LUCAS', 'JONAS', 'MATIAS', 'MESSIAS'].includes(fn)) return 'F';
+    if (fn.endsWith('O') || fn.endsWith('S') || fn.endsWith('R') || fn.endsWith('L') || fn.endsWith('M') || fn.endsWith('N')) return 'M';
+    
+    if (['MARIA', 'ANA', 'JULIA', 'FRANCISCA', 'ANTONIA', 'ALINE', 'SIMONE', 'MICHELE', 'ELAINE', 'VIVIANE', 'GISELE', 'ROSANE', 'CRISTIANE', 'JAQUELINE', 'ELIANE'].includes(fn)) return 'F';
+    if (['JOSE', 'JOAO', 'ANTONIO', 'FRANCISCO', 'CARLOS', 'PAULO', 'GUILHERME', 'HENRIQUE', 'FELIPE', 'JORGE'].includes(fn)) return 'M';
+    
     return 'U';
 }
 
