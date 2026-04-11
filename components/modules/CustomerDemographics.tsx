@@ -87,6 +87,8 @@ export function CustomerDemographics({ records, customers, selectedStore, orders
 
     const { genderData, ageData, ageStatsArray, maleStats, femaleStats, avgAge } = demographics;
 
+    const totalProfilesCount = genderData.reduce((acc: number, item: any) => acc + item.value, 0);
+
     // Comparative Data for Charts
     const ltvData = [
         { name: 'Homens', valor: Math.round(maleStats.totalSpent / (maleStats.count || 1)) },
@@ -135,7 +137,7 @@ export function CustomerDemographics({ records, customers, selectedStore, orders
                     <CardContent>
                         <div className="h-[200px] flex items-center justify-center relative">
                             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                <span className="text-3xl font-bold text-white">{profiles.length}</span>
+                                <span className="text-3xl font-bold text-white">{totalProfilesCount}</span>
                                 <span className="text-[10px] text-neutral-500 uppercase tracking-widest">Clientes</span>
                             </div>
                             <ResponsiveContainer width="100%" height="100%">
@@ -144,8 +146,8 @@ export function CustomerDemographics({ records, customers, selectedStore, orders
                                         data={genderData}
                                         cx="50%"
                                         cy="50%"
-                                        innerRadius={65}
-                                        outerRadius={85}
+                                        innerRadius={60}
+                                        outerRadius={80}
                                         paddingAngle={5}
                                         dataKey="value"
                                         stroke="none"
@@ -161,15 +163,15 @@ export function CustomerDemographics({ records, customers, selectedStore, orders
                                 </PieChart>
                             </ResponsiveContainer>
                         </div>
-                        <div className="flex justify-center gap-6 mt-4">
-                            {genderData.map((d: any) => (
-                                <div key={d.name} className="flex flex-col items-center">
+                        <div className="grid grid-cols-2 gap-4 mt-6">
+                            {genderData.map((d: any, i: number) => (
+                                <div key={i} className="flex justify-between items-center bg-neutral-900 border border-neutral-800 p-3 rounded-lg">
                                     <div className="flex items-center gap-2 text-xs text-neutral-400 mb-1">
                                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
                                         {d.name}
                                     </div>
                                     <span className="text-sm font-bold text-white">
-                                        {((d.value / profiles.length) * 100).toFixed(0)}%
+                                        {totalProfilesCount > 0 ? ((d.value / totalProfilesCount) * 100).toFixed(0) : 0}%
                                     </span>
                                 </div>
                             ))}
