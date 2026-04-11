@@ -49,98 +49,49 @@ export async function GET(request: Request) {
         const startQuery = last12Months[0].start.toISOString();
         const endQuery = last12Months[11].end.toISOString();
 
-        const PAGE_SIZE = 1000;
+        // Execute Native Cloud Computing inside DB
+        const { data: dbData, error: dbError } = await supabase.rpc('get_comparative_financial_metrics', {
+            p_store: store,
+            p_start_date: startQuery,
+            p_end_date: endQuery
+        });
 
-        // Fetch Sales for 12 months
-        let baseCountQuery = supabase.from('sales').select('*', { count: 'exact', head: true }).gte('data', startQuery).lte('data', endQuery);
-        if (store !== 'Todas') baseCountQuery.eq('loja', store);
-        const { count } = await baseCountQuery;
-
-        let filteredRecords: any[] = [];
-        if (count && count > 0) {
-            const pages = Math.ceil(count / PAGE_SIZE);
-            const chunkPromises = [];
-            for (let i = 0; i < pages; i++) {
-                let q = supabase.from('sales').select('id, data, valor, loja, cliente').gte('data', startQuery).lte('data', endQuery).range(i * PAGE_SIZE, (i + 1) * PAGE_SIZE - 1);
-                if (store !== 'Todas') q.eq('loja', store);
-                chunkPromises.push(q);
-            }
-            const results = await Promise.all(chunkPromises);
-            results.forEach(res => { if (res.data) filteredRecords = filteredRecords.concat(res.data); });
+        if (dbError) {
+             throw new Error(dbError.message || "Native RPC missing or failed");
         }
 
-        // Processing
-        const customerVisitsList: { date: Date, totalValue: number }[] = [];
-        const customerRecordsMap = new Map<string, any[]>();
+        const rawMonthly = dbData?.monthlyStats || [];
+        const rawHeatmap = dbData?.heatmap || [];
 
-        filteredRecords.forEach(r => {
-            const client = r.cliente && r.cliente !== 'Consumidor Final' ? r.cliente : 'ANON_' + Math.random();
-            if (!customerRecordsMap.has(client)) customerRecordsMap.set(client, []);
-            customerRecordsMap.get(client)!.push(r);
-        });
-
-        customerRecordsMap.forEach((sales) => {
-            sales.sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
-            const visits: { date: Date, totalValue: number }[] = [];
-            sales.forEach(r => {
-                const lastVisit = visits.length > 0 ? visits[visits.length - 1] : null;
-                const rTime = new Date(r.data).getTime();
-                if (lastVisit && (rTime - lastVisit.date.getTime()) <= 10800000 && (rTime - lastVisit.date.getTime()) >= 0) {
-                    lastVisit.totalValue += r.valor;
-                } else {
-                    visits.push({ date: new Date(r.data), totalValue: r.valor });
-                }
-            });
-            customerVisitsList.push(...visits);
-        });
-
+        // Build guaranteed 12-month sequential array for chart
         const monthlyStats = last12Months.map(month => {
-            const monthSales = filteredRecords.filter(r => {
-                const d = new Date(new Date(r.data).getTime() - (3 * 3600 * 1000));
-                return d >= month.start && d <= month.end;
-            });
-
-            const totalRevenue = monthSales.reduce((sum, r) => sum + (r.valor || 0), 0);
-            const uniqueCustomers = new Set(monthSales.map(r => r.cliente || 'Anonimo')).size;
-
-            const monthVisits = customerVisitsList.filter(v => {
-                const d = new Date(v.date.getTime() - (3 * 3600 * 1000));
-                return d >= month.start && d <= month.end;
-            });
-            const ticketAverage = monthVisits.length > 0 ? totalRevenue / monthVisits.length : 0;
-
-            let maleCount = 0; let femaleCount = 0; // Simplified for speed
-            const totalGenderClassified = maleCount + femaleCount;
-            const malePct = totalGenderClassified > 0 ? (maleCount / totalGenderClassified) * 100 : 0;
-            const femalePct = totalGenderClassified > 0 ? (femaleCount / totalGenderClassified) * 100 : 0;
-
-            return {
-                name: month.label,
-                revenue: totalRevenue,
-                transactions: monthSales.length,
-                uniqueCustomers,
-                ticket: ticketAverage,
-                baskets: 0, washes: 0, dries: 0, // Fallbacks
-                malePct, femalePct
-            };
+             const row = rawMonthly.find((r: any) => r.year_month === month.yearMonth);
+             const revenue = parseFloat(row?.revenue || 0);
+             const transactions = parseInt(row?.transactions || 0, 10);
+             const uniqueCustomers = parseInt(row?.unique_customers || 0, 10);
+             
+             return {
+                 name: month.label,
+                 revenue,
+                 transactions,
+                 uniqueCustomers,
+                 ticket: transactions > 0 ? revenue / transactions : 0, 
+                 baskets: 0, washes: 0, dries: 0,
+                 malePct: 0, femalePct: 0
+             };
         });
 
-        // Heatmap
+        // Heatmap processing
         const dayOfWeekTotals = [0, 0, 0, 0, 0, 0, 0];
         const weekOfMonthTotals = [0, 0, 0, 0, 0, 0];
-        const uniqueMonths = new Set<string>();
+        const numMonths = last12Months.length || 1;
 
-        filteredRecords.forEach(r => {
-            const val = r.valor || 0;
-            const brtDate = new Date(new Date(r.data).getTime() - (3 * 3600 * 1000));
-            dayOfWeekTotals[brtDate.getUTCDay()] += val;
-            let week = getISOWeek(brtDate) - getISOWeek(startOfMonth(brtDate)) + 1;
-            if (week < 1) week = 1;
-            if (week >= 1 && week <= 5) weekOfMonthTotals[week] += val;
-            uniqueMonths.add(format(brtDate, 'yyyy-MM'));
+        rawHeatmap.forEach((h: any) => {
+            const val = parseFloat(h.total || 0);
+            if (h.dow >= 0 && h.dow < 7) dayOfWeekTotals[h.dow] += val;
+            if (h.week_of_month >= 1 && h.week_of_month <= 5) weekOfMonthTotals[h.week_of_month] += val;
         });
 
-        const numMonths = uniqueMonths.size || 1;
         const daysLabel = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
         const heatmapData = {
             daysChart: daysLabel.map((l, i) => ({ name: l, revenue: dayOfWeekTotals[i] / numMonths, total: dayOfWeekTotals[i] })),

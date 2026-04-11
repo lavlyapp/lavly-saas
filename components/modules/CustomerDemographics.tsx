@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { CustomerProfile, calculateCrmMetrics } from "@/lib/processing/crm";
 import { SaleRecord, CustomerRecord } from "@/lib/processing/etl";
 import { useSubscription } from "@/components/context/SubscriptionContext";
@@ -24,7 +24,7 @@ export function CustomerDemographics({ records, customers, selectedStore, orders
     const [demographics, setDemographics] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    React.useEffect(() => {
+    useEffect(() => {
         let isMounted = true;
         const fetchCrm = async () => {
             setIsLoading(true);
