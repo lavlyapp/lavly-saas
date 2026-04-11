@@ -44,45 +44,11 @@ export function CustomerDemographics({ records, customers, selectedStore, orders
         return () => { isMounted = false; };
     }, [selectedStore]);
 
-    if (isLoading) {
-        return (
-            <div className="space-y-6 animate-in fade-in">
-                <div className="h-20 w-full bg-neutral-900 rounded-xl animate-pulse"></div>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="h-64 bg-neutral-900 rounded-xl animate-pulse"></div>
-                    <div className="lg:col-span-2 h-64 bg-neutral-900 rounded-xl animate-pulse"></div>
-                </div>
-            </div>
-        );
-    }
-
-
-    // 1. Protection for Non-Ouro Users
-    if (!canAccess('whatsapp')) { // 'whatsapp' is the Ouro flag for now, or we can check plan directly
-        return (
-            <div className="relative p-6 bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden min-h-[400px] flex flex-col items-center justify-center text-center">
-                <div className="absolute inset-0 bg-gradient-to-br from-amber-900/10 to-transparent pointer-events-none" />
-                <div className="bg-neutral-800/50 p-4 rounded-full mb-4 ring-1 ring-amber-500/30">
-                    <Fingerprint className="w-8 h-8 text-amber-500" />
-                </div>
-                <h3 className="text-xl font-bold text-white mb-2">Quem é o meu Cliente?</h3>
-                <p className="text-neutral-400 max-w-md mb-6">
-                    Desbloqueie inteligência demográfica avançada. Saiba gênero, idade e hábitos de consumo detalhados do seu público.
-                </p>
-                <button
-                    onClick={() => window.alert('Upgrade para Ouro necessário!')}
-                    className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-white font-bold rounded-lg shadow-lg shadow-amber-900/20 transition-all transform hover:scale-105"
-                >
-                    <Sparkles className="w-4 h-4" />
-                    Desbloquear Análise Demográfica (Ouro)
-                </button>
-            </div>
-        );
-    }
-
-
-    // --- Metrics Aggregation (Single Pass) ---
+    // --- Metrics Aggregation (Single Pass) - HOOK MOVED BEFORE EARLY RETURNS TO FIX #310 ---
     const { genderData, ageData, ageStatsArray, maleStats, femaleStats, avgAge } = useMemo(() => {
+        if (!profiles || profiles.length === 0) {
+           return { genderData: [], ageData: [], ageStatsArray: [], maleStats: { count: 0, totalSpent: 0, washCount: 0, dryCount: 0, ticket: 0, topDay: '-' }, femaleStats: { count: 0, totalSpent: 0, washCount: 0, dryCount: 0, ticket: 0, topDay: '-' }, avgAge: 0 };
+        }
         console.time("Demographics Calculation");
         const genderStats: Record<string, number> = { M: 0, F: 0, U: 0 };
         const ageStatsAgg: Record<string, any> = {};
@@ -166,6 +132,41 @@ export function CustomerDemographics({ records, customers, selectedStore, orders
             avgAge: totalAgeCount > 0 ? Math.round(totalAgeSum / totalAgeCount) : 0
         };
     }, [profiles]);
+
+    if (isLoading) {
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                <div className="h-20 w-full bg-neutral-900 rounded-xl animate-pulse"></div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="h-64 bg-neutral-900 rounded-xl animate-pulse"></div>
+                    <div className="lg:col-span-2 h-64 bg-neutral-900 rounded-xl animate-pulse"></div>
+                </div>
+            </div>
+        );
+    }
+
+    // 1. Protection for Non-Ouro Users
+    if (!canAccess('whatsapp')) { // 'whatsapp' is the Ouro flag for now, or we can check plan directly
+        return (
+            <div className="relative p-6 bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden min-h-[400px] flex flex-col items-center justify-center text-center">
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-900/10 to-transparent pointer-events-none" />
+                <div className="bg-neutral-800/50 p-4 rounded-full mb-4 ring-1 ring-amber-500/30">
+                    <Fingerprint className="w-8 h-8 text-amber-500" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">Quem é o meu Cliente?</h3>
+                <p className="text-neutral-400 max-w-md mb-6">
+                    Desbloqueie inteligência demográfica avançada. Saiba gênero, idade e hábitos de consumo detalhados do seu público.
+                </p>
+                <button
+                    onClick={() => window.alert('Upgrade para Ouro necessário!')}
+                    className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-white font-bold rounded-lg shadow-lg shadow-amber-900/20 transition-all transform hover:scale-105"
+                >
+                    <Sparkles className="w-4 h-4" />
+                    Desbloquear Análise Demográfica (Ouro)
+                </button>
+            </div>
+        );
+    }
 
     // Comparative Data for Charts
     const ltvData = [
