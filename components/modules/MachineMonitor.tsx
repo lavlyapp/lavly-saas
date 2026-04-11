@@ -66,11 +66,15 @@ export function MachineMonitor({ allRecords, allOrders, selectedStore }: Machine
     if (!rawTargetArray || rawTargetArray.length === 0) return null;
 
     // VERY IMPORTANT: Edge APIs flatten Date objects to strings. We must re-hydrate them.
-    const targetArray = rawTargetArray.map((r: any) => ({
-        ...r,
-        data: typeof r.data === 'string' ? new Date(r.data) : r.data,
-        startTime: typeof r.startTime === 'string' ? new Date(r.startTime) : r.startTime
-    }));
+    // 'orders' uses created_at, 'sales' uses data. Normalize to data.
+    const targetArray = rawTargetArray.map((r: any) => {
+        const rawData = r.data || r.created_at;
+        return {
+            ...r,
+            data: typeof rawData === 'string' ? new Date(rawData) : rawData,
+            startTime: typeof r.startTime === 'string' ? new Date(r.startTime) : r.startTime
+        };
+    });
 
     const canonicalSelected = getCanonicalStoreName(selectedStore);
 

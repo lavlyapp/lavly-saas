@@ -104,10 +104,13 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
         return defaultRange;
     });
 
-    // Removed useEffect that caused race conditions
-    // const [hasAutoSelected, setHasAutoSelected] = useState(false);
+    useEffect(() => {
+        const handleUpdate = () => setRenderKey(prev => prev + 1);
+        window.addEventListener('lavly-force-financial-update', handleUpdate);
+        return () => window.removeEventListener('lavly-force-financial-update', handleUpdate);
+    }, []);
 
-
+    const [renderKey, setRenderKey] = useState<number>(0);
     const [metrics, setMetrics] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [fetchError, setFetchError] = useState<string | null>(null);
@@ -156,9 +159,14 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
             }
         };
 
+        if (period === 'custom' && !customRange?.start && !customRange?.end) {
+            setIsLoading(false);
+            return;
+        }
+
         fetchMetrics();
         return () => { isMounted = false; };
-    }, [period, customRange, selectedStore]);
+    }, [period, customRange, selectedStore, renderKey]);
 
     const ticketAverage = useMemo(() => {
         if (!metrics) return 0;

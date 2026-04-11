@@ -1,0 +1,10 @@
+const { createClient } = require('@supabase/supabase-js'); 
+const s = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY); 
+
+async function r() { 
+  const { data, error } = await s.rpc('execute_sql_query', { 
+    query: `set local "request.jwt.claim.sub" = '07053c16-c708-4271-bf3a-b9f2e55aafbb'; SELECT get_financial_dashboard_metrics('Todas', '2026-04-11T00:00:00.000Z', '2026-04-11T23:59:59.999Z');` 
+  }); 
+  console.log(data, error); 
+} 
+r();

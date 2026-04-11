@@ -1270,6 +1270,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
 
       try {
         await reloadAllData("Sincronismo", token);
+        window.dispatchEvent(new CustomEvent('lavly-force-financial-update'));
       } catch (dbErr: any) {
         pushLog(`[Aviso] Falha ao recarregar a tela automaticamente: ${dbErr.message}`);
       }
