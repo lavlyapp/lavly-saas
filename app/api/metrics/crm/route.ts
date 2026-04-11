@@ -77,7 +77,7 @@ export async function GET(request: Request) {
 
         console.time('[API CRM] Processing Edge JSON Rehydration');
         
-        const { rehydrateCrmMetrics, rehydratePeriodStats } = await import('@/lib/processing/crm_edge_adapter');
+        const { rehydrateCrmMetrics, rehydratePeriodStats, calculateDemographics } = await import('@/lib/processing/crm_edge_adapter');
 
         const globalMetrics = rehydrateCrmMetrics(rpcData.globalProfiles);
         const filteredMetrics = rehydrateCrmMetrics(rpcData.periodProfiles);
@@ -91,8 +91,11 @@ export async function GET(request: Request) {
             }
         });
 
+        // Compute Demographics server-side to save browser CPU and bandwidth
+        const demographicsStats = calculateDemographics(globalMetrics.profiles);
+
         // Strip heavy arrays to optimize JSON transfer
-        const lightGlobal = { ...globalMetrics, profiles: globalMetrics.profiles }; 
+        const lightGlobal = { ...globalMetrics, profiles: globalMetrics.profiles.slice(0, 50) }; 
         const lightFiltered = { ...filteredMetrics, profiles: [] };
 
         console.timeEnd('[API CRM] Processing Edge JSON Rehydration');
@@ -104,7 +107,8 @@ export async function GET(request: Request) {
                 globalMetrics: lightGlobal,
                 filteredMetrics: lightFiltered,
                 periodStats,
-                visitsHeatmapData
+                visitsHeatmapData,
+                demographics: demographicsStats
             }
         });
 

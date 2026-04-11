@@ -812,17 +812,9 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       // The individual tabs (FinancialDashboard, CRM, etc) are responsible for fetching
       // their own aggregated JSON payloads directly from Next.js Serverless APIs.
 
-      setLogs(prev => [...prev, "[System] Baixando metadados de clientes..."]);
-      const newCustomers = await fetchAllParallel('customers', 'id, cpf, name, phone, email, gender, registration_date', 'id', configuredNames, 1, 0);
-
-      const hydratedCustomers = newCustomers.map((c: any) => ({
-        ...c,
-        registrationDate: c.registration_date ? new Date(c.registration_date) : undefined
-      }));
-
-      // Cloud-Native mode active: Mass sync arrays eliminated!
-      
-      if (hydratedCustomers.length > 0) setAllCustomers(hydratedCustomers);
+      // Mass sync arrays eliminated! 
+      // Customers are no longer fetched into browser RAM to prevent 5-10s UI freezing during Sincronizar.
+      setAllCustomers([]);
       
       setLogs(prev => [...prev, `[System] Cliente UI inicializado. Delegando cálculos para a Borda AWS.`]);
       setStatus("success");

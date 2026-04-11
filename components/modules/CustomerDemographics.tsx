@@ -21,7 +21,7 @@ type PeriodOption = 'today' | 'yesterday' | 'thisMonth' | 'lastMonth' | 'custom'
 export function CustomerDemographics({ records, customers, selectedStore, orders }: CustomerDemographicsProps) {
     const { canAccess } = useSubscription();
 
-    const [profiles, setProfiles] = useState<any[]>([]);
+    const [demographics, setDemographics] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     React.useEffect(() => {
@@ -32,7 +32,9 @@ export function CustomerDemographics({ records, customers, selectedStore, orders
                 const res = await fetch(`/api/metrics/crm?store=${encodeURIComponent(selectedStore || 'Todas')}`);
                 const json = await res.json();
                 if (isMounted && json.success) {
-                    setProfiles(json.payload.globalMetrics.profiles || []);
+                    if (json.payload.demographics) {
+                        setDemographics(json.payload.demographics);
+                    }
                 }
             } catch (err) {
                 console.error("Failed to load crm data for demographics", err);
@@ -43,95 +45,6 @@ export function CustomerDemographics({ records, customers, selectedStore, orders
         fetchCrm();
         return () => { isMounted = false; };
     }, [selectedStore]);
-
-    // --- Metrics Aggregation (Single Pass) - HOOK MOVED BEFORE EARLY RETURNS TO FIX #310 ---
-    const { genderData, ageData, ageStatsArray, maleStats, femaleStats, avgAge } = useMemo(() => {
-        if (!profiles || profiles.length === 0) {
-           return { genderData: [], ageData: [], ageStatsArray: [], maleStats: { count: 0, totalSpent: 0, washCount: 0, dryCount: 0, ticket: 0, topDay: '-' }, femaleStats: { count: 0, totalSpent: 0, washCount: 0, dryCount: 0, ticket: 0, topDay: '-' }, avgAge: 0 };
-        }
-        console.time("Demographics Calculation");
-        const genderStats: Record<string, number> = { M: 0, F: 0, U: 0 };
-        const ageStatsAgg: Record<string, any> = {};
-        const maleGroup = { count: 0, totalSpent: 0, totalFreq: 0, totalTicket: 0, washCount: 0, dryCount: 0, churnHigh: 0, churnMedium: 0, churnLow: 0, days: {} as Record<string, number> };
-        const femaleGroup = { count: 0, totalSpent: 0, totalFreq: 0, totalTicket: 0, washCount: 0, dryCount: 0, churnHigh: 0, churnMedium: 0, churnLow: 0, days: {} as Record<string, number> };
-        let totalAgeSum = 0;
-        let totalAgeCount = 0;
-
-        for (let i = 0; i < profiles.length; i++) {
-            const p = profiles[i];
-
-            // 1. Gender Distribution
-            const g = p.gender || 'U';
-            genderStats[g] = (genderStats[g] || 0) + 1;
-
-            // 2. Age Distribution
-            let range = 'N/A';
-            if (p.age) {
-                totalAgeSum += p.age;
-                totalAgeCount++;
-                if (p.age >= 18 && p.age <= 24) range = '18-24';
-                else if (p.age >= 25 && p.age <= 34) range = '25-34';
-                else if (p.age >= 35 && p.age <= 44) range = '35-44';
-                else if (p.age >= 45 && p.age <= 54) range = '45-54';
-                else if (p.age >= 55) range = '55+';
-            }
-            if (!ageStatsAgg[range]) {
-                ageStatsAgg[range] = { name: range, count: 0, spent: 0, visits: 0, baskets: 0, males: 0, females: 0, days: {} as Record<string, number> };
-            }
-            const a = ageStatsAgg[range];
-            a.count++;
-            a.spent += p.totalSpent;
-            a.visits += p.totalVisits;
-            a.baskets += (p.totalWashes || 0) + (p.totalDries || 0);
-            if (p.gender === 'M') a.males++;
-            if (p.gender === 'F') a.females++;
-            a.days[p.topDay] = (a.days[p.topDay] || 0) + 1;
-
-            // 3. Behavioral Comparison (Male vs Female)
-            if (p.gender === 'M' || p.gender === 'F') {
-                const target = p.gender === 'M' ? maleGroup : femaleGroup;
-                target.count++;
-                target.totalSpent += p.totalSpent;
-                target.totalFreq += p.totalVisits;
-                target.totalTicket += p.averageTicket;
-                target.washCount += (p.totalWashes || 0);
-                target.dryCount += (p.totalDries || 0);
-                if (p.churnRisk === 'high') target.churnHigh++;
-                else if (p.churnRisk === 'medium') target.churnMedium++;
-                else target.churnLow++;
-                target.days[p.topDay] = (target.days[p.topDay] || 0) + 1;
-            }
-        }
-
-        const finalizeGroup = (g: any) => ({
-            ...g,
-            ticket: g.count > 0 ? g.totalTicket / g.count : 0,
-            freq: g.count > 0 ? g.totalFreq / g.count : 0,
-            topDay: Object.entries(g.days).sort((a: any, b: any) => b[1] - a[1])[0]?.[0] || '-'
-        });
-
-        const sortOrder = ['18-24', '25-34', '35-44', '45-54', '55+', 'N/A'];
-        const ageStatsArray = sortOrder.map(key => ageStatsAgg[key]).filter(Boolean);
-        const ageData = ageStatsArray
-            .filter((d: any) => d.name !== 'N/A')
-            .map((d: any) => ({ name: d.name, value: d.count }));
-
-        const genderData = [
-            { name: 'Masculino', value: genderStats['M'] || 0, color: '#3b82f6' },
-            { name: 'Feminino', value: genderStats['F'] || 0, color: '#ec4899' },
-            { name: 'Indefinido', value: genderStats['U'] || 0, color: '#525252' },
-        ].filter(d => d.value > 0);
-
-        console.timeEnd("Demographics Calculation");
-        return {
-            genderData,
-            ageData,
-            ageStatsArray,
-            maleStats: finalizeGroup(maleGroup),
-            femaleStats: finalizeGroup(femaleGroup),
-            avgAge: totalAgeCount > 0 ? Math.round(totalAgeSum / totalAgeCount) : 0
-        };
-    }, [profiles]);
 
     if (isLoading) {
         return (
@@ -167,6 +80,12 @@ export function CustomerDemographics({ records, customers, selectedStore, orders
             </div>
         );
     }
+
+    if (!demographics) {
+        return null;
+    }
+
+    const { genderData, ageData, ageStatsArray, maleStats, femaleStats, avgAge } = demographics;
 
     // Comparative Data for Charts
     const ltvData = [
