@@ -6,13 +6,12 @@ function inferGender(name: string): 'M' | 'F' | 'U' {
     const normalizedName = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
     const fn = normalizedName.split(' ')[0];
     
-    if (['LUCA', 'JEAN', 'ANDRE'].includes(fn)) return 'M';
+    // Very basic fallback if VMPay Database Gender is missing
+    if (['LUCA', 'JEAN', 'ANDRE', 'GABRIEL', 'DANIEL', 'MIGUEL', 'SAMUEL', 'RAFAEL', 'EMANUEL', 'MICHEL', 'ARTHUR', 'VICTOR', 'HEITOR', 'IGOR', 'DAVI', 'YURI', 'KAUA', 'KAIO'].includes(fn)) return 'M';
+    if (['ALICE', 'RAQUEL', 'ISABEL', 'BEATRIZ', 'CARMEN', 'HELEN', 'KAREN', 'MIRIAN', 'LILIAN', 'ESTER', 'RUTH', 'TAIS', 'LAIS', 'IRIS', 'GLAUCIA', 'SUELI', 'ROSELI', 'SHIRLEI', 'ELIS', 'INARA', 'MARIA', 'ANA', 'JULIA', 'FRANCISCA', 'ANTONIA', 'ALINE', 'SIMONE', 'MICHELE', 'ELAINE', 'VIVIANE', 'GISELE', 'ROSANE', 'CRISTIANE', 'JAQUELINE', 'ELIANE'].includes(fn)) return 'F';
     
     if (fn.endsWith('A') && !['LUCAS', 'JONAS', 'MATIAS', 'MESSIAS'].includes(fn)) return 'F';
-    if (fn.endsWith('O') || fn.endsWith('S') || fn.endsWith('R') || fn.endsWith('L') || fn.endsWith('M') || fn.endsWith('N')) return 'M';
-    
-    if (['MARIA', 'ANA', 'JULIA', 'FRANCISCA', 'ANTONIA', 'ALINE', 'SIMONE', 'MICHELE', 'ELAINE', 'VIVIANE', 'GISELE', 'ROSANE', 'CRISTIANE', 'JAQUELINE', 'ELIANE'].includes(fn)) return 'F';
-    if (['JOSE', 'JOAO', 'ANTONIO', 'FRANCISCO', 'CARLOS', 'PAULO', 'GUILHERME', 'HENRIQUE', 'FELIPE', 'JORGE'].includes(fn)) return 'M';
+    if (fn.endsWith('O')) return 'M';
     
     return 'U';
 }
@@ -101,7 +100,7 @@ export function rehydrateCrmMetrics(sqlProfiles: any[]): CrmSummary {
             nextPredictedVisit: new Date(lastVisitDate.getTime() + (visits > 1 ? daysSinceFirst / (visits - 1) : 20) * 86400000),
             age: undefined,
             birthDate: undefined,
-            gender: inferGender(p.name),
+            gender: (p.gender && p.gender !== 'U') ? p.gender : inferGender(p.name),
             preferredStore: 'Todas'
         });
     });

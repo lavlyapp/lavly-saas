@@ -12,8 +12,12 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url);
         const period = searchParams.get('period') || 'thisMonth';
         const store = searchParams.get('store') || 'Todas';
-        const startCustom = searchParams.get('start');
-        const endCustom = searchParams.get('end');
+        let startCustom = searchParams.get('start');
+        let endCustom = searchParams.get('end');
+        
+        // Clean up weird browser serialization artifacts
+        if (startCustom === 'undefined' || startCustom === 'null' || startCustom === '') startCustom = null;
+        if (endCustom === 'undefined' || endCustom === 'null' || endCustom === '') endCustom = null;
 
         // Auth
         const cookieStore = await cookies();
@@ -59,8 +63,12 @@ export async function GET(request: Request) {
             queryStartIso = `${y}-${mStr}-01T00:00:00.000Z`;
             queryEndIso = endOfDayLastMonth.toISOString();
         } else if (period === 'custom') {
-            queryStartIso = startCustom ? `${startCustom}T00:00:00.000Z` : null;
-            queryEndIso = endCustom ? `${endCustom}T23:59:59.999Z` : null;
+            if (startCustom && startCustom.length === 10) {
+                 queryStartIso = `${startCustom}T00:00:00.000Z`;
+            }
+            if (endCustom && endCustom.length === 10) {
+                 queryEndIso = `${endCustom}T23:59:59.999Z`;
+            }
         }
 
         // 2. Edge Direct Fetch logic using V19 Schema

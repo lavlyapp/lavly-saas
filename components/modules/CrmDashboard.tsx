@@ -99,6 +99,9 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
                 const storeForApi = (selectedStore === 'Todas as Lojas' || !selectedStore) ? 'Todas' : selectedStore;
                 let params = `?store=${encodeURIComponent(storeForApi)}&period=${period}`;
                 if (period === 'custom') {
+                    if (!customRange.start || !customRange.end || customRange.start.length !== 10 || customRange.end.length !== 10) {
+                        return; // Prevent crash on incomplete keyboard typing
+                    }
                     params += `&start=${customRange.start}&end=${customRange.end}`;
                 }
 

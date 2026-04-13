@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { differenceInDays } from "date-fns";
 import { Phone, DollarSign, ShoppingBasket, AlertTriangle, Clock, UserX, Download, Lock } from "lucide-react";
 import { calculateCrmMetrics, CustomerProfile } from "@/lib/processing/crm";
@@ -25,7 +25,7 @@ export function ChurnAnalysis({ data, selectedStore }: ChurnAnalysisProps) {
     const [crmData, setCrmData] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    React.useEffect(() => {
+    useEffect(() => {
         let isMounted = true;
         const fetchCrm = async () => {
             setIsLoading(true);
