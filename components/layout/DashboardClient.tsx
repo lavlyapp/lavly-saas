@@ -148,7 +148,7 @@ interface AppContentProps {
   selectedStore: string | null;
   setSelectedStore: (store: string | null) => void;
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
-  handleSyncVMPay: (token: string | null) => Promise<void>;
+  handleSyncVMPay: (token: string | null, isSilent?: boolean) => Promise<void>;
 
   stableInitialLoad: (token: string | null) => void;
   stableFullRefresh: (token: string | null) => void;
@@ -219,6 +219,16 @@ function AppContent({
       }, 3000); // 3 seconds after dashboard mounts
     }
   }, [mounted, isAuthenticated]);
+
+  // --- Auto-Sync Background Routine ---
+  useEffect(() => {
+    if (mounted && isAuthenticated && token) {
+      const autoSyncTimeout = setTimeout(() => {
+        handleSyncVMPay(token, true); // Silent background auto-sync
+      }, 5000); // 5 seconds after initial load
+      return () => clearTimeout(autoSyncTimeout);
+    }
+  }, [mounted, isAuthenticated, token, handleSyncVMPay]);
 
   // Derive profile on the fly when selected (Global Modal Logic)
   const selectedProfile = useMemo(() => {
@@ -1320,15 +1330,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
     }
   }
 
-  // --- Auto-Sync Background Routine ---
-  useEffect(() => {
-    if (mounted && isAuthenticated && token) {
-      const autoSyncTimeout = setTimeout(() => {
-        handleSyncVMPay(token, true); // Silent background auto-sync
-      }, 5000); // 5 seconds after initial load
-      return () => clearTimeout(autoSyncTimeout);
-    }
-  }, [mounted, isAuthenticated, token]);
+
 
 
 
