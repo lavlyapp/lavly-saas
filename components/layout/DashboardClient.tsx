@@ -202,6 +202,25 @@ function AppContent({
     }
   }, [isAuthenticated, token, stableInitialLoad]);
 
+  // Silent Background API Pre-warmer
+  useEffect(() => {
+    if (mounted && isAuthenticated) {
+      setTimeout(() => {
+        console.log("[System] Acionando pré-cálculo silencioso das abas na Borda AWS...");
+        setLogs(prev => [...prev, "[System] Servidor dedicado pré-calculando abas financeiras e de CRM..."]);
+        
+        // Dispara requisições silenciosas para esquentar os nós do banco e cache da Edge
+        Promise.allSettled([
+          fetch('/api/metrics/financial?period=thisMonth&store=Todas&t=' + Date.now()),
+          fetch('/api/metrics/comparative?store=Todas&t=' + Date.now()),
+          fetch('/api/metrics/crm?store=Todas&t=' + Date.now())
+        ]).then(() => {
+            console.log("[System] Pré-cálculo em plano de fundo concluído.");
+        });
+      }, 3000); // 3 seconds after dashboard mounts
+    }
+  }, [mounted, isAuthenticated, setLogs]);
+
   // Derive profile on the fly when selected (Global Modal Logic)
   const selectedProfile = useMemo(() => {
     if (!selectedCustomerName || !allRecords) return null;
@@ -632,24 +651,12 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
     setLogs(prev => [...prev, "[System] Processando interface..."]);
   }, []);
 
-  // Silent Background API Pre-warmer
+  // Hydration & Init Fix
   useEffect(() => {
-    if (mounted && isAuthenticated) {
-      setTimeout(() => {
-        console.log("[System] Acionando pré-cálculo silencioso das abas na Borda AWS...");
-        setLogs(prev => [...prev, "[System] Servidor dedicado pré-calculando abas financeiras e de CRM..."]);
-        
-        // Dispara requisições silenciosas para esquentar os nós do banco e cache da Edge
-        Promise.allSettled([
-          fetch('/api/metrics/financial?period=thisMonth&store=Todas&t=' + Date.now()),
-          fetch('/api/metrics/comparative?store=Todas&t=' + Date.now()),
-          fetch('/api/metrics/crm?store=Todas&t=' + Date.now())
-        ]).then(() => {
-            console.log("[System] Pré-cálculo em plano de fundo concluído.");
-        });
-      }, 3000); // 3 seconds after dashboard mounts
-    }
-  }, [mounted, isAuthenticated]);
+    setMounted(true);
+    console.log("[DashboardClient] ✅ Component mounted and hydrated.");
+    setLogs(prev => [...prev, "[System] Processando interface..."]);
+  }, []);
 
     const viewData = useMemo(() => {
     if (!mounted) return null;
