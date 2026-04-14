@@ -11,7 +11,7 @@
 CREATE OR REPLACE FUNCTION get_crm_backend_metrics(p_store text DEFAULT 'Todas', p_start_date text DEFAULT NULL, p_end_date text DEFAULT NULL)
 RETURNS json
 LANGUAGE plpgsql
-SECURITY INVOKER
+SECURITY DEFINER
 AS $$
 DECLARE
     result json;
@@ -131,7 +131,7 @@ CREATE OR REPLACE FUNCTION public.get_comparative_financial_metrics(
     p_end_date timestamptz
 ) RETURNS json 
 LANGUAGE plpgsql
-SECURITY INVOKER
+SECURITY DEFINER
 AS $$
 DECLARE
     result json;
