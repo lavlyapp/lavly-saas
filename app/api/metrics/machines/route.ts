@@ -68,28 +68,45 @@ export async function GET(request: Request) {
             }
         }
 
-        // Let's use RPC if available or just raw select
-        // 'orders' is smaller, we can fetch all in period
-        
         // 🚨 CRITICAL FIX: The 'orders' table might have restrictive or missing RLS policies blocking authenticated reads.
         // Since we explicitly enforce RBAC securely in Node above, we can safely use the Service Role to grab the data.
         const { createClient } = await import('@supabase/supabase-js');
         const adminClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
-        let q = adminClient.from('orders').select('*').gte('data', startQuery).lte('data', endQuery);
+        let filteredOrders: any[] = [];
+        let hasMore = true;
+        let page = 0;
         
-        if (store !== 'Todas') {
-            // Se o usuário pedir uma loja específica e o RBAC estiver ativo, garanta que ele tem acesso a ela.
-            if (rbacActive && !accessibleStores.includes(store)) {
-                return NextResponse.json({ success: true, payload: { machines: [], summary: {}, topRevenueMachine: null, topCyclesMachine: null, rawOrders: [] } });
+        // Supabase PostgREST has a hard 'max-rows' limit (usually 1000). 
+        // We must paginate gracefully to ensure we don't truncate recent records!
+        while (hasMore) {
+            let q = adminClient.from('orders')
+                .select('*')
+                .gte('data', startQuery)
+                .lte('data', endQuery)
+                .order('data', { ascending: false })
+                .range(page * 1000, (page + 1) * 1000 - 1);
+
+            if (store !== 'Todas') {
+                if (rbacActive && !accessibleStores.includes(store)) {
+                    return NextResponse.json({ success: true, payload: { machines: [], summary: {}, topRevenueMachine: null, topCyclesMachine: null, rawOrders: [] } });
+                }
+                q.eq('loja', store);
+            } else if (rbacActive) {
+                q.in('loja', accessibleStores);
             }
-            q.eq('loja', store);
-        } else if (rbacActive) {
-            // Se for "Todas", e não for admin, força in() na sua lista
-            q.in('loja', accessibleStores);
+
+            const { data, error } = await q;
+
+            if (error || !data || data.length === 0) {
+                hasMore = false;
+            } else {
+                filteredOrders.push(...data);
+                page++;
+                if (data.length < 1000) hasMore = false;
+                if (page > 15) hasMore = false; // Failsafe limit: 15,000 rows max memory limit
+            }
         }
-        
-        const { data: filteredOrders, error } = await q.limit(10000); // 10k is way more than enough for a single month config
 
         if (!filteredOrders || filteredOrders.length === 0) {
             return NextResponse.json({ success: true, payload: { machines: [], summary: {}, topRevenueMachine: null, topCyclesMachine: null, rawOrders: [] } });
