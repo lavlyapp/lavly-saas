@@ -28,10 +28,17 @@ export function MachineMonitor({ allRecords, allOrders, selectedStore }: Machine
     const [renderTime, setRenderTime] = useState<string>("");
     const [apiOrders, setApiOrders] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [refreshKey, setRefreshKey] = useState<number>(0);
 
     useEffect(() => {
         setRenderTime(format(new Date(), "HH:mm"));
     }, [allRecords, allOrders, apiOrders]);
+
+    useEffect(() => {
+        const handleUpdate = () => setRefreshKey(prev => prev + 1);
+        window.addEventListener('lavly-force-financial-update', handleUpdate);
+        return () => window.removeEventListener('lavly-force-financial-update', handleUpdate);
+    }, []);
 
     useEffect(() => {
         let isMounted = true;
@@ -39,7 +46,8 @@ export function MachineMonitor({ allRecords, allOrders, selectedStore }: Machine
             setIsLoading(true);
             try {
                 const st = selectedStore && selectedStore !== 'Todas' ? selectedStore : 'Todas';
-                const res = await fetch(`/api/metrics/machines?period=last48h&store=${encodeURIComponent(st)}`);
+                // Adicionado Cache Buster &t para garantir reload limpo e garantir re-mount após sync
+                const res = await fetch(`/api/metrics/machines?period=last48h&store=${encodeURIComponent(st)}&t=${Date.now()}`);
                 const json = await res.json();
                 if (isMounted && json.success && json.payload && json.payload.rawOrders) {
                     setApiOrders(json.payload.rawOrders);
@@ -52,7 +60,7 @@ export function MachineMonitor({ allRecords, allOrders, selectedStore }: Machine
         };
         fetchOrders();
         return () => { isMounted = false; };
-    }, [selectedStore]);
+    }, [selectedStore, refreshKey]);
 
     // Cloud-native priority: apiOrders
     const rawTargetArray = apiOrders.length > 0 ? apiOrders : (allOrders && allOrders.length > 0 ? allOrders : (allRecords || []));
