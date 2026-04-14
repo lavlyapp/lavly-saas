@@ -207,7 +207,6 @@ function AppContent({
     if (mounted && isAuthenticated) {
       setTimeout(() => {
         console.log("[System] Acionando pré-cálculo silencioso das abas na Borda AWS...");
-        setLogs(prev => [...prev, "[System] Servidor dedicado pré-calculando abas financeiras e de CRM..."]);
         
         // Dispara requisições silenciosas para esquentar os nós do banco e cache da Edge
         Promise.allSettled([
@@ -219,7 +218,7 @@ function AppContent({
         });
       }, 3000); // 3 seconds after dashboard mounts
     }
-  }, [mounted, isAuthenticated, setLogs]);
+  }, [mounted, isAuthenticated]);
 
   // Derive profile on the fly when selected (Global Modal Logic)
   const selectedProfile = useMemo(() => {
