@@ -127,22 +127,28 @@ export async function GET(request: Request) {
         let couponsRes = { count: 0 };
         let last30DaysAvg = 0;
         
-        if (period === 'thisMonth' || period === 'today') {
+        if (period === 'thisMonth' || period === 'today' || period === 'yesterday') {
             const [l30] = await Promise.all([
                 supabase.rpc('get_financial_dashboard_metrics', { p_store: store, p_start_date: thirtyDaysAgoIso, p_end_date: now.toISOString() })
             ]);
-            if (l30.data && l30.data.salesMetrics) {
+            if (l30?.data?.salesMetrics) {
                 last30DaysAvg = l30.data.salesMetrics.totalRevenue / 30;
             }
-        } else {
-            // Para períodos passados, Faturamento Médio Dia = Faturamento do Período / Dias do Mês Visto
+        } else if (period === 'lastMonth') {
+            // Para meses passados completos (lastMonth), a média é Base / Dias do Mês Visto
             const vDate = metrics.period?.startDate ? new Date(metrics.period.startDate) : new Date();
             const daysInMonth = getDaysInMonth(vDate);
-            if (metrics.salesMetrics && metrics.salesMetrics.totalRevenue) {
+            if (metrics.salesMetrics?.totalRevenue) {
                 last30DaysAvg = metrics.salesMetrics.totalRevenue / (daysInMonth || 30);
             }
-            // qCoupons.count has been temporarily disabled because doing COUNT(*) on raw sales table bypasses materialized views
-            couponsRes = { count: 0 };
+        } else {
+             // Para 'custom' e 'all'
+             const daysDiff = metrics.period?.startDate && metrics.period?.endDate ? 
+                Math.max(1, Math.round((new Date(metrics.period.endDate).getTime() - new Date(metrics.period.startDate).getTime()) / 86400000)) 
+                : 30;
+             if (metrics.salesMetrics?.totalRevenue) {
+                 last30DaysAvg = metrics.salesMetrics.totalRevenue / daysDiff;
+             }
         }
         
         paymentStats.coupons = couponsRes.count || 0;
@@ -151,7 +157,11 @@ export async function GET(request: Request) {
         const daysInViewMonth = getDaysInMonth(viewDate);
         const projection = last30DaysAvg * daysInViewMonth;
 
-        return NextResponse.json({
+// Force ticket recalculation outside SQL to prevent discrepancies with BRLD exclusions
+const uniqueC = metrics.period.uniqueCustomers || 0;
+const finalTicket = uniqueC > 0 ? (metrics.salesMetrics.totalRevenue / uniqueC) : 0;
+
+return NextResponse.json({
             success: true,
             payload: {
                 summary: {
@@ -159,8 +169,8 @@ export async function GET(request: Request) {
                     totalValue: metrics.salesMetrics.totalRevenue,
                     startDate: metrics.period.startDate,
                     endDate: metrics.period.endDate,
-                    uniqueCustomers: metrics.period.uniqueCustomers,
-                    ticketMedio: metrics.salesMetrics.averageTicket
+                    uniqueCustomers: uniqueC,
+                    ticketMedio: finalTicket
                 },
                 basketsMetrics: metrics.basketsMetrics,
                 dailyData: metrics.dailyData,
