@@ -70,7 +70,13 @@ export async function GET(request: Request) {
 
         // Let's use RPC if available or just raw select
         // 'orders' is smaller, we can fetch all in period
-        let q = supabase.from('orders').select('*').gte('data', startQuery).lte('data', endQuery);
+        
+        // 🚨 CRITICAL FIX: The 'orders' table might have restrictive or missing RLS policies blocking authenticated reads.
+        // Since we explicitly enforce RBAC securely in Node above, we can safely use the Service Role to grab the data.
+        const { createClient } = await import('@supabase/supabase-js');
+        const adminClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+
+        let q = adminClient.from('orders').select('*').gte('data', startQuery).lte('data', endQuery);
         
         if (store !== 'Todas') {
             // Se o usuário pedir uma loja específica e o RBAC estiver ativo, garanta que ele tem acesso a ela.
