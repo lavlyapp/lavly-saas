@@ -1329,14 +1329,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       return () => clearTimeout(autoSyncTimeout);
     }
   }, [mounted, isAuthenticated, token]);
-      console.error(e);
-      setSyncProgress(0);
-      setStatus("error");
-      setMessage(`Erro: ${e.message}`);
-      const ts = new Date().toISOString().substring(11, 23);
-      setLogs(prev => [...prev, `[${ts}] [Erro Fatal] ${e.message}`]);
-    }
-  }
+
 
 
 
