@@ -80,6 +80,17 @@ export function ComparativeDashboard({ data, customers, selectedStore = 'Todas' 
 
 
 
+    if (fetchError) {
+        return (
+            <div className="flex flex-col h-[400px] items-center justify-center bg-red-900/10 rounded-xl border border-red-500/30 p-6 text-center">
+                <p className="text-red-400 font-bold mb-2">Erro API (Comparativo)</p>
+                <div className="bg-black/50 p-2 rounded text-xs font-mono text-red-300 break-words max-w-full">
+                    {fetchError}
+                </div>
+            </div>
+        );
+    }
+
     if (!monthlyStats || monthlyStats.length === 0) {
         return (
             <div className="flex h-[400px] items-center justify-center bg-neutral-900/50 rounded-xl border border-neutral-800">
