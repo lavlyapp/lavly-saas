@@ -2,7 +2,7 @@
 
 import { SaleRecord } from "@/lib/processing/etl";
 import { getCycleDuration } from "@/lib/processing/crm";
-import { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { format, addMinutes, startOfDay, endOfDay } from "date-fns";
 
