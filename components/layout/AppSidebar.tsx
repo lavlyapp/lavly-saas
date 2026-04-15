@@ -127,9 +127,22 @@ export function AppSidebar({ activeTab, onTabChange, collapsed, onToggle, isMobi
 
             <div className="p-4 mt-auto">
                 <button
-                    onClick={async () => {
-                        await logout();
-                        window.location.href = '/';
+                    onClick={async (e) => {
+                        const btn = e.currentTarget;
+                        btn.style.opacity = '0.5';
+                        btn.style.pointerEvents = 'none';
+                        
+                        try {
+                            // Race condition: wait max 1.5 seconds for logout, then force redirect
+                            await Promise.race([
+                                logout(),
+                                new Promise(resolve => setTimeout(resolve, 1500))
+                            ]);
+                        } catch (err) {
+                            console.error("Logout errored or timed out", err);
+                        } finally {
+                            window.location.href = '/';
+                        }
                     }}
                     className="w-full flex items-center gap-3 px-4 py-3 text-neutral-400 hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-all"
                 >
