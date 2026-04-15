@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { SaleRecord } from "@/lib/processing/etl";
 import { Wrench, Trophy, TrendingUp, AlertCircle, BarChart3, Activity, Calendar, Filter } from "lucide-react";
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
@@ -19,7 +19,7 @@ export function MachineAnalysis({ selectedStore }: MachineAnalysisProps) {
     const [isLoading, setIsLoading] = useState(true);
     const [payload, setPayload] = useState<any>(null);
 
-    React.useEffect(() => {
+    useEffect(() => {
         let isMounted = true;
         const fetchMachines = async () => {
             setIsLoading(true);

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { SaleRecord } from "@/lib/processing/etl";
 import {
     TrendingUp, Users, AlertCircle, ShoppingCart,
@@ -29,7 +29,7 @@ export function Reports({ selectedStore }: ReportsProps) {
     const [isLoading, setIsLoading] = useState(true);
     const [payload, setPayload] = useState<any>(null);
 
-    React.useEffect(() => {
+    useEffect(() => {
         let isMounted = true;
         const fetchReports = async () => {
             setIsLoading(true);
