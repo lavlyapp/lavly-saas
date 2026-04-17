@@ -723,7 +723,9 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
     isInitializing.current = true;
 
     console.log(`[Home] Reloading all data (Reason: ${reason})...`);
-    setStatus("uploading");
+    startTransition(() => {
+      setStatus("uploading");
+    });
     
     try {
       // 1. Create Authenticated Client
@@ -757,7 +759,9 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       }
 
       // 3. Live Cloud Fetch (Sem cache local)
-      setLogs(prev => [...prev, "[System] Carregando histórico geral de vendas direto da nuvem..."]);
+      startTransition(() => {
+        setLogs(prev => [...prev, "[System] Carregando histórico geral de vendas direto da nuvem..."]);
+      });
 
       const rawSupabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -771,7 +775,9 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       );
 
       const fetchAllParallel = async (tableName: string, columns: string, orderBy: string, targetStores: string[], numPartitions: number = 12, startOffsetPartition: number = 0) => {
-        setLogs(prev => [...prev, `[System] Iniciando streaming temporal de ${tableName}...`]);
+        startTransition(() => {
+          setLogs(prev => [...prev, `[System] Iniciando streaming temporal de ${tableName}...`]);
+        });
         const shouldFilterByStore = targetStores.length > 0 && tableName !== 'customers';
         const pageSize = 1000;
         let allData: any[] = [];
@@ -793,7 +799,9 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
                  const { data, error } = await query;
                  if (error) {
                       console.error(`[Erro BATCH] Falha na partição ${partName} offset ${chunkOffset}:`, error);
-                      setLogs(prev => [...prev, `[Erro DB] Falha na partição ${partName} de ${tableName} (${error.code || 'Timeout'}): ${error.message}`]);
+                      startTransition(() => {
+                        setLogs(prev => [...prev, `[Erro DB] Falha na partição ${partName} de ${tableName} (${error.code || 'Timeout'}): ${error.message}`]);
+                      });
                       break; 
                  }
                  
@@ -823,12 +831,16 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
                }
                const batchResults = await Promise.all(batchPromises);
                allData.push(...batchResults.flat());
-               setLogs(prev => [...prev, `[System] Progresso ${tableName}: Bloco ${Math.min(i + maxConcurrent, partitions.length)} de ${partitions.length} processado.`]);
+               startTransition(() => {
+                 setLogs(prev => [...prev, `[System] Progresso ${tableName}: Bloco ${Math.min(i + maxConcurrent, partitions.length)} de ${partitions.length} processado.`]);
+               });
             }
         } else {
             // Fallback for smaller/non-time tables (customers)
             // Just sequential offset sweep since it's super fast without RLS timeouts
-            setLogs(prev => [...prev, `[System] Baixando ${tableName} de forma sequencial leve...`]);
+            startTransition(() => {
+              setLogs(prev => [...prev, `[System] Baixando ${tableName} de forma sequencial leve...`]);
+            });
             const results = await fetchPartition(null, null, "Global");
             allData.push(...results);
         }
@@ -853,15 +865,16 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       startTransition(() => {
         setAllCustomers([]);
         setStatus("success");
+        setLogs(prev => [...prev, `[System] Cliente UI inicializado. Delegando cálculos para a Borda AWS.`]);
       });
-      
-      setLogs(prev => [...prev, `[System] Cliente UI inicializado. Delegando cálculos para a Borda AWS.`]);
       isInitializing.current = false;
 
     } catch (error: any) {
       console.error("[Home] Error reloading data:", error);
-      setLogs(prev => [...prev, `[Erro Fatal] Falha na rede ao conectar com a nuvem: ${error.message}`]);
-      setStatus("error");
+      startTransition(() => {
+        setLogs(prev => [...prev, `[Erro Fatal] Falha na rede ao conectar com a nuvem: ${error.message}`]);
+        setStatus("error");
+      });
       isInitializing.current = false;
     }
   };
@@ -1192,7 +1205,9 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
   async function handleSyncVMPay(passedToken: string | null = null, isSilent: boolean = false) {
     const pushLog = (msg: string) => {
       const ts = new Date().toLocaleTimeString('pt-BR', { hour12: false });
-      setLogs(prev => [...prev, `[${ts}] ${msg}`]);
+      startTransition(() => {
+        setLogs(prev => [...prev, `[${ts}] ${msg}`]);
+      });
     };
 
     const startTime = performance.now();
@@ -1209,9 +1224,11 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         if (now - lastSyncTime < 60000) {
             if (!isSilent) {
                 const remainingSeconds = Math.ceil((60000 - (now - lastSyncTime)) / 1000);
-                setStatus("error");
-                setMessage(`Proteção contra bloqueio: Aguarde ${remainingSeconds} segundos antes de sincronizar novamente.`);
-                setTimeout(() => setStatus("idle"), 5000);
+                startTransition(() => {
+                  setStatus("error");
+                  setMessage(`Proteção contra bloqueio: Aguarde ${remainingSeconds} segundos antes de sincronizar novamente.`);
+                });
+                setTimeout(() => startTransition(() => setStatus("idle")), 5000);
             }
             return;
         }
@@ -1220,9 +1237,11 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
 
     try {
       if (!isSilent) {
-          setStatus("uploading");
-          setSyncProgress(0);
-          setMessage("Preparando sincronização...");
+          startTransition(() => {
+            setStatus("uploading");
+            setSyncProgress(0);
+            setMessage("Preparando sincronização...");
+          });
       }
       pushLog("[VMPay] Verificando sessão segura" + (isSilent ? " (Silencioso)..." : "..."));
       let token = passedToken;
@@ -1245,8 +1264,10 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       const totalStores = credentials.length;
 
       if (!isSilent) {
-          setSyncProgress(25);
-          setMessage(`Sincronizando ${totalStores} loja(s) simultaneamente...`);
+          startTransition(() => {
+            setSyncProgress(25);
+            setMessage(`Sincronizando ${totalStores} loja(s) simultaneamente...`);
+          });
       }
       pushLog(`[VMPay] Acionando Sincronização Global na Nuvem...`);
 
@@ -1269,7 +1290,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         });
         clearTimeout(timeoutId);
 
-        if (!isSilent) setSyncProgress(75);
+        if (!isSilent) startTransition(() => setSyncProgress(75));
         pushLog(`[API] Retorno recebido em ${((performance.now() - callStart) / 1000).toFixed(2)}s (HTTP ${res.status}). Lendo JSON...`);
 
         if (!res.ok) {
@@ -1288,8 +1309,10 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       }
 
       if (!isSilent) {
-          setSyncProgress(90); // Finished downloading, now re-rendering
-          setMessage("Desenhando Novos Gráficos...");
+          startTransition(() => {
+            setSyncProgress(90); // Finished downloading, now re-rendering
+            setMessage("Desenhando Novos Gráficos...");
+          });
       }
 
       if (allNewRawRecords.length === 0) {
@@ -1300,7 +1323,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
               setMessage("Sincronização concluída (Sem novos dados)");
               setSyncProgress(100);
             });
-            setTimeout(() => setSyncProgress(0), 3000);
+            setTimeout(() => startTransition(() => setSyncProgress(0)), 3000);
         }
         pushLog(`[Finalizado] Tempo total: ${((performance.now() - startTime) / 1000).toFixed(2)}s.`);
         return;
@@ -1325,16 +1348,18 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
             setStatus("success");
             setMessage("Sincronização concluída com sucesso!");
           });
-          setTimeout(() => setSyncProgress(0), 3000);
+          setTimeout(() => startTransition(() => setSyncProgress(0)), 3000);
       }
       pushLog(`[Finalizado] Tempo total de Sincronização + Recarga: ${((performance.now() - startTime) / 1000).toFixed(2)}s.`);
     } catch (e: any) {
       console.error("[Sync API] Error:", e);
       pushLog(`[ERRO CRÍTICO] Falha na Sincronização Global: ${e.message}`);
       if (!isSilent) {
-          setStatus("error");
-          setMessage(e.message || "Falha na sincronização");
-          setSyncProgress(0);
+          startTransition(() => {
+            setStatus("error");
+            setMessage(e.message || "Falha na sincronização");
+            setSyncProgress(0);
+          });
       }
     }
   }
