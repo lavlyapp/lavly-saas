@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, useCallback, startTransition } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, startTransition, Suspense } from "react";
 import {
   FileUp, Calendar, AlertCircle, RefreshCw, LogOut,
   Moon, Sun, MapPin, Briefcase, FileText, Download, CheckCircle, Upload, Menu,
@@ -561,7 +561,16 @@ function AppContent({
             ) : (
               <ErrorBoundary>
                 <div key={activeTab}>
-                  {renderContent(token)}
+                  <Suspense fallback={
+                    <div className="flex flex-col items-center justify-center p-8 h-[60vh] w-full bg-neutral-900/50 rounded-3xl border border-neutral-800 animate-in fade-in duration-500">
+                      <div className="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4 shadow-[0_0_30px_rgba(16,185,129,0.3)]" />
+                      <h3 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent">
+                        Processando interface...
+                      </h3>
+                    </div>
+                  }>
+                    {renderContent(token)}
+                  </Suspense>
                 </div>
               </ErrorBoundary>
             )}
