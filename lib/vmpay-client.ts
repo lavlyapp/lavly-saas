@@ -141,10 +141,11 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                             produto = "SECAGEM";
                         }
 
-                        // Fix Timezone: API natively returns UTC timestamps but often omits the 'Z' suffix
+                        // Fix Timezone: VMPay API natively returns BRT timestamps but omits the timezone offset string. 
+                        // We must interpret it as BRT (-03:00), not UTC ('Z'), otherwise the Gantt chart will shift it earlier.
                         let dateStr = sale.data;
-                        if (dateStr && typeof dateStr === 'string' && !dateStr.endsWith('Z')) {
-                            dateStr += 'Z';
+                        if (dateStr && typeof dateStr === 'string' && !dateStr.endsWith('Z') && !dateStr.includes('-03:00')) {
+                            dateStr += '-03:00';
                         }
                         const safeDate = new Date(dateStr);
 

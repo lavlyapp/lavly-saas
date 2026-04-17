@@ -604,7 +604,7 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
                 </TabsContent>
 
                 <TabsContent value="machines">
-                    <MachineAnalysis data={{ records: data.records, orders: data.orders }} />
+                    <MachineAnalysis data={{ records: data.records, orders: data.orders }} selectedStore={selectedStore} />
                 </TabsContent>
 
                 <TabsContent value="availability">
