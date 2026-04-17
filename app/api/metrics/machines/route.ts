@@ -23,28 +23,47 @@ export async function GET(request: Request) {
             supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { cookies: { getAll() { return cookieStore.getAll(); }, setAll() {} } });
         }
 
-        // FIX: The database stores 'data' in UTC. If we want raw chronological bounds independently of local time parsing,
-        // we should just use Date.now() directly for relative lookbacks since machine activity is strictly chronological.
         const nowUtc = new Date();
+        
+        // Helper to get BRT midnight in UTC for exact calendar bounding
+        const getBRTMidnightUTC = (date: Date, offsetDays: number = 0) => {
+            const brtTzOffset = 3 * 60 * 60 * 1000;
+            // Create a local BRT date context
+            const brtDate = new Date(date.getTime() - brtTzOffset);
+            // Reset to midnight in BRT
+            brtDate.setUTCHours(0, 0, 0, 0);
+            // Apply offset (e.g., -1 for yesterday)
+            brtDate.setUTCDate(brtDate.getUTCDate() + offsetDays);
+            // Convert back to UTC boundary
+            return new Date(brtDate.getTime() + brtTzOffset);
+        };
+
+        const todayStartUTC = getBRTMidnightUTC(nowUtc, 0);
+        const yesterdayStartUTC = getBRTMidnightUTC(nowUtc, -1);
+        const thisMonthStartUTC = new Date(todayStartUTC);
+        thisMonthStartUTC.setUTCDate(1); // 1st of current BRT month
+
         let startQuery: string;
         let endQuery: string;
 
         switch (period) {
             case 'today':
-                startQuery = new Date(nowUtc.getTime() - 24 * 3600 * 1000).toISOString();
-                endQuery = nowUtc.toISOString();
+                startQuery = todayStartUTC.toISOString();
+                endQuery = new Date(todayStartUTC.getTime() + 24 * 3600 * 1000).toISOString();
                 break;
             case 'yesterday':
-                startQuery = new Date(nowUtc.getTime() - 48 * 3600 * 1000).toISOString();
-                endQuery = new Date(nowUtc.getTime() - 24 * 3600 * 1000).toISOString();
+                startQuery = yesterdayStartUTC.toISOString();
+                endQuery = todayStartUTC.toISOString();
                 break;
             case 'thisMonth':
-                startQuery = new Date(nowUtc.getTime() - 30 * 24 * 3600 * 1000).toISOString();
-                endQuery = nowUtc.toISOString();
+                startQuery = thisMonthStartUTC.toISOString();
+                endQuery = new Date(todayStartUTC.getTime() + 24 * 3600 * 1000).toISOString(); // Up to end of today
                 break;
             case 'lastMonth':
-                startQuery = new Date(nowUtc.getTime() - 60 * 24 * 3600 * 1000).toISOString();
-                endQuery = new Date(nowUtc.getTime() - 30 * 24 * 3600 * 1000).toISOString();
+                const lastMonthStart = new Date(thisMonthStartUTC);
+                lastMonthStart.setUTCMonth(lastMonthStart.getUTCMonth() - 1);
+                startQuery = lastMonthStart.toISOString();
+                endQuery = thisMonthStartUTC.toISOString();
                 break;
             case 'last48h':
                 startQuery = new Date(nowUtc.getTime() - 48 * 3600 * 1000).toISOString();
