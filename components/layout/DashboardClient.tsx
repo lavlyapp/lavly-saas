@@ -88,11 +88,7 @@ const ComparativeDashboard = dynamic(
   { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
 );
 
-// Dynamically import ChurnAnalysis
-const ChurnAnalysis = dynamic(
-  () => import('@/components/modules/ChurnAnalysis').then(mod => mod.ChurnAnalysis),
-  { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
-);
+import { ChurnAnalysis } from '@/components/modules/ChurnAnalysis';
 
 const MachineAnalysis = dynamic(
   () => import('@/components/modules/MachineAnalysis').then(mod => mod.MachineAnalysis),
@@ -1292,9 +1288,11 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       if (allNewRawRecords.length === 0) {
         pushLog("[VMPay] Nenhuma venda nova encontrada em nenhuma loja.");
         if (!isSilent) {
-            setStatus("success");
-            setMessage("Sincronização concluída (Sem novos dados)");
-            setSyncProgress(100);
+            startTransition(() => {
+              setStatus("success");
+              setMessage("Sincronização concluída (Sem novos dados)");
+              setSyncProgress(100);
+            });
             setTimeout(() => setSyncProgress(0), 3000);
         }
         pushLog(`[Finalizado] Tempo total: ${((performance.now() - startTime) / 1000).toFixed(2)}s.`);
@@ -1315,9 +1313,11 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       }
 
       if (!isSilent) {
-          setSyncProgress(100);
-          setStatus("success");
-          setMessage("Sincronização concluída com sucesso!");
+          startTransition(() => {
+            setSyncProgress(100);
+            setStatus("success");
+            setMessage("Sincronização concluída com sucesso!");
+          });
           setTimeout(() => setSyncProgress(0), 3000);
       }
       pushLog(`[Finalizado] Tempo total de Sincronização + Recarga: ${((performance.now() - startTime) / 1000).toFixed(2)}s.`);
