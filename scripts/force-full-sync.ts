@@ -9,8 +9,8 @@ async function runFullSync() {
     try {
         const endDate = new Date();
         const startDate = new Date();
-        startDate.setDate(startDate.getDate() - 180);
-        // Fetch 180 days to cover the historical gap
+        startDate.setDate(startDate.getDate() - 5);
+        // Fetch 5 days to cover the historical gap
         const records = await syncVMPaySales(startDate, endDate);
         console.log(`Fetched ${records.length} records including items. Updating DB...`);
 
