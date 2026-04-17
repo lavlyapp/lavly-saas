@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, startTransition } from "react";
 import {
   FileUp, Calendar, AlertCircle, RefreshCw, LogOut,
   Moon, Sun, MapPin, Briefcase, FileText, Download, CheckCircle, Upload, Menu,
@@ -1066,8 +1066,10 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         const finalOrders = mergedOrders.map((o: any) => ({ ...o, loja: getCanonicalStoreName(o.loja) }));
         const finalRecords = newRecords.map((r: any) => ({ ...r, loja: getCanonicalStoreName(r.loja) }));
 
-        setAllOrders(finalOrders);
-        setAllRecords(finalRecords);
+        startTransition(() => {
+          setAllOrders(finalOrders);
+          setAllRecords(finalRecords);
+        });
 
         setLogs(prev => [...prev, ...etlLogs, `[DEBUG] Loop Complete. Linked ${enrichedCount} sales.`]);
         setMessage(`Fazendo persistência dos vínculos no banco de dados...`);

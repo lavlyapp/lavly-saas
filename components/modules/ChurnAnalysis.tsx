@@ -1,3 +1,4 @@
+"use client";
 import React, { useMemo, useState, useEffect } from "react";
 import { differenceInDays } from "date-fns";
 import { Phone, DollarSign, ShoppingBasket, AlertTriangle, Clock, UserX, Download, Lock } from "lucide-react";
