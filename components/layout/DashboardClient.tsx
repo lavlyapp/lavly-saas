@@ -740,13 +740,18 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       const dataStores = await resStores.json();
       const activeStores = dataStores.stores || [];
       const configuredNames = activeStores.map((s: any) => getCanonicalStoreName(s.name));
-      setDbStores(configuredNames);
+      
+      startTransition(() => {
+        setDbStores(configuredNames);
+      });
 
       // Check if any of these active stores are missing a CNPJ
       const missingCnpjStores = activeStores.filter((s: any) => !s.cnpj || s.cnpj.trim() === "");
       if (missingCnpjStores.length > 0) {
-        setNeedsOnboardingStores(missingCnpjStores.map((s: any) => ({ name: s.name })));
-        setStatus("idle");
+        startTransition(() => {
+          setNeedsOnboardingStores(missingCnpjStores.map((s: any) => ({ name: s.name })));
+          setStatus("idle");
+        });
         isInitializing.current = false;
         return; // Halt data loading until CNPJs are provided
       }
@@ -845,10 +850,12 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
 
       // Mass sync arrays eliminated! 
       // Customers are no longer fetched into browser RAM to prevent 5-10s UI freezing during Sincronizar.
-      setAllCustomers([]);
+      startTransition(() => {
+        setAllCustomers([]);
+        setStatus("success");
+      });
       
       setLogs(prev => [...prev, `[System] Cliente UI inicializado. Delegando cálculos para a Borda AWS.`]);
-      setStatus("success");
       isInitializing.current = false;
 
     } catch (error: any) {
