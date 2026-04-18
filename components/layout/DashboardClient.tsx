@@ -1220,9 +1220,9 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
   async function handleSyncVMPay(passedToken: string | null = null, isSilent: boolean = false) {
     const pushLog = (msg: string) => {
       const ts = new Date().toLocaleTimeString('pt-BR', { hour12: false });
-      startTransition(() => {
+      setTimeout(() => {
         setLogs(prev => [...prev, `[${ts}] ${msg}`]);
-      });
+      }, 10);
     };
 
     const startTime = performance.now();
@@ -1239,11 +1239,11 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         if (now - lastSyncTime < 60000) {
             if (!isSilent) {
                 const remainingSeconds = Math.ceil((60000 - (now - lastSyncTime)) / 1000);
-                startTransition(() => {
+                setTimeout(() => {
                   setStatus("error");
                   setMessage(`Proteção contra bloqueio: Aguarde ${remainingSeconds} segundos antes de sincronizar novamente.`);
-                });
-                setTimeout(() => startTransition(() => setStatus("idle")), 5000);
+                }, 10);
+                setTimeout(() => setStatus("idle"), 5000);
             }
             return;
         }
@@ -1305,7 +1305,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         });
         clearTimeout(timeoutId);
 
-        if (!isSilent) startTransition(() => setSyncProgress(75));
+        if (!isSilent) setTimeout(() => setSyncProgress(75), 10);
         pushLog(`[API] Retorno recebido em ${((performance.now() - callStart) / 1000).toFixed(2)}s (HTTP ${res.status}). Lendo JSON...`);
 
         if (!res.ok) {
@@ -1333,12 +1333,12 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       if (allNewRawRecords.length === 0) {
         pushLog("[VMPay] Nenhuma venda nova encontrada em nenhuma loja.");
         if (!isSilent) {
-            startTransition(() => {
+            setTimeout(() => {
               setStatus("success");
               setMessage("Sincronização concluída (Sem novos dados)");
               setSyncProgress(100);
-            });
-            setTimeout(() => startTransition(() => setSyncProgress(0)), 3000);
+            }, 10);
+            setTimeout(() => setSyncProgress(0), 3000);
         }
         pushLog(`[Finalizado] Tempo total: ${((performance.now() - startTime) / 1000).toFixed(2)}s.`);
         return;
@@ -1358,12 +1358,12 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       }
 
       if (!isSilent) {
-          startTransition(() => {
+          setTimeout(() => {
             setSyncProgress(100);
             setStatus("success");
             setMessage("Sincronização concluída com sucesso!");
-          });
-          setTimeout(() => startTransition(() => setSyncProgress(0)), 3000);
+          }, 10);
+          setTimeout(() => setSyncProgress(0), 3000);
       }
       pushLog(`[Finalizado] Tempo total de Sincronização + Recarga: ${((performance.now() - startTime) / 1000).toFixed(2)}s.`);
     } catch (e: any) {
