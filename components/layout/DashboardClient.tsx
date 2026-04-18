@@ -42,6 +42,12 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Auto-Recovery para React Error 310 (Suspense Collision)
+    if (error.message && error.message.includes('310')) {
+        console.warn("[Auto-Recovery] Detectado choque de Suspense (React 310). Forçando limpeza de estado...");
+        window.location.reload();
+        return;
+    }
     console.error("DashboardClient ErrorBoundary caught an error", error, errorInfo);
     this.setState({ errorInfo });
   }
@@ -487,7 +493,7 @@ function AppContent({
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-neutral-800 hover:bg-neutral-700 text-white shadow-lg transition-all"
             >
               <RefreshCw className={cn("w-4 h-4", status === 'uploading' && "animate-spin")} />
-              <span>Atualizar Tela</span>
+              <span>Atualizar (v31.2)</span>
             </button>
 
             <div className="relative group">
