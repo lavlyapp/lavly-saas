@@ -1217,6 +1217,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
 
   async function handleSyncVMPay(passedToken: string | null = null, isSilent: boolean = false) {
     const pushLog = (msg: string) => {
+      if (isSilent) return; // Completely mute React DOM string appends during silent sync to prevent 310 Suspense tearing
       const ts = new Date().toLocaleTimeString('pt-BR', { hour12: false });
       setTimeout(() => {
         setLogs(prev => [...prev, `[${ts}] ${msg}`]);
