@@ -313,6 +313,10 @@ function AppContent({
     );
   };
 
+  // CRITICAL FIX: ALL Hooks MUST be called before ANY early returns! 
+  // Placing useMemo below if (isLoading) return ... causes React Error 310!
+  const cachedContent = useMemo(() => renderContent(token), [activeTab, viewData, selectedStore, token]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 text-center">
@@ -344,9 +348,6 @@ function AppContent({
   if (role && role !== 'admin' && !vmpayApiKey) {
     return <OnboardingVMPay onSuccess={() => window.location.reload()} />;
   }
-
-  // Moved states to the top to respect React's hook ordering rules.
-  const cachedContent = useMemo(() => renderContent(token), [activeTab, viewData, selectedStore, token]);
 
   return (
     <div className="flex min-h-screen bg-neutral-950 font-sans text-neutral-100">
