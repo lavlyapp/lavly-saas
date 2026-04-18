@@ -523,7 +523,17 @@ function AppContent({
                       </h3>
                     </div>
                   }>
-                    {status === 'uploading' && activeTab !== 'financial' ? (
+                    {/* 
+                      CRITICAL REACT 310 FIX:
+                      NEVER use a ternary operator here to swap between the Loader and cachedContent! 
+                      Doing so physically unmounts the pending Promises in `<ChurnAnalysis>`, causing a catastrophic unmount-tearing collision (Error 310) when the layout state switches back to 'success' during a startTransition. 
+                      Instead, we keep the data permanently mounted in the React tree and visually hide it with CSS to preserve the Fiber Suspense resolution state! 
+                    */}
+                    <div className={status === 'uploading' && activeTab !== 'financial' ? 'hidden' : 'block'}>
+                      {cachedContent}
+                    </div>
+
+                    {status === 'uploading' && activeTab !== 'financial' && (
                       <div className="flex flex-col items-center justify-center p-8 h-[60vh] w-full bg-neutral-900/50 rounded-3xl border border-neutral-800 animate-in fade-in duration-500">
                         <div className="flex flex-col items-center gap-6 w-full max-w-md">
                           <div className="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4 shadow-[0_0_30px_rgba(16,185,129,0.3)]" />
@@ -543,8 +553,6 @@ function AppContent({
                           </div>
                         </div>
                       </div>
-                    ) : (
-                      cachedContent
                     )}
                   </Suspense>
                 </div>
