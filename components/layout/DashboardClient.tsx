@@ -346,6 +346,7 @@ function AppContent({
   }
 
   // Moved states to the top to respect React's hook ordering rules.
+  const cachedContent = useMemo(() => renderContent(token), [activeTab, viewData, selectedStore, token]);
 
   return (
     <div className="flex min-h-screen bg-neutral-950 font-sans text-neutral-100">
@@ -543,7 +544,7 @@ function AppContent({
                         </div>
                       </div>
                     ) : (
-                      useMemo(() => renderContent(token), [activeTab, viewData, selectedStore, token])
+                      cachedContent
                     )}
                   </Suspense>
                 </div>
