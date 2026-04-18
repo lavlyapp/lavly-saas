@@ -246,58 +246,7 @@ function AppContent({
     }
 
     if (activeTab === 'logs') {
-      return <ActivityLogs />;
-    }
-
-    // 2. Initial Loading State (Fix for blank screen "not loading normally")
-    const isActivelyLoading = status === 'uploading';
-    
-    // Bypass loader if we are on the Financial tab (because it is 100% Cloud-Native and doesn't need raw records)
-    // Removed dependency on allRecords completely to enable 100% Cloud-Native speed
-    if (isActivelyLoading && activeTab !== 'financial') {
-      return (
-        <div className="flex flex-col items-center justify-center p-8 h-[60vh] w-full bg-neutral-900/50 rounded-3xl border border-neutral-800 animate-in fade-in duration-500">
-          <div className="flex flex-col items-center gap-6 w-full max-w-md">
-
-            {/* Visual Header */}
-            <div className="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4 shadow-[0_0_30px_rgba(16,185,129,0.3)]" />
-
-            <div className="text-center w-full">
-              <h3 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent mb-2">
-                Conectando ao VMPay...
-              </h3>
-              <p className="text-sm font-medium text-emerald-100/70 mb-6 font-mono tracking-tight">
-                {message || "Sincronizando banco de dados"}
-              </p>
-
-              {/* Sync Progress Bar */}
-              {syncProgress > 0 && (
-                <div className="w-full h-3 bg-neutral-950 border border-neutral-800 rounded-full overflow-hidden shadow-inner mb-2 relative">
-                  <div
-                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500 ease-out flex items-center justify-end pr-2"
-                    style={{ width: `${syncProgress}%` }}
-                  >
-                    <div className="w-6 h-full bg-white/20 -skew-x-12 animate-[shimmer_1s_infinite]" />
-                  </div>
-                </div>
-              )}
-              {syncProgress > 0 && (
-                <p className="text-right text-[10px] text-neutral-500 font-bold tracking-wider">{syncProgress}% CONCLUÍDO</p>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-8 max-w-md w-full">
-            <div className="bg-black/60 rounded-xl p-4 border border-white/5 font-mono text-[10px] text-emerald-500/50 h-32 overflow-y-auto custom-scrollbar shadow-inner">
-              {logs.slice(-5).map((log, i) => (
-                <div key={i} className="mb-2 truncate">
-                  <span className="text-emerald-500 mr-2 opacity-70">&gt;</span>{log}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div >
-      );
+      return <ActivityLogs />;    // {Loader Logic Removed - Handled at the root render level to protect cached components}  );
     }
 
     // Empty state block removed. App is now 100% Cloud-Native and dashboards gracefully fetch from Edge.
@@ -573,7 +522,29 @@ function AppContent({
                       </h3>
                     </div>
                   }>
-                    {useMemo(() => renderContent(token), [activeTab, viewData, selectedStore, token, syncProgress, message, status])}
+                    {status === 'uploading' && activeTab !== 'financial' ? (
+                      <div className="flex flex-col items-center justify-center p-8 h-[60vh] w-full bg-neutral-900/50 rounded-3xl border border-neutral-800 animate-in fade-in duration-500">
+                        <div className="flex flex-col items-center gap-6 w-full max-w-md">
+                          <div className="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4 shadow-[0_0_30px_rgba(16,185,129,0.3)]" />
+                          <div className="text-center w-full">
+                            <h3 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent mb-2">Conectando ao VMPay...</h3>
+                            <p className="text-sm font-medium text-emerald-100/70 mb-6 font-mono tracking-tight">{message || "Sincronizando banco de dados"}</p>
+                            {syncProgress > 0 && (
+                              <>
+                                <div className="w-full h-3 bg-neutral-950 border border-neutral-800 rounded-full overflow-hidden shadow-inner mb-2 relative">
+                                  <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500 ease-out flex items-center justify-end pr-2" style={{ width: `${syncProgress}%` }}>
+                                    <div className="w-6 h-full bg-white/20 -skew-x-12 animate-[shimmer_1s_infinite]" />
+                                  </div>
+                                </div>
+                                <p className="text-right text-[10px] text-neutral-500 font-bold tracking-wider">{syncProgress}% CONCLUÍDO</p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      useMemo(() => renderContent(token), [activeTab, viewData, selectedStore, token])
+                    )}
                   </Suspense>
                 </div>
               </ErrorBoundary>
