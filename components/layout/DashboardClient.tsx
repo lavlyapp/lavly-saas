@@ -44,9 +44,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Auto-Recovery para React Error 310 (Suspense Collision)
     if (error.message && error.message.includes('310')) {
-        console.warn("[Auto-Recovery] Detectado choque de Suspense (React 310). Forçando limpeza de estado...");
-        window.location.reload();
-        return;
+        console.error("[Fallback] Detectado choque de Suspense (React 310). A suspensão escapou para o ErrorBoundary.");
     }
     console.error("DashboardClient ErrorBoundary caught an error", error, errorInfo);
     this.setState({ errorInfo });

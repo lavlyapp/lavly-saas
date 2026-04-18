@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, startTransition } from "react";
 import { differenceInDays } from "date-fns";
 import { Phone, DollarSign, ShoppingBasket, AlertTriangle, Clock, UserX, Download, Lock } from "lucide-react";
 import { calculateCrmMetrics, CustomerProfile } from "@/lib/processing/crm";
@@ -34,12 +34,18 @@ export function ChurnAnalysis({ data, selectedStore }: ChurnAnalysisProps) {
                 const res = await fetch(`/api/metrics/crm?store=${encodeURIComponent(selectedStore || 'Todas')}`);
                 const json = await res.json();
                 if (isMounted && json.success) {
-                    setCrmData(json.payload.globalMetrics);
+                    startTransition(() => {
+                        setCrmData(json.payload.globalMetrics);
+                    });
                 }
             } catch (err) {
                 console.error("Failed to load churn data", err);
             } finally {
-                if (isMounted) setIsLoading(false);
+                if (isMounted) {
+                    startTransition(() => {
+                        setIsLoading(false);
+                    });
+                }
             }
         };
         fetchCrm();
