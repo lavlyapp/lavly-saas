@@ -573,7 +573,7 @@ function AppContent({
                       </h3>
                     </div>
                   }>
-                    {useMemo(() => renderContent(token), [activeTab, viewData, selectedStore, token, isActivelyLoading, syncProgress, message, status])}
+                    {useMemo(() => renderContent(token), [activeTab, viewData, selectedStore, token, syncProgress, message, status])}
                   </Suspense>
                 </div>
               </ErrorBoundary>
