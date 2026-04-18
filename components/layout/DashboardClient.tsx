@@ -250,7 +250,7 @@ function AppContent({
     }
 
     // 2. Initial Loading State (Fix for blank screen "not loading normally")
-    const isActivelyLoading = status === 'uploading' || (logs.length > 0 && status !== 'error' && status !== 'success');
+    const isActivelyLoading = status === 'uploading';
     
     // Bypass loader if we are on the Financial tab (because it is 100% Cloud-Native and doesn't need raw records)
     // Removed dependency on allRecords completely to enable 100% Cloud-Native speed
@@ -573,7 +573,7 @@ function AppContent({
                       </h3>
                     </div>
                   }>
-                    {renderContent(token)}
+                    {useMemo(() => renderContent(token), [activeTab, viewData, selectedStore, token, isActivelyLoading, syncProgress, message, status])}
                   </Suspense>
                 </div>
               </ErrorBoundary>
