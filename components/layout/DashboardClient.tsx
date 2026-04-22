@@ -92,7 +92,10 @@ const ComparativeDashboard = dynamic(
   { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
 );
 
-import { ChurnAnalysis } from '@/components/modules/ChurnAnalysis';
+const ChurnAnalysis = dynamic(
+  () => import('@/components/modules/ChurnAnalysis').then(mod => mod.ChurnAnalysis),
+  { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
+);
 
 const MachineAnalysis = dynamic(
   () => import('@/components/modules/MachineAnalysis').then(mod => mod.MachineAnalysis),

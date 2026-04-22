@@ -181,9 +181,7 @@ export function ChurnAnalysis({ data, selectedStore }: ChurnAnalysisProps) {
             <div className="flex justify-between items-start">
                 <div className="flex items-center gap-3">
                     <div className={`p-2 rounded-lg bg-opacity-10 ${colorClass.replace('text-', 'bg-')}`}>
-                        <React.Suspense fallback={<div className={`w-4 h-4 rounded-full ${colorClass.replace('text-', 'bg-')} bg-opacity-50 animate-pulse`} />}>
-                            <Icon className={`w-4 h-4 ${colorClass}`} />
-                        </React.Suspense>
+                        <Icon className={`w-4 h-4 ${colorClass}`} />
                     </div>
                     <div>
                         <h4 className="font-semibold text-neutral-200 text-sm group-hover:text-white transition-colors">{profile.name}</h4>
@@ -200,16 +198,12 @@ export function ChurnAnalysis({ data, selectedStore }: ChurnAnalysisProps) {
                 </div>
                 {profile.phone ? (
                     <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 rounded-md border border-green-500/20 text-green-400 text-xs font-mono">
-                        <React.Suspense fallback={<div className="w-3 h-3 bg-green-500/50 rounded-full animate-pulse" />}>
-                            <Phone className="w-3 h-3" />
-                        </React.Suspense>
+                        <Phone className="w-3 h-3" />
                         <span className="hidden sm:inline">WhatsApp</span>
                     </div>
                 ) : (
                     <div className="opacity-50">
-                        <React.Suspense fallback={<div className="w-4 h-4 bg-neutral-600/50 rounded-full animate-pulse" />}>
-                            <Phone className="w-4 h-4 text-neutral-600" />
-                        </React.Suspense>
+                        <Phone className="w-4 h-4 text-neutral-600" />
                     </div>
                 )}
             </div>
