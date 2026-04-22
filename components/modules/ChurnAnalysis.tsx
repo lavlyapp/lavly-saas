@@ -233,176 +233,174 @@ export function ChurnAnalysis({ data, selectedStore }: ChurnAnalysisProps) {
                 </div>
             </div>
         </div>
-    );
-
-    return (
-        <div className="flex flex-col h-full space-y-6">
-            {/* Tabs */}
-            {role !== 'atendente' && (
-                <div className="flex items-center gap-1 p-1 bg-neutral-900 rounded-lg border border-neutral-800 w-fit">
-                    <button
-                        onClick={() => setActiveTab('actions')}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'actions' ? 'bg-neutral-800 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200'}`}
-                    >
-                        🚀 Ações Recomendadas
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('predictive')}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'predictive' ? 'bg-neutral-800 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200'}`}
-                    >
-                        🔮 Risco Preditivo
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('legacy')}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'legacy' ? 'bg-neutral-800 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200'}`}
-                    >
-                        📅 Inatividade (30/60/90)
-                    </button>
-                </div>
-            )}
-
-
-            {/* Content Area */}
-            <div className="flex-1 overflow-hidden relative">
-                {!canAccess('churn_list') ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-4 bg-neutral-900/20 backdrop-blur-sm rounded-xl border border-neutral-800/50">
-                        <div className="p-4 bg-neutral-800 rounded-full shadow-xl">
-                            <Lock className="w-12 h-12 text-neutral-500" />
-                        </div>
-                        <div>
-                            <h3 className="text-xl font-bold text-neutral-200">Recurso Premium</h3>
-                            <p className="text-neutral-500 max-w-md mx-auto mt-2">
-                                A análise detalhada de risco, listas de clientes e oportunidades de resgate estão disponíveis apenas nos planos <strong>Prata</strong> e <strong>Ouro</strong>.
-                            </p>
-                        </div>
-                        <div className="flex gap-3 mt-4">
-                            <div className="px-3 py-1 rounded bg-neutral-800 text-neutral-400 text-xs font-mono uppercase">
-                                Você está no plano Bronze
-                            </div>
-                        </div>
+        return (
+        <React.Suspense fallback={<div className="h-full w-full bg-neutral-900/50 rounded-xl animate-pulse min-h-[400px]"></div>}>
+            <div className="flex flex-col h-full space-y-6">
+                {/* Tabs */}
+                {role !== 'atendente' && (
+                    <div className="flex items-center gap-1 p-1 bg-neutral-900 rounded-lg border border-neutral-800 w-fit">
+                        <button
+                            onClick={() => setActiveTab('actions')}
+                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'actions' ? 'bg-neutral-800 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200'}`}
+                        >
+                            🚀 Ações Recomendadas
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('predictive')}
+                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'predictive' ? 'bg-neutral-800 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200'}`}
+                        >
+                            🔮 Risco Preditivo
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('legacy')}
+                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'legacy' ? 'bg-neutral-800 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200'}`}
+                        >
+                            📅 Inatividade (30/60/90)
+                        </button>
                     </div>
-                ) : (
-                    <>
-                        {activeTab === 'actions' && (
-                            <div className="h-full flex flex-col">
-                                <div className="mb-6">
-                                    <h2 className="text-2xl font-bold text-white mb-2">Oportunidades de Venda (Win-Back)</h2>
-                                    <p className="text-neutral-400">
-                                        Clientes de alto valor que estão saindo da rotina usual. Hora de agir antes que virem Churn.
-                                    </p>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto pb-20">
-                                    {quickWins.map((p, i) => (
-                                        <CustomerCard
-                                            key={i}
-                                            profile={p}
-                                            colorClass="text-blue-400"
-                                            icon={DollarSign}
-                                            actionLabel="Oferecer Desconto"
-                                        />
-                                    ))}
-                                    {quickWins.length === 0 && (
-                                        <div className="col-span-full py-12 text-center border border-dashed border-neutral-800 rounded-2xl">
-                                            <p className="text-neutral-500">Nhuma oportunidade urgente identificada hoje.</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {activeTab === 'predictive' && (
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full overflow-hidden">
-                                {/* Medium Risk */}
-                                <div className="flex flex-col h-full bg-neutral-950/30 rounded-2xl border border-neutral-800">
-                                    <div className="p-4 border-b border-neutral-800 flex items-center justify-between sticky top-0 bg-neutral-950/90 backdrop-blur-sm z-10 rounded-t-2xl">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]"></div>
-                                            <h3 className="font-semibold text-neutral-200">Saindo da Rotina (Médio)</h3>
-                                        </div>
-                                        <span className="text-xs font-mono text-neutral-500 bg-neutral-900 px-2 py-1 rounded-md border border-neutral-800">{mediumRisk.length}</span>
-                                    </div>
-                                    <div className="p-4 space-y-3 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-neutral-800 scrollbar-track-transparent">
-                                        {mediumRisk.map((p, i) => (
-                                            <CustomerCard key={i} profile={p} colorClass="text-yellow-500" icon={AlertTriangle} />
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* High Risk */}
-                                <div className="flex flex-col h-full bg-neutral-950/30 rounded-2xl border border-neutral-800">
-                                    <div className="p-4 border-b border-neutral-800 flex items-center justify-between sticky top-0 bg-neutral-950/90 backdrop-blur-sm z-10 rounded-t-2xl">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div>
-                                            <h3 className="font-semibold text-neutral-200">Em Risco (Alto)</h3>
-                                        </div>
-                                        <span className="text-xs font-mono text-neutral-500 bg-neutral-900 px-2 py-1 rounded-md border border-neutral-800">{highRisk.length}</span>
-                                    </div>
-                                    <div className="p-4 space-y-3 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-neutral-800 scrollbar-track-transparent">
-                                        {highRisk.map((p, i) => (
-                                            <CustomerCard key={i} profile={p} colorClass="text-red-500" icon={UserX} />
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {activeTab === 'legacy' && (
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full overflow-hidden">
-                                {/* 30-60 Days */}
-                                <div className="flex flex-col h-full bg-neutral-950/30 rounded-2xl border border-neutral-800">
-                                    <div className="p-4 border-b border-neutral-800 flex items-center justify-between sticky top-0 bg-neutral-950/90 backdrop-blur-sm z-10 rounded-t-2xl">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-2 h-2 rounded-full bg-neutral-500"></div>
-                                            <h3 className="font-semibold text-neutral-200">Ausentes 30-60 dias</h3>
-                                        </div>
-                                        <span className="text-xs font-mono text-neutral-500 bg-neutral-900 px-2 py-1 rounded-md border border-neutral-800">{inactive30.length}</span>
-                                    </div>
-                                    <div className="p-4 space-y-3 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-neutral-800 scrollbar-track-transparent">
-                                        {inactive30.map((p, i) => (
-                                            <CustomerCard key={i} profile={p} colorClass="text-neutral-500" icon={Clock} />
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* 60-90 Days */}
-                                <div className="flex flex-col h-full bg-neutral-950/30 rounded-2xl border border-neutral-800">
-                                    <div className="p-4 border-b border-neutral-800 flex items-center justify-between sticky top-0 bg-neutral-950/90 backdrop-blur-sm z-10 rounded-t-2xl">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-2 h-2 rounded-full bg-neutral-500"></div>
-                                            <h3 className="font-semibold text-neutral-200">Ausentes 60-90 dias</h3>
-                                        </div>
-                                        <span className="text-xs font-mono text-neutral-500 bg-neutral-900 px-2 py-1 rounded-md border border-neutral-800">{inactive60.length}</span>
-                                    </div>
-                                    <div className="p-4 space-y-3 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-neutral-800 scrollbar-track-transparent">
-                                        {inactive60.map((p, i) => (
-                                            <CustomerCard key={i} profile={p} colorClass="text-neutral-500" icon={Clock} />
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* 90+ Days */}
-                                <div className="flex flex-col h-full bg-neutral-950/30 rounded-2xl border border-neutral-800">
-                                    <div className="p-4 border-b border-neutral-800 flex items-center justify-between sticky top-0 bg-neutral-950/90 backdrop-blur-sm z-10 rounded-t-2xl">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-2 h-2 rounded-full bg-neutral-500"></div>
-                                            <h3 className="font-semibold text-neutral-200">Perdidos (+90 dias)</h3>
-                                        </div>
-                                        <span className="text-xs font-mono text-neutral-500 bg-neutral-900 px-2 py-1 rounded-md border border-neutral-800">{inactive90.length}</span>
-                                    </div>
-                                    <div className="p-4 space-y-3 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-neutral-800 scrollbar-track-transparent">
-                                        {inactive90.map((p, i) => (
-                                            <CustomerCard key={i} profile={p} colorClass="text-neutral-500" icon={UserX} />
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </>
                 )}
+
+
+                {/* Content Area */}
+                <div className="flex-1 overflow-hidden relative">
+                    {!canAccess('churn_list') ? (
+                        <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-4 bg-neutral-900/20 backdrop-blur-sm rounded-xl border border-neutral-800/50">
+                            <div className="p-4 bg-neutral-800 rounded-full shadow-xl">
+                                <Lock className="w-12 h-12 text-neutral-500" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-neutral-200">Recurso Premium</h3>
+                                <p className="text-neutral-500 max-w-md mx-auto mt-2">
+                                    A análise detalhada de risco, listas de clientes e oportunidades de resgate estão disponíveis apenas nos planos <strong>Prata</strong> e <strong>Ouro</strong>.
+                                </p>
+                            </div>
+                            <div className="flex gap-3 mt-4">
+                                <div className="px-3 py-1 rounded bg-neutral-800 text-neutral-400 text-xs font-mono uppercase">
+                                    Você está no plano Bronze
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            {activeTab === 'actions' && (
+                                <div className="h-full flex flex-col">
+                                    <div className="mb-6">
+                                        <h2 className="text-2xl font-bold text-white mb-2">Oportunidades de Venda (Win-Back)</h2>
+                                        <p className="text-neutral-400">
+                                            Clientes de alto valor que estão saindo da rotina usual. Hora de agir antes que virem Churn.
+                                        </p>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto pb-20">
+                                        {quickWins.map((p, i) => (
+                                            <CustomerCard
+                                                key={i}
+                                                profile={p}
+                                                colorClass="text-blue-400"
+                                                icon={DollarSign}
+                                                actionLabel="Oferecer Desconto"
+                                            />
+                                        ))}
+                                        {quickWins.length === 0 && (
+                                            <div className="col-span-full py-12 text-center border border-dashed border-neutral-800 rounded-2xl">
+                                                <p className="text-neutral-500">Nenhuma oportunidade urgente identificada hoje.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'predictive' && (
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full overflow-hidden">
+                                    {/* Medium Risk */}
+                                    <div className="flex flex-col h-full bg-neutral-950/30 rounded-2xl border border-neutral-800">
+                                        <div className="p-4 border-b border-neutral-800 flex items-center justify-between sticky top-0 bg-neutral-950/90 backdrop-blur-sm z-10 rounded-t-2xl">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]"></div>
+                                                <h3 className="font-semibold text-neutral-200">Saindo da Rotina (Médio)</h3>
+                                            </div>
+                                            <span className="text-xs font-mono text-neutral-500 bg-neutral-900 px-2 py-1 rounded-md border border-neutral-800">{mediumRisk.length}</span>
+                                        </div>
+                                        <div className="p-4 space-y-3 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-neutral-800 scrollbar-track-transparent">
+                                            {mediumRisk.map((p, i) => (
+                                                <CustomerCard key={i} profile={p} colorClass="text-yellow-500" icon={AlertTriangle} />
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* High Risk */}
+                                    <div className="flex flex-col h-full bg-neutral-950/30 rounded-2xl border border-neutral-800">
+                                        <div className="p-4 border-b border-neutral-800 flex items-center justify-between sticky top-0 bg-neutral-950/90 backdrop-blur-sm z-10 rounded-t-2xl">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div>
+                                                <h3 className="font-semibold text-neutral-200">Em Risco (Alto)</h3>
+                                            </div>
+                                            <span className="text-xs font-mono text-neutral-500 bg-neutral-900 px-2 py-1 rounded-md border border-neutral-800">{highRisk.length}</span>
+                                        </div>
+                                        <div className="p-4 space-y-3 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-neutral-800 scrollbar-track-transparent">
+                                            {highRisk.map((p, i) => (
+                                                <CustomerCard key={i} profile={p} colorClass="text-red-500" icon={UserX} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'legacy' && (
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full overflow-hidden">
+                                    {/* 30-60 Days */}
+                                    <div className="flex flex-col h-full bg-neutral-950/30 rounded-2xl border border-neutral-800">
+                                        <div className="p-4 border-b border-neutral-800 flex items-center justify-between sticky top-0 bg-neutral-950/90 backdrop-blur-sm z-10 rounded-t-2xl">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2 h-2 rounded-full bg-neutral-500"></div>
+                                                <h3 className="font-semibold text-neutral-200">Ausentes 30-60 dias</h3>
+                                            </div>
+                                            <span className="text-xs font-mono text-neutral-500 bg-neutral-900 px-2 py-1 rounded-md border border-neutral-800">{inactive30.length}</span>
+                                        </div>
+                                        <div className="p-4 space-y-3 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-neutral-800 scrollbar-track-transparent">
+                                            {inactive30.map((p, i) => (
+                                                <CustomerCard key={i} profile={p} colorClass="text-neutral-500" icon={Clock} />
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* 60-90 Days */}
+                                    <div className="flex flex-col h-full bg-neutral-950/30 rounded-2xl border border-neutral-800">
+                                        <div className="p-4 border-b border-neutral-800 flex items-center justify-between sticky top-0 bg-neutral-950/90 backdrop-blur-sm z-10 rounded-t-2xl">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2 h-2 rounded-full bg-neutral-500"></div>
+                                                <h3 className="font-semibold text-neutral-200">Ausentes 60-90 dias</h3>
+                                            </div>
+                                            <span className="text-xs font-mono text-neutral-500 bg-neutral-900 px-2 py-1 rounded-md border border-neutral-800">{inactive60.length}</span>
+                                        </div>
+                                        <div className="p-4 space-y-3 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-neutral-800 scrollbar-track-transparent">
+                                            {inactive60.map((p, i) => (
+                                                <CustomerCard key={i} profile={p} colorClass="text-neutral-500" icon={Clock} />
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* 90+ Days */}
+                                    <div className="flex flex-col h-full bg-neutral-950/30 rounded-2xl border border-neutral-800">
+                                        <div className="p-4 border-b border-neutral-800 flex items-center justify-between sticky top-0 bg-neutral-950/90 backdrop-blur-sm z-10 rounded-t-2xl">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2 h-2 rounded-full bg-neutral-500"></div>
+                                                <h3 className="font-semibold text-neutral-200">Perdidos (+90 dias)</h3>
+                                            </div>
+                                            <span className="text-xs font-mono text-neutral-500 bg-neutral-900 px-2 py-1 rounded-md border border-neutral-800">{inactive90.length}</span>
+                                        </div>
+                                        <div className="p-4 space-y-3 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-neutral-800 scrollbar-track-transparent">
+                                            {inactive90.map((p, i) => (
+                                                <CustomerCard key={i} profile={p} colorClass="text-neutral-500" icon={UserX} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+
             </div>
-
-        </div>
-
-    );
+        </React.Suspense>
 }

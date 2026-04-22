@@ -515,7 +515,7 @@ function AppContent({
               </div>
             ) : (
               <ErrorBoundary>
-                <div key={activeTab}>
+                <div>
                   <Suspense fallback={
                     <div className="flex flex-col items-center justify-center p-8 h-[60vh] w-full bg-neutral-900/50 rounded-3xl border border-neutral-800 animate-in fade-in duration-500">
                       <div className="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4 shadow-[0_0_30px_rgba(16,185,129,0.3)]" />
