@@ -1,0 +1,67 @@
+Data in DB: [
+  {
+    "id": "5854d69d-dfa0-4efb-81c5-d528c2a4b6c1",
+    "sale_id": "43660010000166-31601838",
+    "data": "2026-04-16T01:18:59.315+00:00",
+    "loja": "Lavateria Cascavel",
+    "cliente": "Maria das Dores Moura de Castro Silva",
+    "machine": "5900",
+    "service": "30 MINUTOS",
+    "status": "SUCESSO",
+    "valor": 16.9,
+    "customer_id": "2058883",
+    "created_at": "2026-04-17T20:12:01.897825+00:00"
+  },
+  {
+    "id": "10defef1-5559-4614-a98d-44fcfd28f7cf",
+    "sale_id": "43660010000166-31603943",
+    "data": "2026-04-16T01:52:46.278+00:00",
+    "loja": "Lavateria Cascavel",
+    "cliente": "Gleiciane Silva de Freitas",
+    "machine": "5900",
+    "service": "30 MINUTOS",
+    "status": "SUCESSO",
+    "valor": 16.9,
+    "customer_id": "1521835",
+    "created_at": "2026-04-17T20:12:01.897825+00:00"
+  },
+  {
+    "id": "ca3720cc-cdf9-4d0a-bd73-d936ebcb7783",
+    "sale_id": "43660010000166-31606278",
+    "data": "2026-04-16T02:31:58.622+00:00",
+    "loja": "Lavateria Cascavel",
+    "cliente": "Magno de Paula Fabricio",
+    "machine": "5900",
+    "service": "30 MINUTOS",
+    "status": "SUCESSO",
+    "valor": 16.9,
+    "customer_id": "1220928",
+    "created_at": "2026-04-17T20:12:01.897825+00:00"
+  },
+  {
+    "id": "da42da67-7488-4338-827e-b60aeb984bbb",
+    "sale_id": "43660010000166-31613663",
+    "data": "2026-04-16T10:01:31.907+00:00",
+    "loja": "Lavateria Cascavel",
+    "cliente": "Jeane Alves Falcao",
+    "machine": "5900",
+    "service": "30 MINUTOS",
+    "status": "SUCESSO",
+    "valor": 16.9,
+    "customer_id": "245539",
+    "created_at": "2026-04-16T10:09:51.73271+00:00"
+  },
+  {
+    "id": "745e312c-788d-453c-8a01-1fa2f5677e62",
+    "sale_id": "43660010000166-31614687",
+    "data": "2026-04-16T11:03:11.75+00:00",
+    "loja": "Lavateria Cascavel",
+    "cliente": "Isadora Reboucas Rocha",
+    "machine": "5900",
+    "service": "30 MINUTOS",
+    "status": "SUCESSO",
+    "valor": 16.9,
+    "customer_id": "1369322",
+    "created_at": "2026-04-16T11:21:50.168212+00:00"
+  }
+]

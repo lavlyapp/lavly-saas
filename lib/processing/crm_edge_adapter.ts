@@ -85,8 +85,8 @@ export function rehydrateCrmMetrics(sqlProfiles: any[]): CrmSummary {
             averageInterval: visits > 1 ? daysSinceFirst / (visits - 1) : 20,
             churnRisk,
             nextPredictedVisit: new Date(lastVisitDate.getTime() + (visits > 1 ? daysSinceFirst / (visits - 1) : 20) * 86400000),
-            age: undefined,
-            birthDate: undefined,
+            age: p.age ? Number(p.age) : undefined,
+            birthDate: p.birth_date ? new Date(p.birth_date) : undefined,
             gender: (p.gender && p.gender !== 'U') ? p.gender : 'U',
             preferredStore: 'Todas'
         });

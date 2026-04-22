@@ -54,10 +54,10 @@ BEGIN
     GROUP BY dow, hod;
 
     CREATE TEMP TABLE tmp_gender_dict ON COMMIT DROP AS
-    SELECT DISTINCT ON (name) name, gender 
+    SELECT DISTINCT ON (upper(name)) upper(name) AS name, gender 
     FROM customers 
     WHERE gender IS NOT NULL AND gender != 'U'
-    ORDER BY name, updated_at DESC;
+    ORDER BY upper(name), updated_at DESC;
 
     CREATE TEMP TABLE tmp_filtered_sales ON COMMIT DROP AS
     SELECT 
@@ -65,6 +65,8 @@ BEGIN
         s.telefone AS phone,
         s.valor,
         s.data,
+        s.age,
+        s.birth_date,
         DATE(s.data AT TIME ZONE 'America/Sao_Paulo') AS date_brt,
         CASE WHEN (upper(s.produto) LIKE '%LAV%' OR upper(s.produto) LIKE '%30 MIN%') THEN 1 ELSE 0 END AS wash_flag,
         CASE WHEN (upper(s.produto) LIKE '%SEC%' OR upper(s.produto) LIKE '%45 MIN%') THEN 1 ELSE 0 END AS dry_flag
@@ -84,6 +86,8 @@ BEGIN
         COUNT(DISTINCT date_brt) AS total_visits,
         MIN(data AT TIME ZONE 'America/Sao_Paulo') AS first_visit,
         MAX(data AT TIME ZONE 'America/Sao_Paulo') AS last_visit,
+        MAX(age) AS age,
+        MAX(birth_date) AS birth_date,
         SUM(wash_flag) AS w_count,
         SUM(dry_flag) AS d_count
     FROM tmp_filtered_sales
@@ -91,7 +95,7 @@ BEGIN
 
     CREATE TEMP TABLE tmp_global_profiles ON COMMIT DROP AS
     SELECT gs.*, COALESCE(c.gender, 'U') AS gender
-    FROM tmp_global_sales gs LEFT JOIN tmp_gender_dict c ON gs.name = c.name;
+    FROM tmp_global_sales gs LEFT JOIN tmp_gender_dict c ON upper(gs.name) = c.name;
 
     CREATE TEMP TABLE tmp_period_sales ON COMMIT DROP AS
     SELECT 
@@ -101,6 +105,8 @@ BEGIN
         COUNT(DISTINCT date_brt) AS total_visits,
         MIN(data AT TIME ZONE 'America/Sao_Paulo') AS first_visit,
         MAX(data AT TIME ZONE 'America/Sao_Paulo') AS last_visit,
+        MAX(age) AS age,
+        MAX(birth_date) AS birth_date,
         SUM(wash_flag) AS w_count,
         SUM(dry_flag) AS d_count
     FROM tmp_filtered_sales
@@ -109,7 +115,7 @@ BEGIN
 
     CREATE TEMP TABLE tmp_period_profiles ON COMMIT DROP AS
     SELECT ps.*, COALESCE(c.gender, 'U') AS gender
-    FROM tmp_period_sales ps LEFT JOIN tmp_gender_dict c ON ps.name = c.name;
+    FROM tmp_period_sales ps LEFT JOIN tmp_gender_dict c ON upper(ps.name) = c.name;
 
     SELECT json_build_object(
         'heatmap', COALESCE((SELECT json_agg(json_build_object('dow', dow, 'hod', hod, 'count', count)) FROM tmp_heatmap), '[]'::json),

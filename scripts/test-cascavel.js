@@ -1,0 +1,1 @@
+import { createClient } from '@supabase/supabase-js'; const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY); db.from('orders').select('machine').eq('loja', 'Lavateria Cascavel').limit(50).then(console.log);  
