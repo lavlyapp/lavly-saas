@@ -610,7 +610,12 @@ function AppContent({
 }
 
 export default function DashboardClient({ initialSession, initialRole, initialExpiresAt, initialLifetimeAccess, initialVmpayApiKey }: { initialSession?: any, initialRole?: any, initialExpiresAt?: string | null, initialLifetimeAccess?: boolean, initialVmpayApiKey?: string | null }) {
-  const [activeTab, setActiveTab] = useState("financial");
+  const [activeTab, setActiveTabRaw] = useState("financial");
+  const setActiveTab = useCallback((tab: string) => {
+    startTransition(() => {
+      setActiveTabRaw(tab);
+    });
+  }, []);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [status, setStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
