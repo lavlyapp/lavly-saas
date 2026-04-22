@@ -1,55 +1,7 @@
 import { CrmSummary, PeriodStats, CustomerProfile, SegmentedCustomer } from './crm';
 import { differenceInDays } from 'date-fns';
 
-function inferGender(name: string): 'M' | 'F' | 'U' {
-    if (!name) return 'U';
 
-    const normalizedName = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-    const parts = normalizedName.split(' ');
-    const first = parts[0];
-
-    // 1. Common Exceptions Map (Expanded)
-    const exceptions: Record<string, 'M' | 'F'> = {
-        'LUCA': 'M', 'LUKA': 'M', 'JEAN': 'M', 'RYAN': 'M', 'YAN': 'M',
-        'MICHEL': 'M', 'ELIAS': 'M', 'JONAS': 'M', 'LUCAS': 'M', 'MATHEUS': 'M',
-        'THOMAS': 'M', 'TOMAS': 'M', 'NICOLAS': 'M', 'DOUGLAS': 'M',
-        'ALEX': 'M', 'ALEXANDRE': 'M', 'ANDRE': 'M', 'FELIPE': 'M',
-        'JORGE': 'M', 'THIAGO': 'M', 'DIEGO': 'M', 'DIOGO': 'M',
-        'HUGO': 'M', 'BRUNO': 'M', 'CAIO': 'M', 'BRENO': 'M',
-        'IGOR': 'M', 'VITOR': 'M', 'ARTHUR': 'M', 'DAVI': 'M', 'DAVID': 'M',
-        'KAUAN': 'M', 'CAUA': 'M', 'LUIZ': 'M', 'LUIS': 'M', 'ISAAC': 'M',
-        'GABRIEL': 'M', 'MIGUEL': 'M', 'SAMUEL': 'M', 'DANIEL': 'M',
-        'RAFAEL': 'M', 'LEONARDO': 'M', 'GUSTAVO': 'M', 'GUILHERME': 'M',
-        'PEDRO': 'M', 'PAULO': 'M', 'JOAO': 'M', 'JOSE': 'M', 'CARLOS': 'M',
-        'EDUARDO': 'M', 'RENATO': 'M', 'RICARDO': 'M', 'ROBERTO': 'M',
-        'FABIO': 'M', 'MARCIO': 'M', 'MARCELO': 'M', 'FLAVIO': 'M',
-        'SERGIO': 'M', 'FERNANDO': 'M', 'HENRIQUE': 'M', 'VINICIUS': 'M',
-        'RODRIGO': 'M', 'EMANUEL': 'M', 'HEITOR': 'M', 'YURI': 'M', 'KAIO': 'M',
-        'BEATRIZ': 'F', 'LAIS': 'F', 'THAIS': 'F', 'LIZ': 'F', 'ESTER': 'F',
-        'NAIR': 'F', 'RAQUEL': 'F', 'RUTH': 'F', 'INES': 'F', 'ALICE': 'F',
-        'CLARICE': 'F', 'JANICE': 'F', 'LURDES': 'F', 'ELIZABETH': 'F',
-        'INGRID': 'F', 'ASTRID': 'F', 'ROSE': 'F', 'SIMONE': 'F', 'IVONE': 'F',
-        'IRENE': 'F', 'SOLANGE': 'F', 'MONIQUE': 'F', 'JAQUELINE': 'F',
-        'CAROLINE': 'F', 'CRISTIANE': 'F', 'VIVIANE': 'F', 'TATIANE': 'F',
-        'JOSIANE': 'F', 'LUCIANE': 'F', 'ELIANE': 'F', 'ARIANE': 'F',
-        'ADRIANE': 'F', 'JULIANE': 'F', 'MARIANE': 'F', 'ALINE': 'F',
-        'CARMEN': 'F', 'HELEN': 'F', 'KAREN': 'F', 'MIRIAN': 'F', 'LILIAN': 'F',
-        'GLAUCIA': 'F', 'SUELI': 'F', 'ROSELI': 'F', 'SHIRLEI': 'F', 'ELIS': 'F',
-        'INARA': 'F', 'MARIA': 'F', 'ANA': 'F', 'JULIA': 'F', 'FRANCISCA': 'F',
-        'ANTONIA': 'F', 'MICHELE': 'F', 'ELAINE': 'F', 'GISELE': 'F', 'ROSANE': 'F'
-    };
-
-    if (exceptions[first]) return exceptions[first];
-
-    // 2. Strong Suffix Rules
-    if (first.endsWith('A')) return 'F';
-    
-    // 3. Heuristic for other endings typical of males in PT-BR
-    const lastChar = first.slice(-1);
-    if (['O', 'S', 'R', 'L', 'M', 'N'].includes(lastChar)) return 'M';
-
-    return 'U';
-}
 
 function calculateChurnRisk(firstDate: Date, lastDate: Date, totalVisits: number, recency: number): 'low' | 'medium' | 'high' {
     const daysSinceFirst = Math.max(differenceInDays(new Date(), firstDate), 1);
@@ -135,7 +87,7 @@ export function rehydrateCrmMetrics(sqlProfiles: any[]): CrmSummary {
             nextPredictedVisit: new Date(lastVisitDate.getTime() + (visits > 1 ? daysSinceFirst / (visits - 1) : 20) * 86400000),
             age: undefined,
             birthDate: undefined,
-            gender: (p.gender && p.gender !== 'U') ? p.gender : inferGender(p.name),
+            gender: (p.gender && p.gender !== 'U') ? p.gender : 'U',
             preferredStore: 'Todas'
         });
     });

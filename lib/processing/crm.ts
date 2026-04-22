@@ -443,11 +443,7 @@ export function calculateCrmMetrics(records: SaleRecord[], customerRegistry?: Cu
             if (registryData.email) email = registryData.email;
         }
 
-        // Fallback: Infer gender if not in registry (or if registry didn't have it)
-        // Restored: User requested UI heuristics to be enabled since VMPay lacks this field.
-        if (gender === 'U') {
-            gender = inferGender(name);
-        }
+        // Fallback: None. User requested to rely exclusively on VMPay database gender explicit field.
 
         // Correct Start Date: Use Registration Date if earlier than First Visit
         let finalFirstVisit = firstVisitDate;
@@ -959,78 +955,7 @@ function removeAccents(str: string): string {
     return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
-function inferGender(name: string): 'M' | 'F' | 'U' {
-    if (!name) return 'U';
 
-    // Normalize: Remove extra spaces, uppercase, remove accents
-    const cleanName = removeAccents(name.trim().toUpperCase());
-    const parts = cleanName.split(' ');
-    const first = parts[0];
-
-    // 1. Common Exceptions Map (Expanded)
-    const exceptions: Record<string, 'M' | 'F'> = {
-        // Male Exceptions (ending in A, etc)
-        'LUCA': 'M', 'LUKA': 'M', 'JEAN': 'M', 'RYAN': 'M', 'YAN': 'M',
-        'MICHEL': 'M', 'ELIAS': 'M', 'JONAS': 'M', 'LUCAS': 'M', 'MATHEUS': 'M',
-        'THOMAS': 'M', 'TOMAS': 'M', 'NICOLAS': 'M', 'DOUGLAS': 'M',
-        'ALEX': 'M', 'ALEXANDRE': 'M', 'ANDRE': 'M', 'FELIPE': 'M',
-        'JORGE': 'M', 'THIAGO': 'M', 'DIEGO': 'M', 'DIOGO': 'M',
-        'HUGO': 'M', 'BRUNO': 'M', 'CAIO': 'M', 'BRENO': 'M',
-        'IGOR': 'M', 'VITOR': 'M', 'ARTHUR': 'M', 'DAVI': 'M', 'DAVID': 'M',
-        'KAUAN': 'M', 'CAUA': 'M', 'LUIZ': 'M', 'LUIS': 'M', 'ISAAC': 'M',
-        'GABRIEL': 'M', 'MIGUEL': 'M', 'SAMUEL': 'M', 'DANIEL': 'M',
-        'RAFAEL': 'M', 'LEONARDO': 'M', 'GUSTAVO': 'M', 'GUILHERME': 'M',
-        'PEDRO': 'M', 'PAULO': 'M', 'JOAO': 'M', 'JOSE': 'M', 'CARLOS': 'M',
-        'EDUARDO': 'M', 'RENATO': 'M', 'RICARDO': 'M', 'ROBERTO': 'M',
-        'FABIO': 'M', 'MARCIO': 'M', 'MARCELO': 'M', 'FLAVIO': 'M',
-        'SERGIO': 'M', 'FERNANDO': 'M', 'HENRIQUE': 'M', 'VINICIUS': 'M',
-        'RODRIGO': 'M',
-
-        // Female Exceptions (not ending in A)
-        'BEATRIZ': 'F', 'LAIS': 'F', 'THAIS': 'F', 'LIZ': 'F', 'ESTER': 'F',
-        'NAIR': 'F', 'RAQUEL': 'F', 'RUTH': 'F', 'INES': 'F', 'ALICE': 'F',
-        'CLARICE': 'F', 'JANICE': 'F', 'LURDES': 'F', 'ELIZABETH': 'F',
-        'INGRID': 'F', 'ASTRID': 'F', 'ROSE': 'F', 'SIMONE': 'F', 'IVONE': 'F',
-        'IRENE': 'F', 'SOLANGE': 'F', 'MONIQUE': 'F', 'JAQUELINE': 'F',
-        'CAROLINE': 'F', 'CRISTIANE': 'F', 'VIVIANE': 'F', 'TATIANE': 'F',
-        'JOSIANE': 'F', 'LUCIANE': 'F', 'ELIANE': 'F', 'ARIANE': 'F',
-        'ADRIANE': 'F', 'JULIANE': 'F', 'MARIANE': 'F', 'ALINE': 'F'
-    };
-
-    if (exceptions[first]) return exceptions[first];
-
-    // 2. Strong Suffix Rules
-    if (first.endsWith('A')) return 'F';
-    if (first.endsWith('O')) return 'M';
-
-    // 3. Heuristic for other endings
-    // Names ending in 'E' can be tricky, but many common female names end in 'E' (Alice, Simone...) 
-    // and many male (Felipe, Andre, Jorge...).
-    // The exceptions list handles the most common ones.
-    // Let's assume 'E' is Female unless in male exceptions? Or Male?
-    // In PT-BR:
-    // M: Felipe, Andre, Jorge, Henrique, Alexandre, Guilherme...
-    // F: Alice, Simone, Ivone, Irene, Solange, Monique, Jaqueline...
-    // It's a mix. Let's start with U if simpler rules don't catch it.
-
-    // Names ending in consonants:
-    // M: Gabriel, Miguel, Daniel, Rafael, Samuel, Davi(d), Lui(z)
-    // F: Raque(l), Ester(r), Bea(triz)
-
-    // Ending in 'EL' -> Generally Male (Gabriel, Daniel, Michel) - BUT Raquel, Isabel
-    if (first.endsWith('EL') && first !== 'RAQUEL' && first !== 'ISABEL' && first !== 'MABEL') return 'M';
-
-    // Ending in 'OS' -> Male (Marcos, Carlos, Santos)
-    if (first.endsWith('OS')) return 'M';
-
-    // Ending in 'US' -> Male (Mateus, Vinicius)
-    if (first.endsWith('US')) return 'M';
-
-    // Ending in 'OR' -> Male (Vitor, Igor, Junior)
-    if (first.endsWith('OR')) return 'M';
-
-    return 'U';
-}
 
 
 /**
