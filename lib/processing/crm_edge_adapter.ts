@@ -260,8 +260,7 @@ export function calculateDemographics(profiles: CustomerProfile[]): any {
 
     const genderData = [
         { name: 'Masculino', value: genderStats['M'] || 0, color: '#3b82f6' },
-        { name: 'Feminino', value: genderStats['F'] || 0, color: '#ec4899' },
-        { name: 'Indefinido', value: genderStats['U'] || 0, color: '#525252' },
+        { name: 'Feminino', value: genderStats['F'] || 0, color: '#ec4899' }
     ].filter(d => d.value > 0);
 
     return {
