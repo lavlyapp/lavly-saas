@@ -102,8 +102,8 @@ export async function GET(request: Request) {
         // Compute Demographics server-side to save browser CPU and bandwidth
         const demographicsStats = calculateDemographics(globalMetrics.profiles);
 
-        // Strip heavy arrays to optimize JSON transfer
-        const lightGlobal = { ...globalMetrics, profiles: globalMetrics.profiles.slice(0, 50) }; 
+        // Strip heavy arrays to optimize JSON transfer for the filtered metrics, but keep global full for Churn analysis
+        const lightGlobal = { ...globalMetrics }; 
         const lightFiltered = { ...filteredMetrics, profiles: [] };
 
         console.timeEnd('[API CRM] Processing Edge JSON Rehydration');
