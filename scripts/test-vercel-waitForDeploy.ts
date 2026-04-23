@@ -4,7 +4,7 @@ async function waitForVercelDeployAndTest() {
     console.log("Polling Vercel API until 'debug' field appears...");
     
     for (let i = 0; i < 20; i++) {
-        const url = 'https://www.lavly.com.br/api/vmpay/sync?source=manual&cnpj=50741565000106&t=' + Date.now();
+        const url = 'https://www.teste.lavly.com.br/api/vmpay/sync?source=manual&cnpj=50741565000106&t=' + Date.now();
         try {
             const res = await fetch(url);
             const data = await res.json();

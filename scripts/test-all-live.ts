@@ -19,7 +19,7 @@ async function checkAllLiveDebugs() {
 
     for (const store of credentials) {
         const mKey = store.apiKey;
-        const debugUrl = `https://www.lavly.com.br/api/debug-vmpay?key=${encodeURIComponent(mKey)}`;
+        const debugUrl = `https://www.teste.lavly.com.br/api/debug-vmpay?key=${encodeURIComponent(mKey)}`;
         
         try {
             const res = await fetch(debugUrl);

@@ -1,7 +1,7 @@
 import fetch from 'node-fetch'; // NextJS global fetch
 
 async function testLiveAPI() {
-    const url = 'https://www.lavly.com.br/api/vmpay/sync?source=manual&cnpj=50741565000106&t=' + Date.now();
+    const url = 'https://www.teste.lavly.com.br/api/vmpay/sync?source=manual&cnpj=50741565000106&t=' + Date.now();
     console.log(`Fetching ${url}...`);
     
     const response = await fetch(url);

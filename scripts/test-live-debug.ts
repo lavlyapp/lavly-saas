@@ -26,7 +26,7 @@ async function checkLiveDebug() {
     const mKey = joquei.apiKey;
     console.log("Found key starting with:", mKey.substring(0, 5));
 
-    const debugUrl = `https://www.lavly.com.br/api/debug-vmpay?key=${encodeURIComponent(mKey)}`;
+    const debugUrl = `https://www.teste.lavly.com.br/api/debug-vmpay?key=${encodeURIComponent(mKey)}`;
     
     console.log("Let's ping Vercel Debug API every 10s until it's online:");
 
