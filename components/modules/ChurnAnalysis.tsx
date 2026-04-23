@@ -233,7 +233,9 @@ export function ChurnAnalysis({ data, selectedStore }: ChurnAnalysisProps) {
                 </div>
             </div>
         </div>
-        return (
+    );
+
+    return (
         <div className="flex flex-col h-full space-y-6">
             {/* Tabs */}
             {role !== 'atendente' && (
@@ -402,5 +404,4 @@ export function ChurnAnalysis({ data, selectedStore }: ChurnAnalysisProps) {
 
         </div>
     );
-}  </React.Suspense>
 }
