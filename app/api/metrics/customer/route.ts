@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 
         const { data, error } = await supabase
             .from('sales')
-            .select('id, data, loja, cliente, telefone, valor, produto, maquina, servico')
+            .select('id, data, loja, cliente, telefone, valor, produto')
             .ilike('cliente', name)
             .order('data', { ascending: false });
 
