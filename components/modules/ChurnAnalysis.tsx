@@ -16,15 +16,11 @@ interface ChurnAnalysisProps {
 export function ChurnAnalysis({ data, selectedStore }: ChurnAnalysisProps) {
     const { canAccess } = useSubscription();
     const { role } = useAuth();
-    // ... rest of component until return ...
-
-    // ... inside return, before Content Area ...
-    {/* Content Area */ }
-
     const { openCustomerDetails } = useCustomerContext();
     
     const [crmData, setCrmData] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<'actions' | 'predictive' | 'legacy'>(role === 'atendente' ? 'predictive' : 'actions');
 
     useEffect(() => {
         let isMounted = true;
@@ -52,6 +48,71 @@ export function ChurnAnalysis({ data, selectedStore }: ChurnAnalysisProps) {
         return () => { isMounted = false; };
     }, [selectedStore]);
 
+    const { inactive30, inactive60, inactive90 } = useMemo(() => {
+        if (!crmData) return { inactive30: [], inactive60: [], inactive90: [] };
+
+        const today = new Date();
+        const maxDate = data.records.reduce((max: Date, r: any) => {
+            const d = new Date(r.data);
+            return d > max ? d : max;
+        }, new Date(0));
+
+        const refDate = maxDate.getTime() > 0 ? maxDate : today;
+
+        const i30: CustomerProfile[] = [];
+        const i60: CustomerProfile[] = [];
+        const i90: CustomerProfile[] = [];
+
+        crmData.profiles.forEach((p: CustomerProfile) => {
+            if (p.recency > 90) {
+                i90.push(p);
+            } else if (p.recency > 60) {
+                i60.push(p);
+            } else if (p.recency > 30) {
+                i30.push(p);
+            }
+        });
+
+        // Sort by Total Revenue (High Value Churn first)
+        const sorter = (a: CustomerProfile, b: CustomerProfile) => b.totalSpent - a.totalSpent;
+
+        return {
+            inactive30: i30.sort(sorter),
+            inactive60: i60.sort(sorter),
+            inactive90: i90.sort(sorter)
+        };
+    }, [crmData, data?.records]);
+
+    // Predictive Groups
+    const { highRisk, mediumRisk, lowRisk, quickWins } = useMemo(() => {
+        if (!crmData) return { highRisk: [], mediumRisk: [], lowRisk: [], quickWins: [] };
+
+        const h: CustomerProfile[] = [];
+        const m: CustomerProfile[] = [];
+        const l: CustomerProfile[] = [];
+        const wins: CustomerProfile[] = [];
+
+        crmData.profiles.forEach((p: CustomerProfile) => {
+            if (p.churnRisk === 'high') h.push(p);
+            else if (p.churnRisk === 'medium') m.push(p);
+            else l.push(p);
+
+            // Quick Wins Definition: Medium Risk (saindo da rotina) & High Ticket (> R$ 50)
+            if (p.churnRisk === 'medium' && p.averageTicket > 50) {
+                wins.push(p);
+            }
+        });
+
+        const sorter = (a: CustomerProfile, b: CustomerProfile) => b.totalSpent - a.totalSpent;
+
+        return {
+            highRisk: h.sort(sorter),
+            mediumRisk: m.sort(sorter),
+            lowRisk: l.sort(sorter),
+            quickWins: wins.sort(sorter)
+        };
+    }, [crmData]);
+
     if (isLoading) {
         return (
             <div className="flex flex-col h-full space-y-6 animate-in fade-in">
@@ -72,7 +133,7 @@ export function ChurnAnalysis({ data, selectedStore }: ChurnAnalysisProps) {
         const headers = ["Nome", "Telefone", "Risco de Churn", "Dias Ausente", "Ticket Medio", "Total Gasto", "Ultima Visita"];
 
         // Map data
-        const rows = crmData.profiles.map(p => [
+        const rows = crmData.profiles.map((p: CustomerProfile) => [
             p.name,
             p.phone || "",
             p.churnRisk === 'high' ? 'Alto' : p.churnRisk === 'medium' ? 'Médio' : 'Baixo',
@@ -98,78 +159,6 @@ export function ChurnAnalysis({ data, selectedStore }: ChurnAnalysisProps) {
         link.click();
         document.body.removeChild(link);
     };
-
-    const { inactive30, inactive60, inactive90 } = useMemo(() => {
-        if (!crmData) return { inactive30: [], inactive60: [], inactive90: [] };
-
-        const today = new Date();
-        const maxDate = data.records.reduce((max: Date, r: any) => {
-            const d = new Date(r.data);
-            return d > max ? d : max;
-        }, new Date(0));
-
-        const refDate = maxDate.getTime() > 0 ? maxDate : today;
-
-        const i30: CustomerProfile[] = [];
-        const i60: CustomerProfile[] = [];
-        const i90: CustomerProfile[] = [];
-
-        crmData.profiles.forEach(p => {
-            if (p.recency > 90) {
-                i90.push(p);
-            } else if (p.recency > 60) {
-                i60.push(p);
-            } else if (p.recency > 30) {
-                i30.push(p);
-            }
-        });
-
-        // Sort by Total Revenue (High Value Churn first)
-        const sorter = (a: CustomerProfile, b: CustomerProfile) => b.totalSpent - a.totalSpent;
-
-        return {
-            inactive30: i30.sort(sorter),
-            inactive60: i60.sort(sorter),
-            inactive90: i90.sort(sorter)
-        };
-    }, [crmData, data?.records]);
-
-    if (!crmData) return null;
-
-
-
-    const [activeTab, setActiveTab] = useState<'actions' | 'predictive' | 'legacy'>(role === 'atendente' ? 'predictive' : 'actions');
-
-
-    // Predictive Groups
-    const { highRisk, mediumRisk, lowRisk, quickWins } = useMemo(() => {
-        if (!crmData) return { highRisk: [], mediumRisk: [], lowRisk: [], quickWins: [] };
-
-        const h: CustomerProfile[] = [];
-        const m: CustomerProfile[] = [];
-        const l: CustomerProfile[] = [];
-        const wins: CustomerProfile[] = [];
-
-        crmData.profiles.forEach(p => {
-            if (p.churnRisk === 'high') h.push(p);
-            else if (p.churnRisk === 'medium') m.push(p);
-            else l.push(p);
-
-            // Quick Wins Definition: Medium Risk (saindo da rotina) & High Ticket (> R$ 50)
-            if (p.churnRisk === 'medium' && p.averageTicket > 50) {
-                wins.push(p);
-            }
-        });
-
-        const sorter = (a: CustomerProfile, b: CustomerProfile) => b.totalSpent - a.totalSpent;
-
-        return {
-            highRisk: h.sort(sorter),
-            mediumRisk: m.sort(sorter),
-            lowRisk: l.sort(sorter),
-            quickWins: wins.sort(sorter)
-        };
-    }, [crmData]);
 
     if (!crmData) return null;
 
