@@ -176,7 +176,7 @@ export function Reports({ selectedStore }: ReportsProps) {
                                             <TableRow key={p.name}>
                                                 <TableCell className="font-medium text-white">
                                                     <button
-                                                        onClick={() => openCustomerDetails(p.name)}
+                                                        onClick={() => openCustomerDetails(p.name, p)}
                                                         className="hover:text-blue-400 hover:underline text-left transition-colors"
                                                     >
                                                         {p.name}

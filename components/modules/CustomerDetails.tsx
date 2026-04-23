@@ -144,7 +144,7 @@ export function CustomerDetails({ isOpen, onClose, profile, periodRecords }: Cus
                                 {profile.registrationDate && (
                                     <div className="flex items-center gap-1.5" title="Data de Cadastro">
                                         <Calendar className="w-3 h-3" />
-                                        <span>Cadastrado em {format(profile.registrationDate, 'dd/MM/yyyy')}</span>
+                                        <span>Cadastrado em {format(new Date(profile.registrationDate), 'dd/MM/yyyy')}</span>
                                     </div>
                                 )}
                             </div>
@@ -217,10 +217,10 @@ export function CustomerDetails({ isOpen, onClose, profile, periodRecords }: Cus
                                     {profile.lastVisits?.map((visit, i) => (
                                         <tr key={i} className="hover:bg-neutral-800/50">
                                             <td className="px-4 py-3 font-mono">
-                                                {format(visit.date, "dd/MM/yy")}
+                                                {format(new Date(visit.date), "dd/MM/yy")}
                                             </td>
                                             <td className="px-4 py-3 font-medium text-indigo-300">
-                                                {['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'][visit.date.getDay()]}
+                                                {['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'][new Date(visit.date).getDay()]}
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-2">
@@ -289,7 +289,7 @@ export function CustomerDetails({ isOpen, onClose, profile, periodRecords }: Cus
                         <div className="flex items-center justify-between text-sm text-neutral-400 mb-2">
                             <span>Primeira Visita</span>
                             <span className="text-neutral-300 font-mono">
-                                {profile.firstVisitDate ? format(profile.firstVisitDate, 'dd/MM/yyyy') : '-'}
+                                {profile.firstVisitDate ? format(new Date(profile.firstVisitDate), 'dd/MM/yyyy') : '-'}
                             </span>
                         </div>
                         <div className="flex items-center justify-between text-sm text-neutral-400 mb-2">
