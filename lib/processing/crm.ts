@@ -378,7 +378,7 @@ export function calculateCrmMetrics(records: SaleRecord[], customerRegistry?: Cu
         // Last Visits Breakdown (Derived from visitsList now)
         const lastVisits = [...visitsList]
             .sort((a, b) => b.date.getTime() - a.date.getTime())
-            .slice(0, 5)
+            .slice(0, 10)
             .map(v => {
                 const brtDate = new Date(v.date.getTime() - (3 * 3600 * 1000));
                 const hour = brtDate.getUTCHours();

@@ -199,9 +199,9 @@ export function CustomerDetails({ isOpen, onClose, profile, periodRecords }: Cus
                         </div>
                     </section>
 
-                    {/* Last 5 Visits */}
+                    {/* Last 10 Visits */}
                     <section>
-                        <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-widest mb-4">Últimas 5 Visitas</h3>
+                        <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-widest mb-4">Últimas 10 Visitas</h3>
                         <div className="bg-neutral-800/30 rounded-xl border border-neutral-800 overflow-hidden">
                             <table className="w-full text-left text-xs">
                                 <thead className="bg-neutral-900 text-neutral-500 uppercase font-bold">
