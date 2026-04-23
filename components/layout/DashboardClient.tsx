@@ -92,7 +92,10 @@ const ComparativeDashboard = dynamic(
   { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
 );
 
-import { ChurnAnalysis } from '@/components/modules/ChurnAnalysis';
+const ChurnAnalysis = dynamic(
+  () => import('@/components/modules/ChurnAnalysis').then(mod => mod.ChurnAnalysis),
+  { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
+);
 
 const MachineAnalysis = dynamic(
   () => import('@/components/modules/MachineAnalysis').then(mod => mod.MachineAnalysis),
@@ -1225,10 +1228,12 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
             if (!isSilent) {
                 const remainingSeconds = Math.ceil((60000 - (now - lastSyncTime)) / 1000);
                 setTimeout(() => {
-                  setStatus("error");
-                  setMessage(`Proteção contra bloqueio: Aguarde ${remainingSeconds} segundos antes de sincronizar novamente.`);
+                  startTransition(() => {
+                    setStatus("error");
+                    setMessage(`Proteção contra bloqueio: Aguarde ${remainingSeconds} segundos antes de sincronizar novamente.`);
+                  });
                 }, 10);
-                setTimeout(() => setStatus("idle"), 5000);
+                setTimeout(() => startTransition(() => setStatus("idle")), 5000);
             }
             return;
         }
@@ -1319,11 +1324,13 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         pushLog("[VMPay] Nenhuma venda nova encontrada em nenhuma loja.");
         if (!isSilent) {
             setTimeout(() => {
-              setStatus("success");
-              setMessage("Sincronização concluída (Sem novos dados)");
-              setSyncProgress(100);
+              startTransition(() => {
+                setStatus("success");
+                setMessage("Sincronização concluída (Sem novos dados)");
+                setSyncProgress(100);
+              });
             }, 10);
-            setTimeout(() => setSyncProgress(0), 3000);
+            setTimeout(() => startTransition(() => setSyncProgress(0)), 3000);
         }
         pushLog(`[Finalizado] Tempo total: ${((performance.now() - startTime) / 1000).toFixed(2)}s.`);
         return;
@@ -1344,11 +1351,13 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
 
       if (!isSilent) {
           setTimeout(() => {
-            setSyncProgress(100);
-            setStatus("success");
-            setMessage("Sincronização concluída com sucesso!");
+            startTransition(() => {
+              setSyncProgress(100);
+              setStatus("success");
+              setMessage("Sincronização concluída com sucesso!");
+            });
           }, 10);
-          setTimeout(() => setSyncProgress(0), 3000);
+          setTimeout(() => startTransition(() => setSyncProgress(0)), 3000);
       }
       pushLog(`[Finalizado] Tempo total de Sincronização + Recarga: ${((performance.now() - startTime) / 1000).toFixed(2)}s.`);
     } catch (e: any) {
