@@ -183,7 +183,7 @@ function AppContent({
     if (allRecords && allRecords.length > 0) setRenderTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
   }, [allRecords]);
 
-  const { selectedCustomerName, closeCustomerDetails } = useCustomerContext();
+  const { selectedCustomerName, selectedCustomerProfile, closeCustomerDetails } = useCustomerContext();
   const { user, isAuthenticated, isLoading, token, isExpired, role, vmpayApiKey } = useAuth();
   const [showTerms, setShowTerms] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -232,9 +232,10 @@ function AppContent({
 
   // Derive profile on the fly when selected (Global Modal Logic)
   const selectedProfile = useMemo(() => {
+    if (selectedCustomerProfile) return selectedCustomerProfile;
     if (!selectedCustomerName || !allRecords) return null;
     return getProfile(selectedCustomerName, allRecords, allOrders);
-  }, [selectedCustomerName, allRecords, allOrders]);
+  }, [selectedCustomerName, selectedCustomerProfile, allRecords, allOrders]);
 
   // Content Rendering Logic
   const renderContent = (token: string | null = null) => {

@@ -5,7 +5,8 @@ import { CustomerProfile } from "@/lib/processing/crm";
 
 interface CustomerContextType {
     selectedCustomerName: string | null;
-    openCustomerDetails: (customerName: string) => void;
+    selectedCustomerProfile: CustomerProfile | null;
+    openCustomerDetails: (customerName: string, profile?: CustomerProfile | null) => void;
     closeCustomerDetails: () => void;
 }
 
@@ -13,17 +14,20 @@ const CustomerContext = createContext<CustomerContextType | undefined>(undefined
 
 export function CustomerProvider({ children }: { children: ReactNode }) {
     const [selectedCustomerName, setSelectedCustomerName] = useState<string | null>(null);
+    const [selectedCustomerProfile, setSelectedCustomerProfile] = useState<CustomerProfile | null>(null);
 
-    const openCustomerDetails = (customerName: string) => {
+    const openCustomerDetails = (customerName: string, profile: CustomerProfile | null = null) => {
         setSelectedCustomerName(customerName);
+        setSelectedCustomerProfile(profile);
     };
 
     const closeCustomerDetails = () => {
         setSelectedCustomerName(null);
+        setSelectedCustomerProfile(null);
     };
 
     return (
-        <CustomerContext.Provider value={{ selectedCustomerName, openCustomerDetails, closeCustomerDetails }}>
+        <CustomerContext.Provider value={{ selectedCustomerName, selectedCustomerProfile, openCustomerDetails, closeCustomerDetails }}>
             {children}
         </CustomerContext.Provider>
     );

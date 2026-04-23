@@ -397,6 +397,7 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
                         <div className="col-span-1 md:col-span-2 lg:col-span-4">
                             <CrmCustomerBlock
                                 periodStats={periodStats}
+                                globalProfiles={globalCrmData?.profiles || []}
                                 onSelectSegment={(segment) => {
                                     // Logic to open details could go here, or just filter list
                                     console.log("Selected Segment:", segment);

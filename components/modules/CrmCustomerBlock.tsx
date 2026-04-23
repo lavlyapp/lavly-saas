@@ -11,10 +11,11 @@ import { useSubscription } from "@/components/context/SubscriptionContext";
 interface CrmCustomerBlockProps {
     periodStats: PeriodStats;
     totalCustomers?: number;
+    globalProfiles?: CustomerProfile[];
     onSelectSegment?: (segment: { title: string, list: SegmentedCustomer[] }) => void;
 }
 
-export function CrmCustomerBlock({ periodStats, totalCustomers, onSelectSegment }: CrmCustomerBlockProps) {
+export function CrmCustomerBlock({ periodStats, totalCustomers, globalProfiles = [], onSelectSegment }: CrmCustomerBlockProps) {
     const { canAccess } = useSubscription();
     const { openCustomerDetails } = useCustomerContext();
     const [selectedSegment, setSelectedSegment] = useState<{ title: string; list: SegmentedCustomer[] } | null>(null);
@@ -243,7 +244,10 @@ export function CrmCustomerBlock({ periodStats, totalCustomers, onSelectSegment 
                                         <tr key={i} className="hover:bg-neutral-800/30 transition-colors">
                                             <td className="px-6 py-4">
                                                 <button
-                                                    onClick={() => openCustomerDetails(c.name)}
+                                                    onClick={() => {
+                                                        const fullProfile = globalProfiles.find(p => p.name === c.name);
+                                                        openCustomerDetails(c.name, fullProfile || null);
+                                                    }}
                                                     className="font-medium text-white hover:text-blue-400 hover:underline text-left transition-colors"
                                                 >
                                                     {c.name}
