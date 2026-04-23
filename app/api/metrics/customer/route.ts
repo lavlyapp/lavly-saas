@@ -29,7 +29,7 @@ export async function GET(request: Request) {
         const { data, error } = await supabase
             .from('sales')
             .select('id, data, loja, cliente, telefone, items, valor, produto, maquina, servico')
-            .eq('cliente', name)
+            .ilike('cliente', name)
             .order('data', { ascending: false });
 
         if (error) throw error;
