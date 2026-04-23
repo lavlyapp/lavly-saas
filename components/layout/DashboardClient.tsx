@@ -44,7 +44,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Auto-Recovery para React Error 310 (Suspense Collision)
     if (error.message && error.message.includes('310')) {
-        console.error("[Fallback] Detectado choque de Suspense (React 310). A suspensão escapou para o ErrorBoundary.");
+      console.error("[Fallback] Detectado choque de Suspense (React 310). A suspensão escapou para o ErrorBoundary.");
     }
     console.error("DashboardClient ErrorBoundary caught an error", error, errorInfo);
     this.setState({ errorInfo });
@@ -92,10 +92,7 @@ const ComparativeDashboard = dynamic(
   { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
 );
 
-const ChurnAnalysis = dynamic(
-  () => import('@/components/modules/ChurnAnalysis').then(mod => mod.ChurnAnalysis),
-  { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
-);
+import { ChurnAnalysis } from '@/components/modules/ChurnAnalysis';
 
 const MachineAnalysis = dynamic(
   () => import('@/components/modules/MachineAnalysis').then(mod => mod.MachineAnalysis),
@@ -210,14 +207,14 @@ function AppContent({
     if (mounted && isAuthenticated) {
       setTimeout(() => {
         console.log("[System] Acionando pré-cálculo silencioso das abas na Borda AWS...");
-        
+
         // Dispara requisições silenciosas para esquentar os nós do banco e cache da Edge
         Promise.allSettled([
           fetch('/api/metrics/financial?period=thisMonth&store=Todas&t=' + Date.now()),
           fetch('/api/metrics/comparative?store=Todas&t=' + Date.now()),
           fetch('/api/metrics/crm?store=Todas&t=' + Date.now())
         ]).then(() => {
-            console.log("[System] Pré-cálculo em plano de fundo concluído.");
+          console.log("[System] Pré-cálculo em plano de fundo concluído.");
         });
       }, 3000); // 3 seconds after dashboard mounts
     }
@@ -249,7 +246,8 @@ function AppContent({
     }
 
     if (activeTab === 'logs') {
-      return <ActivityLogs />;    // {Loader Logic Removed - Handled at the root render level to protect cached components}  );
+      return <ActivityLogs />;
+      // {Loader Logic Removed - Handled at the root render level to protect cached components}  );
     }
 
     // Empty state block removed. App is now 100% Cloud-Native and dashboards gracefully fetch from Edge.
@@ -625,11 +623,11 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
     setRawLogs((prev) => {
       const newLogsArgs = typeof updater === 'function' ? updater(prev) : updater;
       if (Array.isArray(newLogsArgs)) {
-         const ts = new Date(new Date().getTime() - 3 * 3600 * 1000).toISOString().substring(11, 23);
-         return newLogsArgs.map(l => {
-             if (typeof l === 'string' && /^\[\d{2}:\d{2}:\d{2}\.\d{3}\]/.test(l)) return l;
-             return `[${ts}] ${l}`;
-         });
+        const ts = new Date(new Date().getTime() - 3 * 3600 * 1000).toISOString().substring(11, 23);
+        return newLogsArgs.map(l => {
+          if (typeof l === 'string' && /^\[\d{2}:\d{2}:\d{2}\.\d{3}\]/.test(l)) return l;
+          return `[${ts}] ${l}`;
+        });
       }
       return newLogsArgs;
     });
@@ -665,7 +663,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
     setLogs(prev => [...prev, "[System] Processando interface..."]);
   }, []);
 
-    const viewData = useMemo(() => {
+  const viewData = useMemo(() => {
     if (!mounted) return null;
 
     if (allRecords.length === 0 && dbStores.length > 0) {
@@ -728,7 +726,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
     startTransition(() => {
       setStatus("uploading");
     });
-    
+
     try {
       // 1. Create Authenticated Client
       const authenticatedClient = createClient(
@@ -739,12 +737,12 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
 
       // 2. Load active stores and config via Secure API (Bypass client DB lock)
       const { getCanonicalStoreName } = await import("@/lib/vmpay-config");
-      
+
       const resStores = await fetch('/api/force-sync/stores');
       const dataStores = await resStores.json();
       const activeStores = dataStores.stores || [];
       const configuredNames = activeStores.map((s: any) => getCanonicalStoreName(s.name));
-      
+
       startTransition(() => {
         setDbStores(configuredNames);
       });
@@ -783,68 +781,68 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         const shouldFilterByStore = targetStores.length > 0 && tableName !== 'customers';
         const pageSize = 1000;
         let allData: any[] = [];
-        
+
         const fetchPartition = async (startIso: string | null, endIso: string | null, partName: string) => {
-             let chunkOffset = 0;
-             let partitionData: any[] = [];
-             while (true) {
-                 let query = rawSupabase.from(tableName).select(columns).order(orderBy, { ascending: false }).range(chunkOffset, chunkOffset + pageSize - 1);
-                 
-                 // Apply date bounds if available (sales & orders)
-                 if (startIso && endIso) {
-                     query = query.gte(orderBy, startIso).lt(orderBy, endIso);
-                 }
-                 if (shouldFilterByStore) {
-                     query = query.in('loja', targetStores);
-                 }
-                 
-                 const { data, error } = await query;
-                 if (error) {
-                      console.error(`[Erro BATCH] Falha na partição ${partName} offset ${chunkOffset}:`, error);
-                      startTransition(() => {
-                        setLogs(prev => [...prev, `[Erro DB] Falha na partição ${partName} de ${tableName} (${error.code || 'Timeout'}): ${error.message}`]);
-                      });
-                      break; 
-                 }
-                 
-                 const records = data || [];
-                 partitionData.push(...records);
-                 if (records.length < pageSize) break; // Exhausted this partition
-                 chunkOffset += pageSize;
-             }
-             return partitionData;
+          let chunkOffset = 0;
+          let partitionData: any[] = [];
+          while (true) {
+            let query = rawSupabase.from(tableName).select(columns).order(orderBy, { ascending: false }).range(chunkOffset, chunkOffset + pageSize - 1);
+
+            // Apply date bounds if available (sales & orders)
+            if (startIso && endIso) {
+              query = query.gte(orderBy, startIso).lt(orderBy, endIso);
+            }
+            if (shouldFilterByStore) {
+              query = query.in('loja', targetStores);
+            }
+
+            const { data, error } = await query;
+            if (error) {
+              console.error(`[Erro BATCH] Falha na partição ${partName} offset ${chunkOffset}:`, error);
+              startTransition(() => {
+                setLogs(prev => [...prev, `[Erro DB] Falha na partição ${partName} de ${tableName} (${error.code || 'Timeout'}): ${error.message}`]);
+              });
+              break;
+            }
+
+            const records = data || [];
+            partitionData.push(...records);
+            if (records.length < pageSize) break; // Exhausted this partition
+            chunkOffset += pageSize;
+          }
+          return partitionData;
         };
 
         if (orderBy === 'data') {
-            // TIME-PARTITIONING for giant tables (sales, orders)
-            const partitions = [];
-            for (let i = startOffsetPartition; i < startOffsetPartition + numPartitions; i++) {
-                const end = new Date(); end.setDate(end.getDate() - (i * 30));
-                const start = new Date(); start.setDate(start.getDate() - ((i + 1) * 30));
-                partitions.push({ start: start.toISOString(), end: end.toISOString(), name: `Mês -${i+1}` });
-            }
+          // TIME-PARTITIONING for giant tables (sales, orders)
+          const partitions = [];
+          for (let i = startOffsetPartition; i < startOffsetPartition + numPartitions; i++) {
+            const end = new Date(); end.setDate(end.getDate() - (i * 30));
+            const start = new Date(); start.setDate(start.getDate() - ((i + 1) * 30));
+            partitions.push({ start: start.toISOString(), end: end.toISOString(), name: `Mês -${i + 1}` });
+          }
 
-            const maxConcurrent = 3;
-            for (let i = 0; i < partitions.length; i += maxConcurrent) {
-               const batchPromises = [];
-               for (let j = 0; j < maxConcurrent && (i + j) < partitions.length; j++) {
-                   const p = partitions[i + j];
-                   batchPromises.push(fetchPartition(p.start, p.end, p.name));
-               }
-               const batchResults = await Promise.all(batchPromises);
-               allData.push(...batchResults.flat());
-               startTransition(() => {
-                 setLogs(prev => [...prev, `[System] Progresso ${tableName}: Bloco ${Math.min(i + maxConcurrent, partitions.length)} de ${partitions.length} processado.`]);
-               });
+          const maxConcurrent = 3;
+          for (let i = 0; i < partitions.length; i += maxConcurrent) {
+            const batchPromises = [];
+            for (let j = 0; j < maxConcurrent && (i + j) < partitions.length; j++) {
+              const p = partitions[i + j];
+              batchPromises.push(fetchPartition(p.start, p.end, p.name));
             }
-        } else {
-            // Fallback for smaller/non-time tables (customers)
-            // Just sequential offset sweep since it's super fast without RLS timeouts
+            const batchResults = await Promise.all(batchPromises);
+            allData.push(...batchResults.flat());
             startTransition(() => {
-              setLogs(prev => [...prev, `[System] Baixando ${tableName} de forma sequencial leve...`]);
+              setLogs(prev => [...prev, `[System] Progresso ${tableName}: Bloco ${Math.min(i + maxConcurrent, partitions.length)} de ${partitions.length} processado.`]);
             });
-            const results = await fetchPartition(null, null, "Global");
-            allData.push(...results);
+          }
+        } else {
+          // Fallback for smaller/non-time tables (customers)
+          // Just sequential offset sweep since it's super fast without RLS timeouts
+          startTransition(() => {
+            setLogs(prev => [...prev, `[System] Baixando ${tableName} de forma sequencial leve...`]);
+          });
+          const results = await fetchPartition(null, null, "Global");
+          allData.push(...results);
         }
 
         // Local memory deduplication to keep UI arrays identical to real DB
@@ -853,7 +851,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
           const key = item.id || `${item.sale_id || Math.random()}-${item.data}`;
           uniqueMap.set(key, item);
         });
-        
+
         return Array.from(uniqueMap.values());
       };
 
@@ -1223,30 +1221,30 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
     const lastSyncTimeStr = localStorage.getItem('last_vmpay_sync');
     const now = Date.now();
     if (lastSyncTimeStr) {
-        const lastSyncTime = parseInt(lastSyncTimeStr, 10);
-        if (now - lastSyncTime < 60000) {
-            if (!isSilent) {
-                const remainingSeconds = Math.ceil((60000 - (now - lastSyncTime)) / 1000);
-                setTimeout(() => {
-                  startTransition(() => {
-                    setStatus("error");
-                    setMessage(`Proteção contra bloqueio: Aguarde ${remainingSeconds} segundos antes de sincronizar novamente.`);
-                  });
-                }, 10);
-                setTimeout(() => startTransition(() => setStatus("idle")), 5000);
-            }
-            return;
+      const lastSyncTime = parseInt(lastSyncTimeStr, 10);
+      if (now - lastSyncTime < 60000) {
+        if (!isSilent) {
+          const remainingSeconds = Math.ceil((60000 - (now - lastSyncTime)) / 1000);
+          setTimeout(() => {
+            startTransition(() => {
+              setStatus("error");
+              setMessage(`Proteção contra bloqueio: Aguarde ${remainingSeconds} segundos antes de sincronizar novamente.`);
+            });
+          }, 10);
+          setTimeout(() => startTransition(() => setStatus("idle")), 5000);
         }
+        return;
+      }
     }
     localStorage.setItem('last_vmpay_sync', now.toString());
 
     try {
       if (!isSilent) {
-          startTransition(() => {
-            setStatus("uploading");
-            setSyncProgress(0);
-            setMessage("Preparando sincronização...");
-          });
+        startTransition(() => {
+          setStatus("uploading");
+          setSyncProgress(0);
+          setMessage("Preparando sincronização...");
+        });
       }
       pushLog("[VMPay] Verificando sessão segura" + (isSilent ? " (Silencioso)..." : "..."));
       let token = passedToken;
@@ -1258,9 +1256,9 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       // 1. Get available store credentials first via secure API route (bypassing client-side DB lock)
       const resStores = await fetch('/api/force-sync/stores');
       const dataStores = await resStores.json();
-      
+
       if (!resStores.ok || !dataStores.success) {
-          throw new Error(dataStores.error || `HTTP error ${resStores.status}`);
+        throw new Error(dataStores.error || `HTTP error ${resStores.status}`);
       }
       const credentials = dataStores.stores || [];
       pushLog(`[VMPay] ${credentials.length} lojas identificadas. Iniciando ciclo...`);
@@ -1269,10 +1267,10 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       const totalStores = credentials.length;
 
       if (!isSilent) {
-          startTransition(() => {
-            setSyncProgress(25);
-            setMessage(`Sincronizando ${totalStores} loja(s) simultaneamente...`);
-          });
+        startTransition(() => {
+          setSyncProgress(25);
+          setMessage(`Sincronizando ${totalStores} loja(s) simultaneamente...`);
+        });
       }
       pushLog(`[VMPay] Acionando Sincronização Global na Nuvem...`);
 
@@ -1281,7 +1279,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       try {
         const controller = new AbortController();
         // 120s limite global para bater com limites máximos do Vercel caso necessário buscar histórico de 6 meses
-        const timeoutId = setTimeout(() => controller.abort(), 120000); 
+        const timeoutId = setTimeout(() => controller.abort(), 120000);
 
         const callStart = performance.now();
         pushLog(`[API] fetch(${url}) enviado.`);
@@ -1295,7 +1293,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         });
         clearTimeout(timeoutId);
 
-        if (!isSilent) setTimeout(() => setSyncProgress(75), 10);
+        if (!isSilent) setTimeout(() => startTransition(() => setSyncProgress(75)), 10);
         pushLog(`[API] Retorno recebido em ${((performance.now() - callStart) / 1000).toFixed(2)}s (HTTP ${res.status}). Lendo JSON...`);
 
         if (!res.ok) {
@@ -1314,23 +1312,23 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       }
 
       if (!isSilent) {
-          startTransition(() => {
-            setSyncProgress(90); // Finished downloading, now re-rendering
-            setMessage("Desenhando Novos Gráficos...");
-          });
+        startTransition(() => {
+          setSyncProgress(90); // Finished downloading, now re-rendering
+          setMessage("Desenhando Novos Gráficos...");
+        });
       }
 
       if (allNewRawRecords.length === 0) {
         pushLog("[VMPay] Nenhuma venda nova encontrada em nenhuma loja.");
         if (!isSilent) {
-            setTimeout(() => {
-              startTransition(() => {
-                setStatus("success");
-                setMessage("Sincronização concluída (Sem novos dados)");
-                setSyncProgress(100);
-              });
-            }, 10);
-            setTimeout(() => startTransition(() => setSyncProgress(0)), 3000);
+          setTimeout(() => {
+            startTransition(() => {
+              setStatus("success");
+              setMessage("Sincronização concluída (Sem novos dados)");
+              setSyncProgress(100);
+            });
+          }, 10);
+          setTimeout(() => startTransition(() => setSyncProgress(0)), 3000);
         }
         pushLog(`[Finalizado] Tempo total: ${((performance.now() - startTime) / 1000).toFixed(2)}s.`);
         return;
@@ -1350,25 +1348,25 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       }
 
       if (!isSilent) {
-          setTimeout(() => {
-            startTransition(() => {
-              setSyncProgress(100);
-              setStatus("success");
-              setMessage("Sincronização concluída com sucesso!");
-            });
-          }, 10);
-          setTimeout(() => startTransition(() => setSyncProgress(0)), 3000);
+        setTimeout(() => {
+          startTransition(() => {
+            setSyncProgress(100);
+            setStatus("success");
+            setMessage("Sincronização concluída com sucesso!");
+          });
+        }, 10);
+        setTimeout(() => startTransition(() => setSyncProgress(0)), 3000);
       }
       pushLog(`[Finalizado] Tempo total de Sincronização + Recarga: ${((performance.now() - startTime) / 1000).toFixed(2)}s.`);
     } catch (e: any) {
       console.error("[Sync API] Error:", e);
       pushLog(`[ERRO CRÍTICO] Falha na Sincronização Global: ${e.message}`);
       if (!isSilent) {
-          startTransition(() => {
-            setStatus("error");
-            setMessage(e.message || "Falha na sincronização");
-            setSyncProgress(0);
-          });
+        startTransition(() => {
+          setStatus("error");
+          setMessage(e.message || "Falha na sincronização");
+          setSyncProgress(0);
+        });
       }
     }
   }
@@ -1385,17 +1383,17 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
         onComplete={async () => {
           setNeedsOnboardingStores([]);
           const currentToken = initialSession?.access_token || null;
-      
-      try {
-        const ts = new Date().toISOString().substring(11, 23);
-        setLogs(prev => [...prev, `[${ts}] [System] Consolidando tabelas Cloud-Native de Alta Performance...`]);
-        await supabase.rpc('refresh_dashboard_materialized_views');
-      } catch (dbErr: any) {
-        const ts = new Date().toISOString().substring(11, 23);
-        setLogs(prev => [...prev, `[${ts}] [Aviso] Falha ao refreshar cache do sistema: ${dbErr.message}`]);
-      }
 
-      await reloadAllData("Manual Sync Completion", currentToken);
+          try {
+            const ts = new Date().toISOString().substring(11, 23);
+            setLogs(prev => [...prev, `[${ts}] [System] Consolidando tabelas Cloud-Native de Alta Performance...`]);
+            await supabase.rpc('refresh_dashboard_materialized_views');
+          } catch (dbErr: any) {
+            const ts = new Date().toISOString().substring(11, 23);
+            setLogs(prev => [...prev, `[${ts}] [Aviso] Falha ao refreshar cache do sistema: ${dbErr.message}`]);
+          }
+
+          await reloadAllData("Manual Sync Completion", currentToken);
         }}
       />
     );
