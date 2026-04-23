@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from "react";
 import { SaleRecord } from "@/lib/processing/etl";
 import { X, Phone, ShoppingBasket, DollarSign, Clock, Calendar, Sunrise, Sun, Sunset, Moon, MapPin, Activity, Sparkles, User, Mail, CreditCard } from "lucide-react";
 import { format } from "date-fns";
@@ -13,20 +14,62 @@ interface CustomerDetailsProps {
     periodRecords?: SaleRecord[]; // Optional: for period-specific stats
 }
 
-export function CustomerDetails({ isOpen, onClose, profile, periodRecords }: CustomerDetailsProps) {
+export function CustomerDetails({ isOpen, onClose, profile: initialProfile, periodRecords }: CustomerDetailsProps) {
     const { canAccess } = useSubscription();
+    const [profile, setProfile] = useState<CustomerProfile | null>(initialProfile);
+    const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
-    if (!isOpen || !profile) return null;
+    useEffect(() => {
+        if (!isOpen || !initialProfile) {
+            setProfile(null);
+            return;
+        }
+        
+        // Se já tiver lastVisits (e.g. calculado localmente ou cacheado), não precisa buscar
+        if (initialProfile.lastVisits && initialProfile.lastVisits.length > 0) {
+            setProfile(initialProfile);
+            return;
+        }
+
+        // Busca o histórico detalhado sob demanda na V2 Cloud-Native
+        let isMounted = true;
+        const fetchDetails = async () => {
+            setIsLoadingDetails(true);
+            try {
+                const res = await fetch(`/api/metrics/customer?name=${encodeURIComponent(initialProfile.name)}`);
+                const json = await res.json();
+                if (isMounted && json.success && json.payload) {
+                    setProfile(json.payload);
+                } else {
+                    setProfile(initialProfile);
+                }
+            } catch(e) {
+                console.error(e);
+                if (isMounted) setProfile(initialProfile);
+            } finally {
+                if (isMounted) setIsLoadingDetails(false);
+            }
+        };
+
+        fetchDetails();
+
+        return () => { isMounted = false; };
+    }, [isOpen, initialProfile]);
+
+    if (!isOpen || !initialProfile) return null;
+    
+    // Mostramos o profile detalhado se estiver pronto, senão o inicial
+    const displayProfile = profile || initialProfile;
 
     // Logic to calculate stats (Period vs Lifetime)
-    let displayWash = profile.totalWashes ?? 0; // Default to Lifetime
-    let displayDry = profile.totalDries ?? 0;
-    let displayTotal = profile.totalCycles ?? 0;
+    let displayWash = displayProfile.totalWashes ?? 0; // Default to Lifetime
+    let displayDry = displayProfile.totalDries ?? 0;
+    let displayTotal = displayProfile.totalCycles ?? 0;
     let isPeriodContext = false;
 
     if (periodRecords && periodRecords.length > 0) {
         // ... (keep existing logic) ...
-        const customerRecords = periodRecords.filter(r => r.cliente.trim().toUpperCase() === profile.name);
+        const customerRecords = periodRecords.filter(r => r.cliente.trim().toUpperCase() === displayProfile.name);
 
         if (customerRecords.length > 0) {
             isPeriodContext = true;
@@ -49,9 +92,9 @@ export function CustomerDetails({ isOpen, onClose, profile, periodRecords }: Cus
             });
 
             // By default, showing lifetime baskets is safer than recalculating without the full heuristics from crm.ts.
-            // We use the global `profile.totalWashes` and `profile.totalDries` directly.
-            displayWash = profile.totalWashes ?? 0;
-            displayDry = profile.totalDries ?? 0;
+            // We use the global `displayProfile.totalWashes` and `displayProfile.totalDries` directly.
+            displayWash = displayProfile.totalWashes ?? 0;
+            displayDry = displayProfile.totalDries ?? 0;
             displayTotal = displayWash + displayDry;
         }
     }
@@ -81,16 +124,16 @@ export function CustomerDetails({ isOpen, onClose, profile, periodRecords }: Cus
                 <div className="p-6 border-b border-neutral-800 flex justify-between items-start bg-neutral-900 z-10">
                     <div>
                         <h2 className="text-xl font-bold text-white leading-tight flex items-center gap-2">
-                            {profile.name}
-                            {profile.gender === 'M' && <span className="text-blue-400 text-xs bg-blue-400/10 px-1.5 py-0.5 rounded border border-blue-400/20">M</span>}
-                            {profile.gender === 'F' && <span className="text-pink-400 text-xs bg-pink-400/10 px-1.5 py-0.5 rounded border border-pink-400/20">F</span>}
+                            {displayProfile.name}
+                            {displayProfile.gender === 'M' && <span className="text-blue-400 text-xs bg-blue-400/10 px-1.5 py-0.5 rounded border border-blue-400/20">M</span>}
+                            {displayProfile.gender === 'F' && <span className="text-pink-400 text-xs bg-pink-400/10 px-1.5 py-0.5 rounded border border-pink-400/20">F</span>}
                         </h2>
 
                         <div className="flex flex-col gap-1 mt-2">
-                            {profile.preferredStore && (
+                            {displayProfile.preferredStore && (
                                 <div className="flex items-center gap-1.5 text-indigo-400 text-sm font-medium mb-1">
                                     <MapPin className="w-3.5 h-3.5" />
-                                    <span className="truncate max-w-[280px]" title={profile.preferredStore}>{profile.preferredStore}</span>
+                                    <span className="truncate max-w-[280px]" title={displayProfile.preferredStore}>{displayProfile.preferredStore}</span>
                                 </div>
                             )}
 
@@ -98,14 +141,14 @@ export function CustomerDetails({ isOpen, onClose, profile, periodRecords }: Cus
                             <div className="flex items-center gap-4">
                                 <div className="flex items-center gap-2 text-neutral-400 text-sm">
                                     <Phone className="w-3 h-3" />
-                                    <span className="font-mono">{profile.phone || 'Sem telefone'}</span>
+                                    <span className="font-mono">{displayProfile.phone || 'Sem telefone'}</span>
                                 </div>
-                                {profile.phone && (
+                                {displayProfile.phone && (
                                     canAccess('whatsapp') ? (
                                         <a
                                             href={generateWhatsAppLink(
-                                                profile.phone,
-                                                `Olá ${profile.name.split(' ')[0]}, tudo bem? Vimos aqui na Lavanderia que...`
+                                                displayProfile.phone,
+                                                `Olá ${displayProfile.name.split(' ')[0]}, tudo bem? Vimos aqui na Lavanderia que...`
                                             )}
                                             target="_blank"
                                             rel="noreferrer"
@@ -126,25 +169,25 @@ export function CustomerDetails({ isOpen, onClose, profile, periodRecords }: Cus
                             </div>
 
                             {/* Email */}
-                            {profile.email && (
+                            {displayProfile.email && (
                                 <div className="flex items-center gap-2 text-neutral-500 text-xs">
                                     <Mail className="w-3 h-3" />
-                                    <span>{profile.email}</span>
+                                    <span>{displayProfile.email}</span>
                                 </div>
                             )}
 
                             {/* CPF & Registration Date */}
                             <div className="flex items-center gap-3 text-neutral-500 text-xs">
-                                {profile.cpf && (
+                                {displayProfile.cpf && (
                                     <div className="flex items-center gap-1.5" title="CPF">
                                         <CreditCard className="w-3 h-3" />
-                                        <span className="font-mono">{profile.cpf}</span>
+                                        <span className="font-mono">{displayProfile.cpf}</span>
                                     </div>
                                 )}
-                                {profile.registrationDate && (
+                                {displayProfile.registrationDate && (
                                     <div className="flex items-center gap-1.5" title="Data de Cadastro">
                                         <Calendar className="w-3 h-3" />
-                                        <span>Cadastrado em {format(new Date(profile.registrationDate), 'dd/MM/yyyy')}</span>
+                                        <span>Cadastrado em {format(new Date(displayProfile.registrationDate), 'dd/MM/yyyy')}</span>
                                     </div>
                                 )}
                             </div>
@@ -171,14 +214,14 @@ export function CustomerDetails({ isOpen, onClose, profile, periodRecords }: Cus
                                 <div className="flex items-center gap-2 text-emerald-400">
                                     <DollarSign className="w-5 h-5" />
                                     <span className="text-xl font-mono font-bold">
-                                        {profile.totalSpent.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 })}
+                                        {displayProfile.totalSpent.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 })}
                                     </span>
                                 </div>
                             </div>
 
                             {/* Cestos Card Breakdown */}
                             <div className="bg-neutral-800/50 p-4 rounded-xl border border-neutral-700/50 col-span-2 md:col-span-1">
-                                <span className="text-xs text-neutral-400 block mb-1">Cestos (Vitalício) {`[DBG: TW=${profile.totalWashes} / pWash=${isPeriodContext ? 'PContext' : 'GContext'}]`} </span>
+                                <span className="text-xs text-neutral-400 block mb-1">Cestos (Vitalício) {`[DBG: TW=${displayProfile.totalWashes} / pWash=${isPeriodContext ? 'PContext' : 'GContext'}]`} </span>
                                 <div className="flex items-center gap-3">
                                     <div className="flex items-center gap-1">
                                         <span className="text-lg font-mono font-bold text-blue-400">{displayWash}</span>
@@ -214,7 +257,17 @@ export function CustomerDetails({ isOpen, onClose, profile, periodRecords }: Cus
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-neutral-800 text-neutral-300">
-                                    {profile.lastVisits?.map((visit, i) => (
+                                    {isLoadingDetails && (
+                                        <tr>
+                                            <td colSpan={5} className="px-4 py-8 text-center text-neutral-500">
+                                                <div className="flex items-center justify-center gap-3">
+                                                    <div className="w-4 h-4 border-2 border-neutral-500/30 border-t-neutral-500 rounded-full animate-spin" />
+                                                    Carregando histórico completo na nuvem...
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {!isLoadingDetails && displayProfile.lastVisits?.map((visit, i) => (
                                         <tr key={i} className="hover:bg-neutral-800/50">
                                             <td className="px-4 py-3 font-mono">
                                                 {format(new Date(visit.date), "dd/MM/yy")}
@@ -240,9 +293,9 @@ export function CustomerDetails({ isOpen, onClose, profile, periodRecords }: Cus
                                             </td>
                                         </tr>
                                     ))}
-                                    {(!profile.lastVisits || profile.lastVisits.length === 0) && (
+                                    {!isLoadingDetails && (!displayProfile.lastVisits || displayProfile.lastVisits.length === 0) && (
                                         <tr>
-                                            <td colSpan={4} className="px-4 py-6 text-center text-neutral-500 italic">
+                                            <td colSpan={5} className="px-4 py-6 text-center text-neutral-500 italic">
                                                 Nenhum registro recente.
                                             </td>
                                         </tr>
@@ -256,10 +309,16 @@ export function CustomerDetails({ isOpen, onClose, profile, periodRecords }: Cus
                     <section>
                         <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-widest mb-4">Horários Preferidos (Top 3)</h3>
                         <div className="space-y-3">
-                            {profile.topSlots.length === 0 && (
+                            {isLoadingDetails && (
+                                <div className="text-neutral-500 text-sm italic flex items-center gap-2">
+                                    <div className="w-3 h-3 border-2 border-neutral-500/30 border-t-neutral-500 rounded-full animate-spin" />
+                                    Carregando...
+                                </div>
+                            )}
+                            {!isLoadingDetails && (!displayProfile.topSlots || displayProfile.topSlots.length === 0) && (
                                 <p className="text-neutral-600 text-sm italic">Sem dados suficientes no período.</p>
                             )}
-                            {profile.topSlots.map((slot, idx) => (
+                            {!isLoadingDetails && displayProfile.topSlots?.map((slot, idx) => (
                                 <div key={idx} className="flex items-center justify-between bg-neutral-800/30 p-3 rounded-lg border border-neutral-800">
                                     <div className="flex items-center gap-3">
                                         <div className="w-6 h-6 rounded-full bg-neutral-800 flex items-center justify-center text-xs font-bold text-neutral-500">
@@ -289,19 +348,19 @@ export function CustomerDetails({ isOpen, onClose, profile, periodRecords }: Cus
                         <div className="flex items-center justify-between text-sm text-neutral-400 mb-2">
                             <span>Primeira Visita</span>
                             <span className="text-neutral-300 font-mono">
-                                {profile.firstVisitDate ? format(new Date(profile.firstVisitDate), 'dd/MM/yyyy') : '-'}
+                                {displayProfile.firstVisitDate ? format(new Date(displayProfile.firstVisitDate), 'dd/MM/yyyy') : '-'}
                             </span>
                         </div>
                         <div className="flex items-center justify-between text-sm text-neutral-400 mb-2">
                             <span>Ticket Médio (Histórico)</span>
                             <span className="text-neutral-300 font-mono">
-                                {profile.averageTicket.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                {displayProfile.averageTicket.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </span>
                         </div>
                         <div className="flex items-center justify-between text-sm text-neutral-400 mb-2">
                             <span>Total Gasto (Lifetime)</span>
                             <span className="text-neutral-300 font-mono">
-                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(profile.totalSpent)}
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(displayProfile.totalSpent)}
                             </span>
                         </div>
                     </section>
