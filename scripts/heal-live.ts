@@ -4,7 +4,7 @@ async function healLive() {
     console.log("Triggering Live Vercel Sync for All Stores to Heal Database...");
     
     // We assume the live site at lavly.com.br has the latest pushed code
-    const BASE_URL = "https://lavly.com.br/api/vmpay/sync";
+    const BASE_URL = "https://www.teste.lavly.com.br/api/vmpay/sync";
 
     const credentials = await getVMPayCredentials();
     for (const cred of credentials) {
