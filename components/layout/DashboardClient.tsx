@@ -517,20 +517,6 @@ function AppContent({
             ) : (
               <ErrorBoundary>
                 <div>
-                  <Suspense fallback={
-                    <div className="flex flex-col items-center justify-center p-8 h-[60vh] w-full bg-neutral-900/50 rounded-3xl border border-neutral-800 animate-in fade-in duration-500">
-                      <div className="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4 shadow-[0_0_30px_rgba(16,185,129,0.3)]" />
-                      <h3 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent">
-                        Processando interface...
-                      </h3>
-                    </div>
-                  }>
-                    {/* 
-                      CRITICAL REACT 310 FIX:
-                      NEVER use a ternary operator here to swap between the Loader and cachedContent! 
-                      Doing so physically unmounts the pending Promises in `<ChurnAnalysis>`, causing a catastrophic unmount-tearing collision (Error 310) when the layout state switches back to 'success' during a startTransition. 
-                      Instead, we keep the data permanently mounted in the React tree and visually hide it with CSS to preserve the Fiber Suspense resolution state! 
-                    */}
                     <div className={status === 'uploading' && activeTab !== 'financial' ? 'hidden' : 'block'}>
                       {cachedContent}
                     </div>
@@ -556,7 +542,6 @@ function AppContent({
                         </div>
                       </div>
                     )}
-                  </Suspense>
                 </div>
               </ErrorBoundary>
             )}
