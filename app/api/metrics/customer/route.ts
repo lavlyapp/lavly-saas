@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 
         const { data, error } = await supabase
             .from('sales')
-            .select('id, data, loja, cliente, telefone, items, valor, produto, maquina, servico')
+            .select('id, data, loja, cliente, telefone, valor, produto, maquina, servico')
             .ilike('cliente', name)
             .order('data', { ascending: false });
 
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
         const parsedRecords = data.map(r => ({
             ...r,
             data: new Date(r.data),
-            items: typeof r.items === 'string' ? JSON.parse(r.items) : (r.items || [])
+            items: [] // No items column in Supabase sales table
         }));
 
         const metrics = calculateCrmMetrics(parsedRecords);
