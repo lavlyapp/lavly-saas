@@ -133,13 +133,9 @@ export function AppSidebar({ activeTab, onTabChange, collapsed, onToggle, isMobi
                         btn.style.pointerEvents = 'none';
                         
                         try {
-                            // Race condition: wait max 1.5 seconds for logout, then force redirect
-                            await Promise.race([
-                                logout(),
-                                new Promise(resolve => setTimeout(resolve, 1500))
-                            ]);
+                            await logout();
                         } catch (err) {
-                            console.error("Logout errored or timed out", err);
+                            console.error("Logout errored", err);
                         } finally {
                             window.location.href = '/';
                         }

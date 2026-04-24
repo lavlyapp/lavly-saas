@@ -130,13 +130,46 @@ export function AuthProvider({ children, initialSession, initialRole, initialExp
     };
 
     const logout = async () => {
+        setIsLoading(true);
         try {
             await Promise.race([clear(), new Promise(resolve => setTimeout(resolve, 1500))]);
             console.log("[Auth] Local cache cleared.");
         } catch (e) {
             console.error("[Auth] Failed to clear local cache:", e);
         }
-        await supabase.auth.signOut();
+
+        try {
+            await supabase.auth.signOut();
+        } catch (e) {
+            console.error("[Auth] SignOut error:", e);
+        }
+
+        // Force cleanup of session state
+        setUser(null);
+        setRole(null);
+        setToken(null);
+        setExpiresAt(null);
+        setVmpayApiKey(null);
+
+        // Aggressively clear browser storage and cookies
+        if (typeof window !== 'undefined') {
+            try {
+                window.localStorage.clear();
+                window.sessionStorage.clear();
+
+                const cookies = document.cookie.split("; ");
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookieName = cookies[i].split("=")[0];
+                    document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+                    // Also try to clear domain-level cookies
+                    const domain = window.location.hostname;
+                    document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${domain}`;
+                    document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=.${domain}`;
+                }
+            } catch (e) {
+                console.error("[Auth] Error clearing browser storage:", e);
+            }
+        }
     };
 
     const isExpired = isLifetimeAccess ? false : (expiresAt ? new Date() > new Date(expiresAt) : false);
