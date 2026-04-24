@@ -344,8 +344,11 @@ function AppContent({
   }
 
   // Password Change Onboarding - Highest Priority
-  if (user?.user_metadata?.force_password_change) {
-    return <OnboardingPassword onSuccess={() => window.location.assign('/dashboard')} />;
+  if (user?.user_metadata?.force_password_change && !skipPassword) {
+    return <OnboardingPassword 
+        onSuccess={() => window.location.assign('/dashboard')} 
+        onDismiss={() => setSkipPassword(true)} 
+    />;
   }
 
   // VMPay Onboarding Block - Strict Enforcement
@@ -633,6 +636,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
   const [storeOwners, setStoreOwners] = useState<Record<string, string>>({});
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [skipPassword, setSkipPassword] = useState(false);
   const stores = useMemo(() => {
     const dataStores = Array.from(new Set(allRecords.map(r => getCanonicalStoreName(r.loja))));
     const combined = Array.from(new Set([...dbStores, ...dataStores])).filter(Boolean).sort();

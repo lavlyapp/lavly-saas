@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { Lock, ShieldAlert, ArrowRight, AlertCircle, RefreshCcw } from 'lucide-react';
+import { Lock, ShieldAlert, ArrowRight, AlertCircle, RefreshCcw, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/context/AuthContext';
 
 interface OnboardingPasswordProps {
     onSuccess: () => void;
+    onDismiss?: () => void;
 }
 
-export function OnboardingPassword({ onSuccess }: OnboardingPasswordProps) {
+export function OnboardingPassword({ onSuccess, onDismiss }: OnboardingPasswordProps) {
     const { user } = useAuth();
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -81,6 +82,16 @@ export function OnboardingPassword({ onSuccess }: OnboardingPasswordProps) {
 
             <div className="max-w-md w-full bg-neutral-900 border border-neutral-800 rounded-3xl p-8 relative z-10 shadow-2xl">
                 
+                {onDismiss && (
+                    <button 
+                        onClick={onDismiss}
+                        className="absolute top-6 right-6 p-2 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-full transition-colors"
+                        type="button"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                )}
+
                 <div className="w-16 h-16 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center justify-center mb-6">
                     <ShieldAlert className="w-8 h-8 text-red-400" />
                 </div>
