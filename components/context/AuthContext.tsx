@@ -130,16 +130,19 @@ export function AuthProvider({ children, initialSession, initialRole, initialExp
     };
 
     const logout = async () => {
-        setIsLoading(true);
         try {
-            await Promise.race([clear(), new Promise(resolve => setTimeout(resolve, 1500))]);
+            await Promise.race([clear(), new Promise(resolve => setTimeout(resolve, 1000))]);
             console.log("[Auth] Local cache cleared.");
         } catch (e) {
             console.error("[Auth] Failed to clear local cache:", e);
         }
 
         try {
-            await supabase.auth.signOut();
+            // Previne que o logout trave caso a rede caia ou demore
+            await Promise.race([
+                supabase.auth.signOut(),
+                new Promise(resolve => setTimeout(resolve, 2000))
+            ]);
         } catch (e) {
             console.error("[Auth] SignOut error:", e);
         }
