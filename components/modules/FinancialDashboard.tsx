@@ -357,9 +357,29 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                             <ResponsiveContainer width="100%" height={300}>
                                 <BarChart data={isMultiStoreView ? storeData : dailyData}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                                    <XAxis dataKey={isMultiStoreView ? "name" : "date"} stroke="#666" fontSize={12} tickLine={false} axisLine={false} />
+                                    <XAxis 
+                                        dataKey={isMultiStoreView ? "name" : "date"} 
+                                        stroke="#666" 
+                                        fontSize={12} 
+                                        tickLine={false} 
+                                        axisLine={false} 
+                                        tickFormatter={(val) => {
+                                            if (isMultiStoreView || typeof val !== 'string' || !val.includes('-')) return val;
+                                            const [y, m, d] = val.split('-');
+                                            return `${d}/${m}/${y.substring(2)}`;
+                                        }}
+                                    />
                                     <YAxis stroke="#666" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `R$${value}`} />
-                                    <Tooltip contentStyle={{ backgroundColor: '#171717', border: '1px solid #333', borderRadius: '8px' }} itemStyle={{ color: '#10b981' }} formatter={(value: any) => [new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value)), 'Receita']} />
+                                    <Tooltip 
+                                        contentStyle={{ backgroundColor: '#171717', border: '1px solid #333', borderRadius: '8px' }} 
+                                        itemStyle={{ color: '#10b981' }} 
+                                        formatter={(value: any) => [new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value)), 'Receita']} 
+                                        labelFormatter={(label) => {
+                                            if (isMultiStoreView || typeof label !== 'string' || !label.includes('-')) return label;
+                                            const [y, m, d] = label.split('-');
+                                            return `${d}/${m}/${y.substring(2)}`;
+                                        }}
+                                    />
                                     <Bar dataKey={isMultiStoreView ? "totalRevenue" : "value"} fill="#10b981" radius={[4, 4, 0, 0] as [number, number, number, number]} />
                                 </BarChart>
                             </ResponsiveContainer>
