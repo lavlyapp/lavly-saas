@@ -47,20 +47,20 @@ export function OnboardingPassword({ onSuccess }: OnboardingPasswordProps) {
 
         try {
             // Promise.race to prevent infinite network hang
-            const updatePromise = supabase.auth.updateUser({
-                password: password,
-                data: { force_password_change: null }
-            });
+            const updatePromise = fetch('/api/auth/set-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
+            }).then(res => res.json());
 
-            const timeoutPromise = new Promise<{error: {message: string}}>((_, reject) => {
+            const timeoutPromise = new Promise<{error: string}>((_, reject) => {
                 setTimeout(() => reject(new Error('Timeout na comunicação com o servidor. Verifique sua internet.')), 10000);
             });
 
             const response = await Promise.race([updatePromise, timeoutPromise]) as any;
-            const updateError = response?.error;
 
-            if (updateError) {
-                setError(updateError.message);
+            if (!response.success) {
+                setError(response.error || 'Erro ao atualizar a senha.');
             } else {
                 // Força a atualização da sessão local antes de chamar o sucesso
                 await supabase.auth.refreshSession();
