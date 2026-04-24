@@ -345,12 +345,12 @@ function AppContent({
 
   // Password Change Onboarding - Highest Priority
   if (user?.user_metadata?.force_password_change) {
-    return <OnboardingPassword onSuccess={() => window.location.reload()} />;
+    return <OnboardingPassword onSuccess={() => window.location.assign('/dashboard')} />;
   }
 
   // VMPay Onboarding Block - Strict Enforcement
   if (role && role !== 'admin' && !vmpayApiKey) {
-    return <OnboardingVMPay onSuccess={() => window.location.reload()} />;
+    return <OnboardingVMPay onSuccess={() => window.location.assign('/dashboard')} />;
   }
 
   return (

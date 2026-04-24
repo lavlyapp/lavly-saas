@@ -46,19 +46,29 @@ export function OnboardingPassword({ onSuccess }: OnboardingPasswordProps) {
         setLoading(true);
 
         try {
-            // Update the password and clear the 'force_password_change' flag simultaneously
-            const { error: updateError } = await supabase.auth.updateUser({
+            // Promise.race to prevent infinite network hang
+            const updatePromise = supabase.auth.updateUser({
                 password: password,
-                data: { force_password_change: null } // Setting to null removes the flag
+                data: { force_password_change: null }
             });
+
+            const timeoutPromise = new Promise<{error: {message: string}}>((_, reject) => {
+                setTimeout(() => reject(new Error('Timeout na comunicação com o servidor. Verifique sua internet.')), 10000);
+            });
+
+            const response = await Promise.race([updatePromise, timeoutPromise]) as any;
+            const updateError = response?.error;
 
             if (updateError) {
                 setError(updateError.message);
             } else {
+                // Força a atualização da sessão local antes de chamar o sucesso
+                await supabase.auth.refreshSession();
                 onSuccess();
             }
         } catch (err: any) {
-            setError('Problema de conexão com o servidor. Tente novamente mais tarde.');
+            console.error("Password update error:", err);
+            setError(err.message || 'Problema de conexão com o servidor. Tente novamente mais tarde.');
         } finally {
             setLoading(false);
         }
