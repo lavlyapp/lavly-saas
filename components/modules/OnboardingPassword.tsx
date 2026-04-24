@@ -63,8 +63,6 @@ export function OnboardingPassword({ onSuccess, onDismiss }: OnboardingPasswordP
             if (!response.success) {
                 setError(response.error || 'Erro ao atualizar a senha.');
             } else {
-                // Força a atualização da sessão local antes de chamar o sucesso
-                await supabase.auth.refreshSession();
                 onSuccess();
             }
         } catch (err: any) {
