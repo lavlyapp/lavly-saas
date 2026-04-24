@@ -195,6 +195,7 @@ function AppContent({
   // UI States that must be defined before early returns
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [skipPassword, setSkipPassword] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -636,7 +637,6 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
   const [storeOwners, setStoreOwners] = useState<Record<string, string>>({});
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [skipPassword, setSkipPassword] = useState(false);
   const stores = useMemo(() => {
     const dataStores = Array.from(new Set(allRecords.map(r => getCanonicalStoreName(r.loja))));
     const combined = Array.from(new Set([...dbStores, ...dataStores])).filter(Boolean).sort();
