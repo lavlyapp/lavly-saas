@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
     try {
         const cookieStore = await cookies();
-        const supabase = createServerClient(
+        const supabaseService = createServerClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.SUPABASE_SERVICE_ROLE_KEY!,
             {
@@ -17,20 +17,30 @@ export async function GET() {
                 }
             }
         );
+
+        const supabaseAuth = createServerClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+                cookies: {
+                    get(name: string) { return cookieStore.get(name)?.value; }
+                }
+            }
+        );
         
-        const activeStores = await getVMPayCredentials(supabase);
+        const activeStores = await getVMPayCredentials(supabaseService);
 
         // Fetch profiles to map owners for admin
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user } } = await supabaseAuth.auth.getUser();
         let isAdmin = false;
         if (user) {
-            const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+            const { data: profile } = await supabaseService.from('profiles').select('role').eq('id', user.id).single();
             if (profile && profile.role === 'admin') isAdmin = true;
         }
 
         let storeOwnerMap: Record<string, string> = {};
         if (isAdmin) {
-            const { data: allProfiles } = await supabase.from('profiles').select('admin_alias, email, assigned_stores');
+            const { data: allProfiles } = await supabaseService.from('profiles').select('admin_alias, email, assigned_stores');
             if (allProfiles) {
                 for (const p of allProfiles) {
                     const ownerName = p.admin_alias || p.email || 'Desconhecido';
