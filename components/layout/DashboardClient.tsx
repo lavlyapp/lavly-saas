@@ -144,6 +144,7 @@ interface AppContentProps {
   allCustomers: CustomerRecord[];
   data: any;
   stores: string[];
+  storeOwners: Record<string, string>;
   allOrders: OrderRecord[];
   selectedStore: string | null;
   setSelectedStore: (store: string | null) => void;
@@ -167,6 +168,7 @@ function AppContent({
   allCustomers,
   data: viewData,
   stores,
+  storeOwners,
   allOrders,
   selectedStore,
   setSelectedStore,
@@ -317,7 +319,7 @@ function AppContent({
 
   // CRITICAL FIX: ALL Hooks MUST be called before ANY early returns! 
   // Placing useMemo below if (isLoading) return ... causes React Error 310!
-  const cachedContent = useMemo(() => renderContent(token), [activeTab, viewData, selectedStore, token]);
+  const cachedContent = useMemo(() => renderContent(token), [activeTab, viewData, selectedStore, token, storeOwners]);
 
   if (isLoading) {
     return (
@@ -405,6 +407,7 @@ function AppContent({
             <div className="w-full sm:w-auto shrink-0 z-50">
               <StoreSelector
                 stores={stores}
+                storeOwners={storeOwners}
                 selectedStore={selectedStore}
                 onSelectStore={setSelectedStore}
               />
@@ -627,6 +630,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
 
   // Filter States
   const [dbStores, setDbStores] = useState<string[]>([]);
+  const [storeOwners, setStoreOwners] = useState<Record<string, string>>({});
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const stores = useMemo(() => {
@@ -634,13 +638,6 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
     const combined = Array.from(new Set([...dbStores, ...dataStores])).filter(Boolean).sort();
     return combined;
   }, [allRecords, dbStores]);
-
-  // Hydration & Init Fix
-  useEffect(() => {
-    setMounted(true);
-    console.log("[DashboardClient] ✅ Component mounted and hydrated.");
-    setLogs(prev => [...prev, "[System] Processando interface..."]);
-  }, []);
 
   // Hydration & Init Fix
   useEffect(() => {
@@ -729,8 +726,14 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       const activeStores = dataStores.stores || [];
       const configuredNames = activeStores.map((s: any) => getCanonicalStoreName(s.name));
 
+      const newOwnersMap: Record<string, string> = {};
+      activeStores.forEach((s: any) => {
+          if (s.owner) newOwnersMap[getCanonicalStoreName(s.name)] = s.owner;
+      });
+
       startTransition(() => {
         setDbStores(configuredNames);
+        setStoreOwners(newOwnersMap);
       });
 
       // Check if any of these active stores are missing a CNPJ

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getVMPayCredentials } from '@/lib/vmpay-config';
+import { getVMPayCredentials, getCanonicalStoreName } from '@/lib/vmpay-config';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
@@ -19,8 +19,38 @@ export async function GET() {
         );
         
         const activeStores = await getVMPayCredentials(supabase);
+
+        // Fetch profiles to map owners for admin
+        const { data: { user } } = await supabase.auth.getUser();
+        let isAdmin = false;
+        if (user) {
+            const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+            if (profile && profile.role === 'admin') isAdmin = true;
+        }
+
+        let storeOwnerMap: Record<string, string> = {};
+        if (isAdmin) {
+            const { data: allProfiles } = await supabase.from('profiles').select('admin_alias, email, assigned_stores');
+            if (allProfiles) {
+                for (const p of allProfiles) {
+                    const ownerName = p.admin_alias || p.email || 'Desconhecido';
+                    if (p.assigned_stores && Array.isArray(p.assigned_stores)) {
+                        for (const sName of p.assigned_stores) {
+                            if (typeof sName === 'string') {
+                                storeOwnerMap[getCanonicalStoreName(sName)] = ownerName;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Only return safe metadata to the frontend
-        const safeStores = activeStores.map(s => ({ name: s.name, cnpj: s.cnpj }));
+        const safeStores = activeStores.map(s => ({ 
+            name: s.name, 
+            cnpj: s.cnpj,
+            owner: isAdmin ? (storeOwnerMap[getCanonicalStoreName(s.name)] || 'Outros') : undefined
+        }));
         
         return NextResponse.json({ success: true, stores: safeStores });
     } catch (e: any) {
