@@ -29,10 +29,14 @@ async function fetchMachines(apiKey: string): Promise<EquipmentMap> {
             if (!Array.isArray(data) || data.length === 0) break;
 
             data.forEach((m: any) => {
-                map[String(m.id)] = {
+                const mappedObj = {
                     name: m.nome,
                     type: (m.tipo || '').toUpperCase()
                 };
+                map[String(m.id)] = mappedObj;
+                if (m.nome) {
+                    map[String(m.nome).trim()] = mappedObj;
+                }
             });
 
             if (data.length < size) break;
@@ -134,9 +138,11 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                         // Determine product type (wash/dry)
                         let produto = item?.tipoServico?.toUpperCase() || "LAVAGEM";
 
-                        // Strict override if the hardware is definitively a dryer
+                        // Strict override if the hardware is definitively a dryer or washer
                         if (mappedObj?.type === "SECAGEM") {
                             produto = "SECAGEM";
+                        } else if (mappedObj?.type === "LAVAGEM") {
+                            produto = "LAVAGEM";
                         } else if (produto === "LAVAGEM" && String(mappedMachineName).toLowerCase().includes("secadora")) {
                             produto = "SECAGEM";
                         }
@@ -160,6 +166,8 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                                 // Strict hardware type check
                                 if (iMapObj?.type === "SECAGEM") {
                                     iService = "SECAGEM";
+                                } else if (iMapObj?.type === "LAVAGEM") {
+                                    iService = "LAVAGEM";
                                 } else if (String(iName).toLowerCase().includes("secadora") && iService === "LAVAGEM") {
                                     iService = "SECAGEM";
                                 }

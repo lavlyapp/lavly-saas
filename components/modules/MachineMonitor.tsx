@@ -62,8 +62,8 @@ export function MachineMonitor({ allRecords, allOrders, selectedStore }: Machine
         return () => { isMounted = false; };
     }, [selectedStore, refreshKey]);
 
-    // Cloud-native priority: apiOrders
-    const rawTargetArray = apiOrders.length > 0 ? apiOrders : (allOrders && allOrders.length > 0 ? allOrders : (allRecords || []));
+    // Cloud-native priority: Combine current API orders with historical records to prevent dropping machines that haven't been used in the last 48h
+    const rawTargetArray = [...apiOrders, ...(allOrders || []), ...(allRecords || [])];
     if (isLoading && rawTargetArray.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center p-8 mt-6 bg-neutral-900/50 rounded-xl border border-neutral-800">
@@ -171,7 +171,12 @@ export function MachineMonitor({ allRecords, allOrders, selectedStore }: Machine
             const storeLower = store.toLowerCase();
 
             let type: 'washer' | 'dryer';
-            if (storeLower.includes('lavateria') && !isNaN(machineNum)) {
+            const explicitService = productOrService.toUpperCase();
+            if (explicitService.includes('LAV')) {
+                type = 'washer';
+            } else if (explicitService.includes('SEC')) {
+                type = 'dryer';
+            } else if (storeLower.includes('lavateria') && !isNaN(machineNum)) {
                 type = machineNum % 2 === 0 ? 'washer' : 'dryer';
             } else {
                 type = duration > 40 ? 'dryer' : 'washer';
