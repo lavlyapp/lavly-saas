@@ -129,6 +129,19 @@ export async function syncVMPaySales(startDate: Date, endDate: Date, specificCre
                     console.log(`[VMPay Client] Page ${page} received ${data.length} records for ${cred.name}. (API Key: ${cred.apiKey.substring(0, 5)}...)`);
 
                     for (const sale of data) {
+                        // FIX: VMPay Cascavel Master Key Leak
+                        // A VMPay configurou a chave de Cascavel como Master Key, vazando máquinas de toda a rede.
+                        if (cred.apiKey === 'e8689749-58b1-4a3e-8f1c-11d1a5e2b42e') {
+                            const allowedCascavel = ['5900', '5901', '5902', '5903', '5904', '5905'];
+                            let isValid = false;
+                            const rootEq = String(sale.equipamento || "").trim();
+                            if (allowedCascavel.includes(rootEq)) isValid = true;
+                            for (const i of sale.pedido?.itens || []) {
+                                if (allowedCascavel.includes(String(i.maquina || "").trim())) isValid = true;
+                            }
+                            if (!isValid) continue; // Descarta sumariamente a venda vazada
+                        }
+
                         // Normalize
                         const item = sale.pedido?.itens?.[0];
                         const machineNameRaw = item?.maquina || sale.equipamento || "Desconhecido";

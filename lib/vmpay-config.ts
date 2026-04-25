@@ -25,6 +25,9 @@ export interface VMPayCredential {
     neighborhood?: string;
     city?: string;
     state?: string;
+    
+    // Lista restrita de máquinas reais da loja (útil se a VMPay vazar máquinas de outras lojas no mesmo token)
+    allowedMachines?: string[];
 }
 
 // Store Name Normalization Map
