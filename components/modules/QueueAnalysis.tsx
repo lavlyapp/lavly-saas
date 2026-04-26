@@ -36,9 +36,10 @@ export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
                 const res = await fetch(`/api/metrics/queue?store=${encodeURIComponent(selectedStore || 'Todas')}`, {
                     signal: controller.signal
                 });
-                clearTimeout(timeoutId);
                 
                 const json = await res.json();
+                clearTimeout(timeoutId);
+                
                 console.log("[QueueAnalysis] Resposta da API:", json.success ? "Sucesso" : "Falha");
                 
                 if (isMounted && json.success) {
