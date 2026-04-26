@@ -128,8 +128,8 @@ export function MachineMonitor({ allRecords, allOrders, selectedStore }: Machine
             'Lavateria JOQUEI': ['6360', '6361', '6362', '6363', '6364', '6365'],
             'Lavateria SHOPPING SOLARES': ['5042', '5043', '5044', '5045', '5046', '5047'],
             'Lavateria SHOPPING (Maracanau)': ['5928', '5929', '5930', '5931', '5932', '5933'],
-            'Lavateria SANTOS DUMONT': ['5120', '5121', '5122', '5123', '5124', '5125'],
-            'Lavateria JOSE WALTER': ['5130', '5131', '5132', '5133', '5134', '5135'] // Estimated ranges for 6 machines
+            'Lavateria SANTOS DUMONT': ['5120 LAV', '5121 SEC', '5122 LAV', '5123 SEC', '5124 LAV', '5125 SEC'],
+            'Lavateria JOSE WALTER': ['5800', '5801', '5802', '5803', '5804', '5805']
         };
 
         if (KNOWN_NETWORK[canonicalStore]) {
