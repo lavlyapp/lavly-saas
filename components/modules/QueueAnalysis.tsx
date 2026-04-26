@@ -43,7 +43,9 @@ export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
                 console.log("[QueueAnalysis] Resposta da API:", json.success ? "Sucesso" : "Falha");
                 
                 if (isMounted && json.success) {
-                    setPayload(json.payload);
+                    React.startTransition(() => {
+                        setPayload(json.payload);
+                    });
                 }
             } catch (err: any) {
                 console.error("[QueueAnalysis] Failed to load queue data", err);
@@ -51,7 +53,11 @@ export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
                     console.error("[QueueAnalysis] Request timed out after 15s");
                 }
             } finally {
-                if (isMounted) setIsLoading(false);
+                if (isMounted) {
+                    React.startTransition(() => {
+                        setIsLoading(false);
+                    });
+                }
             }
         };
         fetchQueue();
