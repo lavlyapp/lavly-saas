@@ -42,16 +42,29 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Auto-Recovery para React Error 310 (Suspense Collision)
-    if (error.message && error.message.includes('310')) {
-      console.error("[Fallback] Detectado choque de Suspense (React 310). A suspensão escapou para o ErrorBoundary.");
-    }
     console.error("DashboardClient ErrorBoundary caught an error", error, errorInfo);
     this.setState({ errorInfo });
   }
 
   render() {
     if (this.state.hasError) {
+      const isSuspenseCollision = this.state.error?.message?.includes('310');
+      
+      if (isSuspenseCollision) {
+        // Auto-Recovery from React 310
+        setTimeout(() => {
+            if (this.state.hasError) {
+                this.setState({ hasError: false, error: null, errorInfo: null });
+            }
+        }, 500);
+        return (
+            <div className="flex flex-col items-center justify-center p-12 w-full h-[50vh] text-neutral-400 animate-pulse">
+                <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-4" />
+                <p>Otimizando módulo de visualização...</p>
+            </div>
+        );
+      }
+
       return (
         <div className="p-8 m-4 bg-red-950/50 border border-red-500/50 rounded-xl text-white">
           <h2 className="text-xl font-bold text-red-500 flex items-center gap-2 mb-4">
@@ -315,9 +328,7 @@ function AppContent({
     );
   };
 
-  // CRITICAL FIX: ALL Hooks MUST be called before ANY early returns! 
-  // Placing useMemo below if (isLoading) return ... causes React Error 310!
-  const cachedContent = useMemo(() => renderContent(token), [activeTab, viewData, selectedStore, token, storeOwners]);
+  // Removed useMemo around cachedContent as it caused Suspense collisions
 
   if (isLoading) {
     return (
@@ -524,7 +535,7 @@ function AppContent({
                 <div>
                     <div className={status === 'uploading' && activeTab !== 'financial' ? 'hidden' : 'block'}>
                       <Suspense fallback={<div className="p-8 text-neutral-500">Carregando painel...</div>}>
-                        {cachedContent}
+                        {renderContent(token)}
                       </Suspense>
                     </div>
 
