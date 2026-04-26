@@ -461,7 +461,7 @@ function AppContent({
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-neutral-800 hover:bg-neutral-700 text-white shadow-lg transition-all"
             >
               <RefreshCw className={cn("w-4 h-4", status === 'uploading' && "animate-spin")} />
-              <span>Atualizar (v31.2)</span>
+              <span>Atualizar (v31.3)</span>
             </button>
 
             <div className="relative group">
