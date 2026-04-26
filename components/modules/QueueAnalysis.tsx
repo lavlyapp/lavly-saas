@@ -36,9 +36,11 @@ export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
 
                 const fetchPromise = fetch(`/api/metrics/queue?store=${encodeURIComponent(selectedStore || 'Todas')}`);
                 const res = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+                setDebugState("fetch_resolved");
                 
                 const jsonPromise = res.json();
                 const json = await Promise.race([jsonPromise, timeoutPromise]) as any;
+                setDebugState("json_parsed");
                 
                 console.log("[QueueAnalysis] Resposta da API:", json.success ? "Sucesso" : "Falha");
                 
@@ -48,11 +50,13 @@ export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
                     });
                 }
             } catch (err: any) {
+                setDebugState(`error: ${err.message || err.name || 'unknown'}`);
                 console.error("[QueueAnalysis] Failed to load queue data", err);
                 if (err.name === 'AbortError') {
                     console.error("[QueueAnalysis] Request timed out after 15s");
                 }
             } finally {
+                setDebugState(prev => prev + " -> finally");
                 if (isMounted) {
                     React.startTransition(() => {
                         setIsLoading(false);
@@ -66,7 +70,10 @@ export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
 
     if (isLoading) {
         return (
-            <div className="space-y-6 animate-in fade-in">
+            <div className="space-y-6 animate-in fade-in relative">
+                <div className="absolute top-2 right-2 px-2 py-1 bg-black/50 text-white font-mono text-[10px] rounded z-50">
+                    DEBUG: {debugState}
+                </div>
                 <div className="h-24 w-full bg-indigo-900/20 border border-indigo-500/20 rounded-2xl animate-pulse"></div>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-2 space-y-6">
