@@ -30,15 +30,15 @@ export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
             console.log("[QueueAnalysis] Iniciando fetchQueue para loja:", selectedStore || 'Todas');
             setIsLoading(true);
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
-                
-                const res = await fetch(`/api/metrics/queue?store=${encodeURIComponent(selectedStore || 'Todas')}`, {
-                    signal: controller.signal
+                const timeoutPromise = new Promise<never>((_, reject) => {
+                    setTimeout(() => reject(new Error('FetchTimeoutError')), 15000);
                 });
+
+                const fetchPromise = fetch(`/api/metrics/queue?store=${encodeURIComponent(selectedStore || 'Todas')}`);
+                const res = await Promise.race([fetchPromise, timeoutPromise]) as Response;
                 
-                const json = await res.json();
-                clearTimeout(timeoutId);
+                const jsonPromise = res.json();
+                const json = await Promise.race([jsonPromise, timeoutPromise]) as any;
                 
                 console.log("[QueueAnalysis] Resposta da API:", json.success ? "Sucesso" : "Falha");
                 
