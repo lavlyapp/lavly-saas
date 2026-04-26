@@ -104,10 +104,7 @@ const Reports = dynamic<any>(
   { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
 );
 
-const QueueAnalysis = dynamic(
-  () => import('@/components/modules/QueueAnalysis').then(mod => mod.QueueAnalysis),
-  { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
-);
+import { QueueAnalysis } from '@/components/modules/QueueAnalysis';
 
 const CouponManager = dynamic(
   () => import('@/components/modules/CouponManager').then(mod => mod.CouponManager),
