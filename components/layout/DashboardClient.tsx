@@ -526,7 +526,9 @@ function AppContent({
               <ErrorBoundary>
                 <div>
                     <div className={status === 'uploading' && activeTab !== 'financial' ? 'hidden' : 'block'}>
-                      {cachedContent}
+                      <Suspense fallback={<div className="p-8 text-neutral-500">Carregando painel...</div>}>
+                        {cachedContent}
+                      </Suspense>
                     </div>
 
                     {status === 'uploading' && activeTab !== 'financial' && (
