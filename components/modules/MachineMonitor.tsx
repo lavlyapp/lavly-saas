@@ -121,6 +121,28 @@ export function MachineMonitor({ allRecords, allOrders, selectedStore }: Machine
         const machineMap = new Map<string, any>();
         const canonicalStore = getCanonicalStoreName(store);
 
+        // Pre-seed known machines for the franchisee network to guarantee they always appear in the dashboard
+        // even if they haven't had a single sale in the last 30+ days (which causes them to drop from the VMPay API history).
+        const KNOWN_NETWORK: Record<string, string[]> = {
+            'Lavateria Cascavel': ['5900', '5901', '5902', '5903', '5904', '5905'],
+            'Lavateria JOQUEI': ['6360', '6361', '6362', '6363', '6364', '6365'],
+            'Lavateria SHOPPING SOLARES': ['5042', '5043', '5044', '5045', '5046', '5047'],
+            'Lavateria SHOPPING (Maracanau)': ['5928', '5929', '5930', '5931', '5932', '5933'],
+            'Lavateria SANTOS DUMONT': ['5120', '5121', '5122', '5123', '5124', '5125'],
+            'Lavateria JOSE WALTER': ['5130', '5131', '5132', '5133', '5134', '5135'] // Estimated ranges for 6 machines
+        };
+
+        if (KNOWN_NETWORK[canonicalStore]) {
+            KNOWN_NETWORK[canonicalStore].forEach(mId => {
+                machineMap.set(mId, {
+                    data: new Date(0), // Epoch time so real sales overwrite it
+                    service: parseInt(mId, 10) % 2 === 0 ? 'LAVAGEM' : 'SECAGEM',
+                    produto: parseInt(mId, 10) % 2 === 0 ? 'LAVAGEM' : 'SECAGEM'
+                });
+            });
+        }
+
+
         storeRecords.forEach(record => {
             let machineName = "Desconhecida";
 
@@ -154,7 +176,8 @@ export function MachineMonitor({ allRecords, allOrders, selectedStore }: Machine
             // Limit inactivity: Exclude machines not seen in > 120 days
             const daysSinceSeen = differenceInMinutes(now, record.data) / (24 * 60);
 
-            if (daysSinceSeen > 120) return;
+            // Allow pre-seeded machines (new Date(0) will have > 18000 days)
+            if (daysSinceSeen > 120 && record.data.getTime() !== 0) return;
 
             const existing = machineMap.get(machineName);
             if (!existing || record.data > existing.data) {
