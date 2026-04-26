@@ -27,15 +27,28 @@ export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
     React.useEffect(() => {
         let isMounted = true;
         const fetchQueue = async () => {
+            console.log("[QueueAnalysis] Iniciando fetchQueue para loja:", selectedStore || 'Todas');
             setIsLoading(true);
             try {
-                const res = await fetch(`/api/metrics/queue?store=${encodeURIComponent(selectedStore || 'Todas')}`);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+                
+                const res = await fetch(`/api/metrics/queue?store=${encodeURIComponent(selectedStore || 'Todas')}`, {
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                
                 const json = await res.json();
+                console.log("[QueueAnalysis] Resposta da API:", json.success ? "Sucesso" : "Falha");
+                
                 if (isMounted && json.success) {
                     setPayload(json.payload);
                 }
-            } catch (err) {
-                console.error("Failed to load queue data", err);
+            } catch (err: any) {
+                console.error("[QueueAnalysis] Failed to load queue data", err);
+                if (err.name === 'AbortError') {
+                    console.error("[QueueAnalysis] Request timed out after 15s");
+                }
             } finally {
                 if (isMounted) setIsLoading(false);
             }

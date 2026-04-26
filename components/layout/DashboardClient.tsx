@@ -234,14 +234,16 @@ function AppContent({
   }, [mounted, isAuthenticated]);
 
   // --- Auto-Sync Background Routine ---
+  const hasAutoSynced = useRef(false);
   useEffect(() => {
-    if (mounted && isAuthenticated && token) {
+    if (mounted && isAuthenticated && token && !hasAutoSynced.current) {
       const autoSyncTimeout = setTimeout(() => {
-        handleSyncVMPay(token, true); // Silent background auto-sync
+        hasAutoSynced.current = true;
+        handleSyncVMPay(token, true); // Silent background auto-sync exactly once
       }, 5000); // 5 seconds after initial load
       return () => clearTimeout(autoSyncTimeout);
     }
-  }, [mounted, isAuthenticated, token, handleSyncVMPay]);
+  }, [mounted, isAuthenticated, token]);
 
   // Derive profile on the fly when selected (Global Modal Logic)
   const selectedProfile = useMemo(() => {
@@ -715,14 +717,16 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
 
   const isInitializing = useRef(false);
 
-  const reloadAllData = async (reason: string = "Inicial", authToken: string | null = null, forceFullSync: boolean = false) => {
+  const reloadAllData = async (reason: string = "Inicial", authToken: string | null = null, forceFullSync: boolean = false, isSilent: boolean = false) => {
     if (isInitializing.current) return;
     isInitializing.current = true;
 
     console.log(`[Home] Reloading all data (Reason: ${reason})...`);
-    startTransition(() => {
-      setStatus("uploading");
-    });
+    if (!isSilent) {
+        startTransition(() => {
+          setStatus("uploading");
+        });
+    }
 
     try {
       // 1. Create Authenticated Client
@@ -867,7 +871,9 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       // Customers are no longer fetched into browser RAM to prevent 5-10s UI freezing during Sincronizar.
       startTransition(() => {
         setAllCustomers([]);
-        setStatus("success");
+        if (!isSilent) {
+            setStatus("success");
+        }
         setLogs(prev => [...prev, `[System] Cliente UI inicializado. Delegando cálculos para a Borda AWS.`]);
       });
       isInitializing.current = false;
@@ -1344,7 +1350,7 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       pushLog(`[Sistema] Atualizando painel...`);
 
       try {
-        await reloadAllData("Sincronismo", token);
+        await reloadAllData("Sincronismo", token, false, isSilent);
         window.dispatchEvent(new CustomEvent('lavly-force-financial-update'));
       } catch (dbErr: any) {
         pushLog(`[Aviso] Falha ao recarregar a tela automaticamente: ${dbErr.message}`);
