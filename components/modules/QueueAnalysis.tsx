@@ -27,43 +27,51 @@ export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
 
     React.useEffect(() => {
         let isMounted = true;
-        const fetchQueue = async () => {
-            console.log("[QueueAnalysis] Iniciando fetchQueue para loja:", selectedStore || 'Todas');
-            setIsLoading(true);
-            try {
-                const timeoutPromise = new Promise<never>((_, reject) => {
-                    setTimeout(() => reject(new Error('FetchTimeoutError')), 15000);
-                });
+        const debugBox = document.getElementById('qa-debug-box');
+        const updateDebug = (msg: string) => {
+            setDebugState(msg);
+            if (debugBox) debugBox.innerText = `DEBUG: ${msg}`;
+        };
 
-                const fetchPromise = fetch(`/api/metrics/queue?store=${encodeURIComponent(selectedStore || 'Todas')}`);
-                const res = await Promise.race([fetchPromise, timeoutPromise]) as Response;
-                setDebugState("fetch_resolved");
-                
-                const jsonPromise = res.json();
-                const json = await Promise.race([jsonPromise, timeoutPromise]) as any;
-                setDebugState("json_parsed");
-                
-                console.log("[QueueAnalysis] Resposta da API:", json.success ? "Sucesso" : "Falha");
-                
-                if (isMounted && json.success) {
-                    React.startTransition(() => {
-                        setPayload(json.payload);
-                    });
+        const fetchQueue = () => {
+            console.log("[QueueAnalysis] Iniciando XHR para loja:", selectedStore || 'Todas');
+            updateDebug("xhr_started");
+            setIsLoading(true);
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', `/api/metrics/queue?store=${encodeURIComponent(selectedStore || 'Todas')}`, true);
+            xhr.timeout = 15000;
+
+            xhr.onload = () => {
+                updateDebug(`xhr_loaded_${xhr.status}`);
+                if (xhr.status === 200 && isMounted) {
+                    try {
+                        const json = JSON.parse(xhr.responseText);
+                        if (json.success) {
+                            React.startTransition(() => {
+                                setPayload(json.payload);
+                            });
+                        }
+                    } catch (e) {
+                        updateDebug("json_parse_error");
+                    }
                 }
-            } catch (err: any) {
-                setDebugState(`error: ${err.message || err.name || 'unknown'}`);
-                console.error("[QueueAnalysis] Failed to load queue data", err);
-                if (err.name === 'AbortError') {
-                    console.error("[QueueAnalysis] Request timed out after 15s");
-                }
-            } finally {
-                setDebugState(prev => prev + " -> finally");
                 if (isMounted) {
-                    React.startTransition(() => {
-                        setIsLoading(false);
-                    });
+                    React.startTransition(() => setIsLoading(false));
                 }
-            }
+            };
+
+            xhr.onerror = () => {
+                updateDebug("xhr_error");
+                if (isMounted) React.startTransition(() => setIsLoading(false));
+            };
+
+            xhr.ontimeout = () => {
+                updateDebug("xhr_timeout");
+                if (isMounted) React.startTransition(() => setIsLoading(false));
+            };
+
+            xhr.send();
         };
         fetchQueue();
         return () => { isMounted = false; };
@@ -72,7 +80,7 @@ export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
     if (isLoading) {
         return (
             <div className="space-y-6 animate-in fade-in relative">
-                <div className="absolute top-2 right-2 px-2 py-1 bg-black/50 text-white font-mono text-[10px] rounded z-50">
+                <div id="qa-debug-box" className="absolute top-2 right-2 px-2 py-1 bg-black/50 text-white font-mono text-[10px] rounded z-50">
                     DEBUG: {debugState}
                 </div>
                 <div className="h-24 w-full bg-indigo-900/20 border border-indigo-500/20 rounded-2xl animate-pulse"></div>
