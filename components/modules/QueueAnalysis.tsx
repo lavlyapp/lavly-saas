@@ -23,6 +23,7 @@ export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
     const [selectedHour, setSelectedHour] = useState<{ day: number, hour: number } | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [payload, setPayload] = useState<any>(null);
+    const [debugState, setDebugState] = useState("init");
 
     React.useEffect(() => {
         let isMounted = true;
