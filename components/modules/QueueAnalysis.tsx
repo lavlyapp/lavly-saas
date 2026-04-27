@@ -19,6 +19,21 @@ interface QueueAnalysisProps {
 const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
+class LocalErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: any }> {
+    constructor(props: any) { super(props); this.state = { error: null }; }
+    static getDerivedStateFromError(error: any) { return { error }; }
+    render() {
+        if (this.state.error) {
+            return <div className="p-8 bg-red-900/50 text-white rounded-xl border border-red-500 font-mono text-xs whitespace-pre-wrap overflow-auto">
+                <h2 className="text-xl font-bold mb-4">FATAL RENDER ERROR IN QUEUE ANALYSIS</h2>
+                {this.state.error.message}<br/>
+                {this.state.error.stack}
+            </div>;
+        }
+        return this.props.children;
+    }
+}
+
 export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
     const [selectedHour, setSelectedHour] = useState<{ day: number, hour: number } | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -179,8 +194,9 @@ export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
     };
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500">
-            {/* Strategy Insight */}
+        <LocalErrorBoundary>
+            <div className="space-y-6 animate-in fade-in duration-500">
+                {/* Strategy Insight */}
             <div className="p-6 bg-gradient-to-r from-indigo-600/10 to-blue-600/10 border border-indigo-500/20 rounded-2xl">
                 <div className="flex items-start gap-4">
                     <div className="p-3 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-500/20">
@@ -442,6 +458,7 @@ export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
                     </Card>
                 </div>
             </div>
-        </div>
+            </div>
+        </LocalErrorBoundary>
     );
 }
