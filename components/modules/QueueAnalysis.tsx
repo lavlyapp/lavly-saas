@@ -74,7 +74,20 @@ export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
             xhr.send();
         };
         fetchQueue();
-        return () => { isMounted = false; };
+        
+        let counter = 0;
+        const interval = setInterval(() => {
+            counter++;
+            const dbg = document.getElementById('qa-debug-box');
+            if (dbg && dbg.innerText.includes('xhr_started')) {
+                dbg.innerText = `DEBUG: xhr_started (${counter}s)`;
+            }
+        }, 1000);
+
+        return () => { 
+            isMounted = false; 
+            clearInterval(interval);
+        };
     }, [selectedStore]);
 
     if (isLoading) {
