@@ -84,11 +84,14 @@ export function AuthProvider({ children, initialSession, initialRole, initialExp
 
             if (event === 'SIGNED_IN' && currentUser) {
                 // Log login action
-                supabase.from('audit_logs').insert([{
+                supabase.from('activity_logs').insert([{
                     user_id: currentUser.id,
-                    user_email: currentUser.email,
                     action: 'LOGIN',
-                    details: { timestamp: new Date().toISOString() }
+                    details: { 
+                        timestamp: new Date().toISOString(),
+                        user_email: currentUser.email,
+                        domain: 'www.teste.lavly.com.br' // Replaced www.lavly.com.br with www.teste.lavly.com.br as requested
+                    }
                 }]).then(({ error }) => {
                     if (error) console.error("Login audit log error:", error);
                 });

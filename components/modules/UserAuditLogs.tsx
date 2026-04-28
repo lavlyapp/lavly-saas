@@ -21,7 +21,7 @@ export function UserAuditLogs() {
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('audit_logs')
+        .from('activity_logs')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(100);
@@ -104,14 +104,14 @@ export function UserAuditLogs() {
                     <td className="py-4 px-6 whitespace-nowrap">
                       <div className="flex items-center gap-2 text-sm font-medium text-white">
                         <User className="w-4 h-4 text-indigo-400" />
-                        {log.user_email || 'Desconhecido'}
+                        {log.details?.user_email || log.user_id || 'Sistema'}
                       </div>
                     </td>
                     <td className="py-4 px-6 whitespace-nowrap">
                       {formatAction(log.action)}
                     </td>
                     <td className="py-4 px-6 text-sm text-neutral-500 max-w-[200px] truncate">
-                      {JSON.stringify(log.details)}
+                      {log.details?.domain ? `Ambiente: ${log.details.domain}` : 'Log padrão'}
                     </td>
                   </tr>
                 ))}
