@@ -30,7 +30,8 @@ export async function GET(request: Request) {
         let dataQuery = supabase.from('sales')
             .select('id, data, loja, cliente, telefone, items, valor, produto')
             .gte('data', thirtyDaysAgo.toISOString())
-            .order('data', { ascending: false });
+            .order('data', { ascending: false })
+            .limit(6000);
             
         if (store !== 'Todas') dataQuery = dataQuery.eq('loja', store);
         
