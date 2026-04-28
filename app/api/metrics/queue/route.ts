@@ -75,7 +75,7 @@ export async function GET(request: Request) {
 
         return NextResponse.json({
              success: true, 
-             payload: { metrics, flexibleCustomers, visitsHeatmap }
+             payload: { metrics, flexibleCustomers, visitsHeatmap, debugRecords: parsedRecords.slice(0, 3) }
         });
 
     } catch (e: any) {
