@@ -34,72 +34,6 @@ class LocalErrorBoundary extends React.Component<{ children: React.ReactNode }, 
     }
 }
 
-export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
-// Removed selectedHour hook from parent QueueAnalysis to avoid hook mismatches
-// It has been moved into QueueAnalysisContent
-        let isMounted = true;
-        const debugBox = document.getElementById('qa-debug-box');
-        const updateDebug = (msg: string) => {
-            setDebugState(msg);
-            if (debugBox) debugBox.innerText = `DEBUG: ${msg}`;
-        };
-
-        const fetchQueue = () => {
-            console.log("[QueueAnalysis] Iniciando XHR para loja:", selectedStore || 'Todas');
-            updateDebug("xhr_started");
-            setIsLoading(true);
-
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', `/api/metrics/queue?store=${encodeURIComponent(selectedStore || 'Todas')}`, true);
-            xhr.timeout = 15000;
-
-            xhr.onload = () => {
-                updateDebug(`xhr_loaded_${xhr.status}`);
-                if (xhr.status === 200 && isMounted) {
-                    try {
-                        const json = JSON.parse(xhr.responseText);
-                        if (json.success) {
-                            React.startTransition(() => {
-                                setPayload(json.payload);
-                            });
-                        }
-                    } catch (e) {
-                        updateDebug("json_parse_error");
-                    }
-                }
-                if (isMounted) {
-                    React.startTransition(() => setIsLoading(false));
-                }
-            };
-
-            xhr.onerror = () => {
-                updateDebug("xhr_error");
-                if (isMounted) React.startTransition(() => setIsLoading(false));
-            };
-
-            xhr.ontimeout = () => {
-                updateDebug("xhr_timeout");
-                if (isMounted) React.startTransition(() => setIsLoading(false));
-            };
-
-            xhr.send();
-        };
-        fetchQueue();
-        
-        let counter = 0;
-        const interval = setInterval(() => {
-            counter++;
-            const dbg = document.getElementById('qa-debug-box');
-            if (dbg && dbg.innerText.includes('xhr_started')) {
-                dbg.innerText = `DEBUG: xhr_started (${counter}s)`;
-            }
-        }, 1000);
-
-        return () => { 
-            isMounted = false; 
-            clearInterval(interval);
-        };
-    }, [selectedStore]);
 
 function QueueAnalysisSkeleton({ debugState }: { debugState: string }) {
     return (
@@ -158,8 +92,8 @@ function QueueAnalysisContent({ payload }: { payload: any }) {
 
     const moveDemandROI = useMemo(() => {
         const totalPeakCyclesMonth = metrics.saturationByHour
-            .filter(s => s.saturation > 0.6)
-            .reduce((acc, s) => acc + (s.count * 4), 0);
+            .filter((s: any) => s.saturation > 0.6)
+            .reduce((acc: number, s: any) => acc + (s.count * 4), 0);
 
         const avgTicket = metrics.expansionROI?.avgTicket || 35;
         return (totalPeakCyclesMonth * 0.15) * avgTicket;
@@ -327,7 +261,7 @@ function QueueAnalysisContent({ payload }: { payload: any }) {
                                         <Info className="w-3 h-3" /> Como este cálculo é feito?
                                     </h4>
                                     <ul className="text-[11px] space-y-2 text-neutral-400">
-                                        <li>• <b>Demanda Reprimida:</b> Analisamos {metrics.saturationByHour.filter(s => s.saturation > 0.75).length} horários onde a saturação foi superior a 75%.</li>
+                                        <li>• <b>Demanda Reprimida:</b> Analisamos {metrics.saturationByHour.filter((s: any) => s.saturation > 0.75).length} horários onde a saturação foi superior a 75%.</li>
                                         <li>• <b>Ciclos Capturados:</b> Estimamos que {metrics.expansionROI?.capturedCyclesPerMonth || 0} ciclos que foram perdidos por falta de máquina seriam absorvidos.</li>
                                         <li>• <b>Conversão:</b> Baseado no seu ticket médio de {(metrics.expansionROI?.avgTicket || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}.</li>
                                     </ul>
@@ -357,7 +291,7 @@ function QueueAnalysisContent({ payload }: { payload: any }) {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {flexibleCustomers.map(c => (
+                                    {flexibleCustomers.map((c: any) => (
                                         <TableRow key={c.name}>
                                             <TableCell>
                                                 <p className="font-medium text-white">{c.name}</p>

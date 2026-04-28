@@ -245,7 +245,7 @@ export function Reports({ selectedStore }: ReportsProps) {
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
-                                        {opportunities?.onlyWash.map(c => (
+                                        {opportunities?.onlyWash.map((c: any) => (
                                             <div key={c.name} className="flex justify-between items-center p-3 bg-neutral-900 rounded-lg border border-neutral-800">
                                                 <div>
                                                     <button
