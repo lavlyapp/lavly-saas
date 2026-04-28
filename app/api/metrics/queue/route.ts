@@ -28,7 +28,7 @@ export async function GET(request: Request) {
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
         let dataQuery = supabase.from('sales')
-            .select('id, data, loja, cliente, telefone, items, valor, produto')
+            .select('id, data, loja, cliente, telefone, valor, produto, orders(machine, service)')
             .gte('data', thirtyDaysAgo.toISOString())
             .order('data', { ascending: false })
             .limit(6000);
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
         const parsedRecords = records.map(r => ({
             ...r,
             data: new Date(r.data),
-            items: typeof r.items === 'string' ? JSON.parse(r.items) : (r.items || [])
+            items: r.orders || []
         }));
 
         // Processing
