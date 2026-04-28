@@ -35,12 +35,8 @@ class LocalErrorBoundary extends React.Component<{ children: React.ReactNode }, 
 }
 
 export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
-    const [selectedHour, setSelectedHour] = useState<{ day: number, hour: number } | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [payload, setPayload] = useState<any>(null);
-    const [debugState, setDebugState] = useState("init");
-
-    React.useEffect(() => {
+// Removed selectedHour hook from parent QueueAnalysis to avoid hook mismatches
+// It has been moved into QueueAnalysisContent
         let isMounted = true;
         const debugBox = document.getElementById('qa-debug-box');
         const updateDebug = (msg: string) => {
@@ -105,36 +101,29 @@ export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
         };
     }, [selectedStore]);
 
-    if (isLoading) {
-        return (
-            <div className="space-y-6 animate-in fade-in relative">
-                <div id="qa-debug-box" className="absolute top-2 right-2 px-2 py-1 bg-black/50 text-white font-mono text-[10px] rounded z-50">
-                    DEBUG: {debugState}
+function QueueAnalysisSkeleton({ debugState }: { debugState: string }) {
+    return (
+        <div className="space-y-6 animate-in fade-in relative">
+            <div id="qa-debug-box" className="absolute top-2 right-2 px-2 py-1 bg-black/50 text-white font-mono text-[10px] rounded z-50">
+                DEBUG: {debugState}
+            </div>
+            <div className="h-24 w-full bg-indigo-900/20 border border-indigo-500/20 rounded-2xl animate-pulse"></div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 space-y-6">
+                    <div className="h-64 bg-neutral-900/40 rounded-xl animate-pulse"></div>
+                    <div className="h-64 bg-neutral-900/40 rounded-xl animate-pulse"></div>
                 </div>
-                <div className="h-24 w-full bg-indigo-900/20 border border-indigo-500/20 rounded-2xl animate-pulse"></div>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2 space-y-6">
-                        <div className="h-64 bg-neutral-900/40 rounded-xl animate-pulse"></div>
-                        <div className="h-64 bg-neutral-900/40 rounded-xl animate-pulse"></div>
-                    </div>
-                    <div className="space-y-6">
-                        <div className="h-32 bg-neutral-900/40 rounded-xl animate-pulse"></div>
-                        <div className="h-32 bg-neutral-900/40 rounded-xl animate-pulse"></div>
-                    </div>
+                <div className="space-y-6">
+                    <div className="h-32 bg-neutral-900/40 rounded-xl animate-pulse"></div>
+                    <div className="h-32 bg-neutral-900/40 rounded-xl animate-pulse"></div>
                 </div>
             </div>
-        );
-    }
+        </div>
+    );
+}
 
-    if (!payload?.metrics) {
-        return (
-            <div className="flex flex-col items-center justify-center p-12 text-neutral-500">
-                <Clock className="w-12 h-12 mb-4 opacity-50" />
-                <p className="text-lg">Nenhum dado de fila disponível para análise.</p>
-            </div>
-        );
-    }
-
+function QueueAnalysisContent({ payload }: { payload: any }) {
+    const [selectedHour, setSelectedHour] = useState<{ day: number, hour: number } | null>(null);
     const { metrics, visitsHeatmap, flexibleCustomers } = payload;
 
     // Dynamic trimming: only show hours where there is at least some activity
@@ -461,4 +450,90 @@ export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
             </div>
         </LocalErrorBoundary>
     );
+}
+
+export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
+    const [isLoading, setIsLoading] = useState(true);
+    const [payload, setPayload] = useState<any>(null);
+    const [debugState, setDebugState] = useState("init");
+
+    React.useEffect(() => {
+        let isMounted = true;
+        const debugBox = document.getElementById('qa-debug-box');
+        const updateDebug = (msg: string) => {
+            setDebugState(msg);
+            if (debugBox) debugBox.innerText = `DEBUG: ${msg}`;
+        };
+
+        const fetchQueue = () => {
+            console.log("[QueueAnalysis] Iniciando XHR para loja:", selectedStore || 'Todas');
+            updateDebug("xhr_started");
+            setIsLoading(true);
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', `/api/metrics/queue?store=${encodeURIComponent(selectedStore || 'Todas')}`, true);
+            xhr.timeout = 15000;
+
+            xhr.onload = () => {
+                updateDebug(`xhr_loaded_${xhr.status}`);
+                if (xhr.status === 200 && isMounted) {
+                    try {
+                        const json = JSON.parse(xhr.responseText);
+                        if (json.success) {
+                            React.startTransition(() => {
+                                setPayload(json.payload);
+                            });
+                        }
+                    } catch (e) {
+                        updateDebug("json_parse_error");
+                    }
+                }
+                if (isMounted) {
+                    React.startTransition(() => setIsLoading(false));
+                }
+            };
+
+            xhr.onerror = () => {
+                updateDebug("xhr_error");
+                if (isMounted) React.startTransition(() => setIsLoading(false));
+            };
+
+            xhr.ontimeout = () => {
+                updateDebug("xhr_timeout");
+                if (isMounted) React.startTransition(() => setIsLoading(false));
+            };
+
+            xhr.send();
+        };
+        fetchQueue();
+        
+        let counter = 0;
+        const interval = setInterval(() => {
+            counter++;
+            const dbg = document.getElementById('qa-debug-box');
+            if (dbg && dbg.innerText.includes('xhr_started')) {
+                dbg.innerText = `DEBUG: xhr_started (${counter}s)`;
+            }
+        }, 1000);
+
+        return () => { 
+            isMounted = false; 
+            clearInterval(interval);
+        };
+    }, [selectedStore]);
+
+    if (isLoading) {
+        return <QueueAnalysisSkeleton debugState={debugState} />;
+    }
+
+    if (!payload?.metrics) {
+        return (
+            <div className="flex flex-col items-center justify-center p-12 text-neutral-500">
+                <Clock className="w-12 h-12 mb-4 opacity-50" />
+                <p className="text-lg">Nenhum dado de fila disponível para análise.</p>
+            </div>
+        );
+    }
+
+    return <QueueAnalysisContent payload={payload} />;
 }
