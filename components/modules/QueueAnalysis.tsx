@@ -91,8 +91,12 @@ function QueueAnalysisContent({ payload }: { payload: any }) {
     }, [metrics.saturationByHour]);
 
     const moveDemandROI = useMemo(() => {
+        const sorted = [...metrics.saturationByHour].sort((a, b) => b.saturation - a.saturation);
+        const peakSat = sorted[0]?.saturation || 0;
+        const dynamicThreshold = Math.max(0.15, peakSat * 0.85);
+
         const totalPeakCyclesMonth = metrics.saturationByHour
-            .filter((s: any) => s.saturation > 0.6)
+            .filter((s: any) => s.saturation >= dynamicThreshold)
             .reduce((acc: number, s: any) => acc + (s.count * 4), 0);
 
         const avgTicket = metrics.expansionROI?.avgTicket || 35;

@@ -59,8 +59,12 @@ export function findFlexibleCustomers(records: SaleRecord[], saturationByHour: A
         const brtDate = new Date(r.data.getTime() - (3 * 3600 * 1000));
         const d = brtDate.getUTCDay();
         const h = brtDate.getUTCHours();
+        // Dynamic threshold to find peaks even in global view where saturation is diluted
+        const maxSat = Math.max(...saturationByHour.map(s => s.saturation), 0);
+        const dynamicPeakThreshold = Math.max(0.15, maxSat * 0.85);
+        
         const sat = satMatrix[(d * 24) + h] || 0;
-        const isPeak = sat > 0.6; // High or Critical
+        const isPeak = sat >= dynamicPeakThreshold; 
 
         const existing = customerMap.get(r.cliente) || { name: r.cliente, phone: r.telefone || '', visits: [] };
         existing.visits.push({ d, h, isPeak });
@@ -307,18 +311,19 @@ export function calculateMachineAvailability(records: SaleRecord[]): Availabilit
     let totalCyclesInRange = 0;
 
     records.forEach(r => {
-        r.items?.forEach(i => {
-            totalRevenueInRange += (i.value || 0);
-            totalCyclesInRange++;
-        });
+        totalRevenueInRange += (r.valor || 0);
+        totalCyclesInRange += Math.max(1, (r.items?.length || 1));
     });
 
     const avgTicket = totalCyclesInRange > 0 ? totalRevenueInRange / totalCyclesInRange : 35; // Default fallback R$ 35
 
+    const maxGlobalSaturation = Math.max(...saturationByHour.map(s => s.saturation), 0);
+    const dynamicPeakThreshold = Math.max(0.15, maxGlobalSaturation * 0.85);
+
     // Check saturation data to estimate lost cycles
     saturationByHour.forEach(s => {
-        // If saturation > 75%, assume demand higher than capacity.
-        if (s.saturation > 0.75) {
+        // If saturation is at peak, assume latent demand.
+        if (s.saturation >= dynamicPeakThreshold) {
             latentCyclesPerMonth += (1 * 4); // 1 extra cycle per hour * 4 weeks
         }
     });
