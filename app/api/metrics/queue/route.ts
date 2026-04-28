@@ -22,26 +22,24 @@ export async function GET(request: Request) {
             supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { cookies: { getAll() { return cookieStore.getAll(); }, setAll() {} } });
         }
 
-        // Fetch last 15,000 Sales for the store (or all if less) - Machine Availability caps at 15000 anyway
-        // We do 2 queries: one to count, one to fetch last 15000 ordered by data desc
-        let countQuery = supabase.from('sales').select('count', { count: 'exact', head: true });
-        if (store !== 'Todas') countQuery = countQuery.eq('loja', store);
-        const { count } = await countQuery;
-        
-        let fetchCount = Math.min(count || 0, 15000);
-        let records: any[] = [];
-        
-        if (fetchCount > 0) {
-            let dataQuery = supabase.from('sales')
-                .select('id, data, loja, cliente, telefone, items, valor, produto')
-                .order('data', { ascending: false })
-                .limit(fetchCount);
-                
-            if (store !== 'Todas') dataQuery = dataQuery.eq('loja', store);
+        // Performance optimization: we only need the last 30 days to calculate queue probability
+        // Offload filtering to PostgreSQL to avoid OOM / 504 Gateway Timeout in Vercel Edge
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        let dataQuery = supabase.from('sales')
+            .select('id, data, loja, cliente, telefone, items, valor, produto')
+            .gte('data', thirtyDaysAgo.toISOString())
+            .order('data', { ascending: false });
             
-            const { data } = await dataQuery;
-            if (data) records = data;
+        if (store !== 'Todas') dataQuery = dataQuery.eq('loja', store);
+        
+        const { data, error } = await dataQuery;
+        if (error) {
+            console.error("Queue query error:", error);
         }
+        
+        const records: any[] = data || [];
 
         // Rehydrate Dates
         const parsedRecords = records.map(r => ({

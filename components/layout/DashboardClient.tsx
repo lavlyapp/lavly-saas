@@ -134,6 +134,11 @@ const ActivityLogs = dynamic<any>(
   { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
 );
 
+const UserAuditLogs = dynamic<any>(
+  () => import('@/components/modules/UserAuditLogs').then(mod => mod.UserAuditLogs),
+  { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
+);
+
 const CustomerDemographics = dynamic<any>(
   () => import('@/components/modules/CustomerDemographics').then(mod => mod.CustomerDemographics),
   { ssr: false, loading: () => <p className="text-neutral-500 p-4">Carregando...</p> }
@@ -259,6 +264,10 @@ function AppContent({
 
     if (activeTab === 'admin') {
       return <LavlyAdminDashboard />;
+    }
+
+    if (activeTab === 'audit') {
+      return <UserAuditLogs />;
     }
 
     if (activeTab === 'logs') {
@@ -1259,6 +1268,18 @@ export default function DashboardClient({ initialSession, initialRole, initialEx
       let token = passedToken;
       if (!token && initialSession?.access_token) {
         token = initialSession.access_token;
+      }
+
+      // Log the Sync Action
+      if (initialSession?.user?.id && !isSilent) {
+        supabase.from('audit_logs').insert([{ 
+          user_id: initialSession.user.id, 
+          user_email: initialSession.user.email,
+          action: 'SYNC_VMPAY',
+          details: { manual: true, timestamp: new Date().toISOString() }
+        }]).then(({ error }) => {
+            if (error) console.error("Audit log error:", error);
+        });
       }
 
       pushLog("[VMPay] Buscando lista de lojas cadastradas...");

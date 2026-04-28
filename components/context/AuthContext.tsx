@@ -77,10 +77,23 @@ export function AuthProvider({ children, initialSession, initialRole, initialExp
             setIsLoading(false);
         }
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             const currentUser = session?.user ?? null;
             setUser(currentUser);
             setToken(session?.access_token ?? null);
+
+            if (event === 'SIGNED_IN' && currentUser) {
+                // Log login action
+                supabase.from('audit_logs').insert([{
+                    user_id: currentUser.id,
+                    user_email: currentUser.email,
+                    action: 'LOGIN',
+                    details: { timestamp: new Date().toISOString() }
+                }]).then(({ error }) => {
+                    if (error) console.error("Login audit log error:", error);
+                });
+            }
+
             if (currentUser) {
                 await fetchProfile(currentUser.id);
             } else {
