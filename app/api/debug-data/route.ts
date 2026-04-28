@@ -19,9 +19,9 @@ export async function GET(request: Request) {
         }
 
         const { data, error } = await supabase.from('sales')
-            .select('id, data, items, produto')
+            .select('id, data, orders(machine, service)')
             .order('data', { ascending: false })
-            .limit(10);
+            .limit(5);
             
         return NextResponse.json({ success: true, error, data });
     } catch (e: any) {
