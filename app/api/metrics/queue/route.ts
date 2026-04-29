@@ -27,20 +27,31 @@ export async function GET(request: Request) {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-        let dataQuery = supabase.from('sales')
-            .select('id, data, loja, cliente, telefone, valor, produto, orders(machine, service)')
-            .gte('data', thirtyDaysAgo.toISOString())
-            .order('data', { ascending: false })
-            .limit(6000);
-            
-        if (store !== 'Todas') dataQuery = dataQuery.eq('loja', store);
+        // PostgREST limits queries to 1000 rows by default. For Queue Analysis we need at least 15,000 rows
+        // to have a representative sample over 30 days for the entire network.
+        // We use parallel pagination to fetch this efficiently within Vercel's timeout.
+        let countQuery = supabase.from('sales').select('id', { count: 'exact', head: true }).gte('data', thirtyDaysAgo.toISOString());
+        if (store !== 'Todas') countQuery = countQuery.eq('loja', store);
         
-        const { data, error } = await dataQuery;
-        if (error) {
-            console.error("Queue query error:", error);
+        const { count } = await countQuery;
+        // Limit to 20,000 for "Todas", or 5,000 for a single store to protect memory
+        const totalRows = Math.min(count || 0, store === 'Todas' ? 20000 : 5000);
+        
+        const pageSize = 1000;
+        const promises = [];
+        for (let i = 0; i < Math.ceil(totalRows / pageSize); i++) {
+            let pageQuery = supabase.from('sales')
+                .select('id, data, loja, cliente, telefone, valor, produto, orders(machine, service)')
+                .gte('data', thirtyDaysAgo.toISOString())
+                .order('data', { ascending: false })
+                .range(i * pageSize, (i + 1) * pageSize - 1);
+            
+            if (store !== 'Todas') pageQuery = pageQuery.eq('loja', store);
+            promises.push(pageQuery);
         }
         
-        const records: any[] = data || [];
+        const results = await Promise.all(promises);
+        const records: any[] = results.flatMap(r => r.data || []);
 
         // Rehydrate Dates
         const parsedRecords = records.map(r => ({
