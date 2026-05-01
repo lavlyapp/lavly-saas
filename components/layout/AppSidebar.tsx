@@ -93,7 +93,7 @@ export function AppSidebar({ activeTab, onTabChange, collapsed, onToggle, isMobi
                     </button>
                 </div>
 
-            <nav className="flex-1 px-4 space-y-2 mt-4">
+            <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-neutral-800 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-neutral-700">
                 {menuItems.filter(item => isVisible(item.requiredPlan, item.roles)).map((item) => (
                     <button
                         key={item.id}
