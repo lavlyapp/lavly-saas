@@ -267,6 +267,49 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
     // Top 15 Clients (Always Global)
     const top15 = globalCrmData?.profiles?.slice(0, 15) || [];
 
+    // --- Lazy Load Top 15 Details ---
+    const [top15Details, setTop15Details] = useState<Record<string, CustomerProfile>>({});
+
+    useEffect(() => {
+        if (!top15 || top15.length === 0) return;
+
+        let isMounted = true;
+        const fetchMissingDetails = async () => {
+            const namesToFetch = top15
+                .map((p: any) => p.name)
+                .filter((name: string) => !top15Details[name]);
+
+            if (namesToFetch.length === 0) return;
+
+            // Fetch in chunks to avoid slamming the API, though 15 is small enough for Promise.all
+            try {
+                const results = await Promise.allSettled(
+                    namesToFetch.map((name: string) =>
+                        fetch(`/api/metrics/customer?name=${encodeURIComponent(name)}`).then(res => res.json())
+                    )
+                );
+
+                if (isMounted) {
+                    setTop15Details(prev => {
+                        const next = { ...prev };
+                        results.forEach((result, index) => {
+                            if (result.status === 'fulfilled' && result.value.success && result.value.payload) {
+                                next[namesToFetch[index]] = result.value.payload;
+                            }
+                        });
+                        return next;
+                    });
+                }
+            } catch (e) {
+                console.error("Failed to fetch top 15 details", e);
+            }
+        };
+
+        fetchMissingDetails();
+
+        return () => { isMounted = false; };
+    }, [top15, top15Details]);
+
     if (isLoading) {
         return (
             <div className="space-y-8 animate-in fade-in">
@@ -646,15 +689,22 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
                                             <td className="px-6 py-4 text-center">
                                                 <div className="flex items-center justify-center gap-2">
                                                     <Calendar className="w-3 h-3 text-neutral-500" />
-                                                    {profile.topDay}
+                                                    {top15Details[profile.name]?.topDay || (top15Details[profile.name] === undefined ? '...' : profile.topDay)}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <div className="flex items-center justify-center gap-2">
-                                                    {profile.topShift === 'Manhã' && <Sunrise className="w-3 h-3 text-amber-400" />}
-                                                    {profile.topShift === 'Tarde' && <Sun className="w-3 h-3 text-orange-400" />}
-                                                    {profile.topShift === 'Noite' && <Moon className="w-3 h-3 text-blue-400" />}
-                                                    {profile.topShift}
+                                                    {(() => {
+                                                        const shift = top15Details[profile.name]?.topShift || (top15Details[profile.name] === undefined ? '...' : profile.topShift);
+                                                        return (
+                                                            <>
+                                                                {shift === 'Manhã' && <Sunrise className="w-3 h-3 text-amber-400" />}
+                                                                {shift === 'Tarde' && <Sun className="w-3 h-3 text-orange-400" />}
+                                                                {shift === 'Noite' && <Moon className="w-3 h-3 text-blue-400" />}
+                                                                {shift}
+                                                            </>
+                                                        );
+                                                    })()}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-right font-bold text-white">
