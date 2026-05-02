@@ -176,15 +176,24 @@ export function rehydratePeriodStats(sqlProfiles: any[], sqlGlobalProfiles: any[
             washAndDryList.push(customer);
         }
 
-        // Calculate New Customers (First visit ever equals first visit in period)
+        // Calculate New Customers and Returning Customers
         const g = globalLookup.get(p.name);
         if (g) {
             const pFirstVisit = new Date(p.first_visit).getTime();
             const gFirstVisit = new Date(g.first_visit).getTime();
             
+            // 1. Cliente completamente novo (Primeira visita do mês = Primeira visita da vida)
             // Tolerância de 1 segundo para evitar bugs de arredondamento de timestamp do Postgres
             if (Math.abs(pFirstVisit - gFirstVisit) < 1000) {
                 newCustomers++;
+            } 
+            // 2. Cliente de Retorno (Vinha antes, sumiu por 180 dias, e voltou agora)
+            else if (p.last_visit_before_period) {
+                const lastPrior = new Date(p.last_visit_before_period).getTime();
+                const diffDays = (pFirstVisit - lastPrior) / (1000 * 60 * 60 * 24);
+                if (diffDays > 180) {
+                    newCustomers++;
+                }
             }
         }
     });
