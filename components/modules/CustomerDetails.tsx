@@ -112,10 +112,7 @@ export function CustomerDetails({ isOpen, onClose, profile: initialProfile, peri
     return (
         <div className="fixed inset-0 z-[9998] flex items-center justify-end">
             {/* Backdrop */}
-            <div
-                className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
-                onClick={onClose}
-            ></div>
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"></div>
 
             {/* Slide-over Panel */}
             <div className="relative w-full max-w-md h-full bg-neutral-900 border-l border-neutral-800 shadow-2xl transform transition-transform duration-300 ease-in-out flex flex-col">
@@ -214,7 +211,7 @@ export function CustomerDetails({ isOpen, onClose, profile: initialProfile, peri
                                 <div className="flex items-center gap-2 text-emerald-400">
                                     <DollarSign className="w-5 h-5" />
                                     <span className="text-xl font-mono font-bold">
-                                        {displayProfile.totalSpent.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 })}
+                                        {Number(displayProfile.totalSpent || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 })}
                                     </span>
                                 </div>
                             </div>
@@ -289,7 +286,7 @@ export function CustomerDetails({ isOpen, onClose, profile: initialProfile, peri
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 text-right font-mono text-emerald-400">
-                                                R$ {visit.total.toFixed(2)}
+                                                R$ {Number(visit.total || 0).toFixed(2)}
                                             </td>
                                         </tr>
                                     ))}
@@ -354,13 +351,13 @@ export function CustomerDetails({ isOpen, onClose, profile: initialProfile, peri
                         <div className="flex items-center justify-between text-sm text-neutral-400 mb-2">
                             <span>Ticket Médio (Histórico)</span>
                             <span className="text-neutral-300 font-mono">
-                                {displayProfile.averageTicket.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                {Number(displayProfile.averageTicket || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </span>
                         </div>
                         <div className="flex items-center justify-between text-sm text-neutral-400 mb-2">
                             <span>Total Gasto (Lifetime)</span>
                             <span className="text-neutral-300 font-mono">
-                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(displayProfile.totalSpent)}
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(displayProfile.totalSpent || 0))}
                             </span>
                         </div>
                     </section>

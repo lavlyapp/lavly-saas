@@ -93,7 +93,10 @@ export function MachineMonitor({ allRecords, allOrders, selectedStore }: Machine
     if (!isAllStores && !allRecords.some(r => getCanonicalStoreName(r.loja) === canonicalSelected)) return null;
 
     // 1. Process Data & Calculate Statuses
-    const now = new Date();
+    // Strict BRT localization: The VMPay API saves BRT time as naked UTC strings. We must shift 'now' 3 hours back to match.
+    const nowUtc = new Date();
+    const now = new Date(nowUtc.getTime() - (3 * 3600 * 1000));
+    
     const machinesByStore: Record<string, MachineStatus[]> = {};
     const problemMachines: { store: string; machine: string; lastSeen: Date; type: 'washer' | 'dryer' }[] = [];
 
@@ -189,7 +192,7 @@ export function MachineMonitor({ allRecords, allOrders, selectedStore }: Machine
 
         machineMap.forEach((record, name) => {
             const productOrService = record.service || record.produto || '';
-            const duration = getCycleDuration(productOrService);
+            const duration = getCycleDuration(productOrService, name);
             const machineNum = parseInt(name.replace(/\D/g, ''), 10);
             const storeLower = store.toLowerCase();
 

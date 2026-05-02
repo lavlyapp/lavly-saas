@@ -296,7 +296,11 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
                                     <div
                                         key={profile.name}
                                         className="p-3 hover:bg-neutral-800 cursor-pointer flex items-center justify-between group"
-                                        onClick={() => setSelectedProfile(profile)}
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedProfile(profile);
+                                        }}
                                     >
                                         <div>
                                             <p className="font-medium text-white">{profile.name}</p>
