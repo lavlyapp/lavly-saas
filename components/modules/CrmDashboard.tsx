@@ -18,6 +18,8 @@ import { useWeatherAlerts } from "@/hooks/useWeatherAlerts"; // New
 import { WeatherAlert } from "./WeatherAlert"; // New
 import { CloudRain } from "lucide-react"; // New
 import { SegmentedCustomer } from "@/lib/processing/crm"; // Existing import needed below
+import { supabase } from "@/lib/supabase";
+import { rehydrateCrmMetrics, rehydratePeriodStats, calculateDemographics } from "@/lib/processing/crm_edge_adapter";
 
 
 interface CrmDashboardProps {
@@ -97,26 +99,84 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
             setFetchError(null);
             try {
                 const storeForApi = (selectedStore === 'Todas as Lojas' || !selectedStore) ? 'Todas' : selectedStore;
-                let params = `?store=${encodeURIComponent(storeForApi)}&period=${period}`;
-                if (period === 'custom') {
+                
+                // Calculate ISO dates for RPC
+                let queryStartIso = '2020-01-01T00:00:00.000Z';
+                let queryEndIso = new Date().toISOString();
+                
+                const nowBrt = new Date(new Date().getTime() - (3 * 3600 * 1000));
+                const todayStr = nowBrt.toISOString().split('T')[0];
+                const yesterdayBrt = new Date(nowBrt.getTime() - (24 * 3600 * 1000));
+                const yesterdayStr = yesterdayBrt.toISOString().split('T')[0];
+
+                if (period === 'today') {
+                    queryStartIso = `${todayStr}T00:00:00.000Z`;
+                    queryEndIso = `${todayStr}T23:59:59.999Z`;
+                } else if (period === 'yesterday') {
+                    queryStartIso = `${yesterdayStr}T00:00:00.000Z`;
+                    queryEndIso = `${yesterdayStr}T23:59:59.999Z`;
+                } else if (period === 'thisMonth') {
+                    const y = nowBrt.getFullYear();
+                    const m = String(nowBrt.getMonth() + 1).padStart(2, '0');
+                    queryStartIso = `${y}-${m}-01T00:00:00.000Z`;
+                    queryEndIso = `${todayStr}T23:59:59.999Z`;
+                } else if (period === 'lastMonth') {
+                    let m = nowBrt.getMonth();
+                    let y = nowBrt.getFullYear();
+                    if (m === 0) { m = 12; y -= 1; }
+                    const mStr = String(m).padStart(2, '0');
+                    const endOfDayLastMonth = new Date(y, m, 0, 23, 59, 59);
+                    queryStartIso = `${y}-${mStr}-01T00:00:00.000Z`;
+                    queryEndIso = endOfDayLastMonth.toISOString();
+                } else if (period === 'custom') {
                     if (!customRange.start || !customRange.end || customRange.start.length !== 10 || customRange.end.length !== 10) {
                         return; // Prevent crash on incomplete keyboard typing
                     }
-                    params += `&start=${customRange.start}&end=${customRange.end}`;
+                    queryStartIso = `${customRange.start}T00:00:00.000Z`;
+                    queryEndIso = `${customRange.end}T23:59:59.999Z`;
                 }
 
-                const res = await fetch(`/api/metrics/crm${params}`);
-                const json = await res.json();
+                // DIRECT SUPABASE BYPASS (Avoids Vercel 10s Timeout limit for 4MB payloads)
+                const { data: rpcData, error: rpcError } = await supabase.rpc('get_crm_backend_metrics', {
+                    p_store: storeForApi,
+                    p_start_date: queryStartIso,
+                    p_end_date: queryEndIso
+                });
+
+                if (rpcError || !rpcData) {
+                    throw new Error(rpcError?.message || "Função RPC get_crm_backend_metrics não instalada no BD!");
+                }
+
+                // Local Rehydration
+                const globalMetrics = rehydrateCrmMetrics(rpcData.globalProfiles);
+                const filteredMetrics = rehydrateCrmMetrics(rpcData.periodProfiles);
+                const periodStats = rehydratePeriodStats(rpcData.periodProfiles, rpcData.globalProfiles);
+                
+                let visitsHeatmapData = Array.from({length: 7}, () => Array(24).fill(0));
+                rpcData.heatmap?.forEach((h: any) => {
+                    if(h.dow >= 0 && h.dow < 7 && h.hod >= 0 && h.hod < 24){
+                         visitsHeatmapData[h.dow][h.hod] = h.count;
+                    }
+                });
+
+                const demographicsStats = calculateDemographics(rpcData.globalProfiles);
+
+                const lightGlobal = { ...globalMetrics }; 
+                const lightFiltered = { ...filteredMetrics, profiles: [] };
+
+                const finalPayload = {
+                    globalMetrics: lightGlobal,
+                    filteredMetrics: lightFiltered,
+                    periodStats,
+                    visitsHeatmapData,
+                    demographics: demographicsStats
+                };
 
                 if (isMounted) {
-                    if (json.success && json.payload) {
-                        setMetrics(json.payload);
-                    } else {
-                        setFetchError(`Falha Vercel: ${json.error || 'No data'}`);
-                    }
+                    setMetrics(finalPayload);
                 }
             } catch (err: any) {
-                if (isMounted) setFetchError(`Erro de conexão: ${err.message}`);
+                if (isMounted) setFetchError(`Erro de conexão Direta: ${err.message}`);
             } finally {
                 if (isMounted) setIsLoading(false);
             }
