@@ -11,42 +11,48 @@ import { useAuth } from "@/components/context/AuthContext";
 interface ChurnAnalysisProps {
     data: any;
     selectedStore?: string;
+    crmData?: any;
 }
 
-export function ChurnAnalysis({ data, selectedStore }: ChurnAnalysisProps) {
+export function ChurnAnalysis({ data, selectedStore, crmData: passedCrmData }: ChurnAnalysisProps) {
     const { canAccess } = useSubscription();
     const { role } = useAuth();
     const { openCustomerDetails } = useCustomerContext();
     
-    const [crmData, setCrmData] = useState<any>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const [crmData, setCrmData] = useState<any>(passedCrmData || null);
+    const [isLoading, setIsLoading] = useState(passedCrmData ? false : true);
     const [activeTab, setActiveTab] = useState<'actions' | 'predictive' | 'legacy'>(role === 'atendente' ? 'predictive' : 'actions');
 
     useEffect(() => {
-        let isMounted = true;
-        const fetchCrm = async () => {
-            setIsLoading(true);
-            try {
-                const res = await fetch(`/api/metrics/crm?store=${encodeURIComponent(selectedStore || 'Todas')}`);
-                const json = await res.json();
-                if (isMounted && json.success) {
-                    startTransition(() => {
-                        setCrmData(json.payload.globalMetrics);
-                    });
+        if (passedCrmData) {
+            setCrmData(passedCrmData);
+            setIsLoading(false);
+        } else {
+            let isMounted = true;
+            const fetchCrm = async () => {
+                setIsLoading(true);
+                try {
+                    const res = await fetch(`/api/metrics/crm?store=${encodeURIComponent(selectedStore || 'Todas')}`);
+                    const json = await res.json();
+                    if (isMounted && json.success) {
+                        startTransition(() => {
+                            setCrmData(json.payload.globalMetrics);
+                        });
+                    }
+                } catch (err) {
+                    console.error("Failed to load churn data", err);
+                } finally {
+                    if (isMounted) {
+                        startTransition(() => {
+                            setIsLoading(false);
+                        });
+                    }
                 }
-            } catch (err) {
-                console.error("Failed to load churn data", err);
-            } finally {
-                if (isMounted) {
-                    startTransition(() => {
-                        setIsLoading(false);
-                    });
-                }
-            }
-        };
-        fetchCrm();
-        return () => { isMounted = false; };
-    }, [selectedStore]);
+            };
+            fetchCrm();
+            return () => { isMounted = false; };
+        }
+    }, [selectedStore, passedCrmData]);
 
     const { inactive30, inactive60, inactive90 } = useMemo(() => {
         if (!crmData) return { inactive30: [], inactive60: [], inactive90: [] };

@@ -220,23 +220,7 @@ function AppContent({
     }
   }, [isAuthenticated, token, stableInitialLoad]);
 
-  // Silent Background API Pre-warmer
-  useEffect(() => {
-    if (mounted && isAuthenticated) {
-      setTimeout(() => {
-        console.log("[System] Acionando pré-cálculo silencioso das abas na Borda AWS...");
-
-        // Dispara requisições silenciosas para esquentar os nós do banco e cache da Edge
-        Promise.allSettled([
-          fetch('/api/metrics/financial?period=thisMonth&store=Todas&t=' + Date.now()),
-          fetch('/api/metrics/comparative?store=Todas&t=' + Date.now()),
-          fetch('/api/metrics/crm?store=Todas&t=' + Date.now())
-        ]).then(() => {
-          console.log("[System] Pré-cálculo em plano de fundo concluído.");
-        });
-      }, 3000); // 3 seconds after dashboard mounts
-    }
-  }, [mounted, isAuthenticated]);
+  // Silent Background API Pre-warmer removed to prevent DB query collisions.
 
   // --- Auto-Sync Background Routine ---
   const hasAutoSynced = useRef(false);
