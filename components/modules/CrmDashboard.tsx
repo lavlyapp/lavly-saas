@@ -640,8 +640,8 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
                                             <td className="px-6 py-4 text-center font-bold text-emerald-400">
                                                 {profile.averageTicket.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                             </td>
-                                            <td className="px-6 py-4 text-center text-neutral-600">
-                                                -
+                                            <td className="px-6 py-4 text-center text-neutral-400 font-medium">
+                                                {profile.avgBasketsPerVisit.toFixed(1)}
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <div className="flex items-center justify-center gap-2">
