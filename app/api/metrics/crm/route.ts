@@ -89,7 +89,7 @@ export async function GET(request: Request) {
 
         const globalMetrics = rehydrateCrmMetrics(rpcData.globalProfiles);
         const filteredMetrics = rehydrateCrmMetrics(rpcData.periodProfiles);
-        const periodStats = rehydratePeriodStats(rpcData.periodProfiles);
+        const periodStats = rehydratePeriodStats(rpcData.periodProfiles, rpcData.globalProfiles);
         
         // Heatmap Translation
         let visitsHeatmapData = Array.from({length: 7}, () => Array(24).fill(0));

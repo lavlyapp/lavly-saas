@@ -131,7 +131,7 @@ export function rehydrateCrmMetrics(sqlProfiles: any[]): CrmSummary {
     };
 }
 
-export function rehydratePeriodStats(sqlProfiles: any[]): PeriodStats {
+export function rehydratePeriodStats(sqlProfiles: any[], sqlGlobalProfiles: any[] = []): PeriodStats {
     let onlyWashCount = 0;
     let onlyDryCount = 0;
     let washAndDryCount = 0;
@@ -142,6 +142,10 @@ export function rehydratePeriodStats(sqlProfiles: any[]): PeriodStats {
     
     let totalRevenue = 0;
     let totalVisits = 0;
+    let newCustomers = 0;
+
+    const globalLookup = new Map<string, any>();
+    sqlGlobalProfiles.forEach(g => globalLookup.set(g.name, g));
     
     sqlProfiles.forEach(p => {
         const wCount = Number(p.w_count) || 0;
@@ -171,13 +175,25 @@ export function rehydratePeriodStats(sqlProfiles: any[]): PeriodStats {
             washAndDryCount++;
             washAndDryList.push(customer);
         }
+
+        // Calculate New Customers (First visit ever equals first visit in period)
+        const g = globalLookup.get(p.name);
+        if (g) {
+            const pFirstVisit = new Date(p.first_visit).getTime();
+            const gFirstVisit = new Date(g.first_visit).getTime();
+            
+            // Tolerância de 1 segundo para evitar bugs de arredondamento de timestamp do Postgres
+            if (Math.abs(pFirstVisit - gFirstVisit) < 1000) {
+                newCustomers++;
+            }
+        }
     });
 
     const activeCustomers = sqlProfiles.length;
 
     return {
         activeCustomers,
-        newCustomers: 0, 
+        newCustomers: newCustomers, 
         newCustomersList: [],
         onlyWashCount,
         onlyDryCount,
