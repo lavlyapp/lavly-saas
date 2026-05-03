@@ -73,7 +73,7 @@ export async function GET(request: Request) {
         const promises = [];
         for (let i = 0; i < Math.ceil(totalRows / pageSize); i++) {
             let pageQuery = supabase.from('sales')
-                .select('items, valor')
+                .select('valor, orders(machine, service)')
                 .order('data', { ascending: false })
                 .range(i * pageSize, (i + 1) * pageSize - 1);
             
@@ -88,14 +88,11 @@ export async function GET(request: Request) {
         
         for (let i = 0; i < recentRecords.length; i++) {
             const r = recentRecords[i];
-            let itemsArray = r.items;
-            if (typeof itemsArray === 'string') {
-                try { itemsArray = JSON.parse(itemsArray); } catch(e) { itemsArray = []; }
-            }
-            if (!itemsArray || itemsArray.length === 0) continue;
+            const ordersArray = Array.isArray(r.orders) ? r.orders : (r.orders ? [r.orders] : []);
+            if (ordersArray.length === 0) continue;
 
-            for (let j = 0; j < itemsArray.length; j++) {
-                const item = itemsArray[j];
+            for (let j = 0; j < ordersArray.length; j++) {
+                const item = ordersArray[j];
                 const mId = item.machine;
                 if (!mId) continue;
 
@@ -106,12 +103,12 @@ export async function GET(request: Request) {
                 }
 
                 const svcString = (item.service || '').toLowerCase();
-                const machString = (item.machine || '').toLowerCase();
+                const machString = (mId || '').toLowerCase();
                 const isWash = svcString.includes('lav') || machString.includes('lav');
                 
                 curr.type = isWash ? 'Lavadora' : 'Secadora';
                 curr.cycles++;
-                curr.totalRevenue += (item.value || 0);
+                curr.totalRevenue += (r.valor || 0) / ordersArray.length;
                 curr.totalMinutes += isWash ? 33.5 : 49;
             }
         }
