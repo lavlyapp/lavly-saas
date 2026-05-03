@@ -137,8 +137,8 @@ export function CustomerDemographics({ records, customers, selectedStore, orders
                     <CardContent>
                         <div className="h-[200px] flex items-center justify-center relative">
                             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                <span className="text-3xl font-bold text-white">{totalProfilesCount}</span>
-                                <span className="text-[10px] text-neutral-500 uppercase tracking-widest">Clientes</span>
+                                <span className="text-3xl font-black text-white">{totalProfilesCount}</span>
+                                <span className="text-xs font-semibold text-neutral-500 mt-1 uppercase tracking-wider text-center">Clientes<br/><span className="text-[10px] text-neutral-600">(Identificados)</span></span>
                             </div>
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>

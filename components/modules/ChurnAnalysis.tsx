@@ -11,42 +11,48 @@ import { useAuth } from "@/components/context/AuthContext";
 interface ChurnAnalysisProps {
     data: any;
     selectedStore?: string;
+    crmData?: any;
 }
 
-export function ChurnAnalysis({ data, selectedStore }: ChurnAnalysisProps) {
+export function ChurnAnalysis({ data, selectedStore, crmData: passedCrmData }: ChurnAnalysisProps) {
     const { canAccess } = useSubscription();
     const { role } = useAuth();
     const { openCustomerDetails } = useCustomerContext();
     
-    const [crmData, setCrmData] = useState<any>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const [crmData, setCrmData] = useState<any>(passedCrmData || null);
+    const [isLoading, setIsLoading] = useState(passedCrmData ? false : true);
     const [activeTab, setActiveTab] = useState<'actions' | 'predictive' | 'legacy'>(role === 'atendente' ? 'predictive' : 'actions');
 
     useEffect(() => {
-        let isMounted = true;
-        const fetchCrm = async () => {
-            setIsLoading(true);
-            try {
-                const res = await fetch(`/api/metrics/crm?store=${encodeURIComponent(selectedStore || 'Todas')}`);
-                const json = await res.json();
-                if (isMounted && json.success) {
-                    startTransition(() => {
-                        setCrmData(json.payload.globalMetrics);
-                    });
+        if (passedCrmData) {
+            setCrmData(passedCrmData);
+            setIsLoading(false);
+        } else {
+            let isMounted = true;
+            const fetchCrm = async () => {
+                setIsLoading(true);
+                try {
+                    const res = await fetch(`/api/metrics/crm?store=${encodeURIComponent(selectedStore || 'Todas')}`);
+                    const json = await res.json();
+                    if (isMounted && json.success) {
+                        startTransition(() => {
+                            setCrmData(json.payload.globalMetrics);
+                        });
+                    }
+                } catch (err) {
+                    console.error("Failed to load churn data", err);
+                } finally {
+                    if (isMounted) {
+                        startTransition(() => {
+                            setIsLoading(false);
+                        });
+                    }
                 }
-            } catch (err) {
-                console.error("Failed to load churn data", err);
-            } finally {
-                if (isMounted) {
-                    startTransition(() => {
-                        setIsLoading(false);
-                    });
-                }
-            }
-        };
-        fetchCrm();
-        return () => { isMounted = false; };
-    }, [selectedStore]);
+            };
+            fetchCrm();
+            return () => { isMounted = false; };
+        }
+    }, [selectedStore, passedCrmData]);
 
     const { inactive30, inactive60, inactive90 } = useMemo(() => {
         if (!crmData) return { inactive30: [], inactive60: [], inactive90: [] };
@@ -207,16 +213,22 @@ export function ChurnAnalysis({ data, selectedStore }: ChurnAnalysisProps) {
             )}
 
             {/* Indicators */}
-            <div className="grid grid-cols-2 gap-2 mt-auto">
+            <div className="grid grid-cols-3 gap-2 mt-auto">
+                <div className="bg-neutral-950/50 p-2 rounded border border-neutral-800 text-center">
+                    <span className="text-[10px] text-neutral-500 block">Total Gasto</span>
+                    <span className="text-sm font-bold text-emerald-400 truncate block">
+                        {profile.totalSpent.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </span>
+                </div>
                 <div className="bg-neutral-950/50 p-2 rounded border border-neutral-800 text-center">
                     <span className="text-[10px] text-neutral-500 block">Ticket Médio</span>
-                    <span className="text-sm font-bold text-neutral-300">
+                    <span className="text-sm font-bold text-neutral-300 truncate block">
                         {profile.averageTicket.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </span>
                 </div>
                 <div className="bg-neutral-950/50 p-2 rounded border border-neutral-800 text-center">
-                    <span className="text-[10px] text-neutral-500 block">Intervalo Médio</span>
-                    <span className="text-sm font-bold text-neutral-300">
+                    <span className="text-[10px] text-neutral-500 block">Interv. Médio</span>
+                    <span className="text-sm font-bold text-neutral-300 truncate block">
                         {Math.round(profile.averageInterval || 0)} dias
                     </span>
                 </div>

@@ -1,0 +1,38 @@
+name: VMPay Global Sync Automation
+
+on:
+  schedule:
+    # HORÁRIOS DIURNOS (07:00 às 23:00 no Brasil = 10:00 às 02:00 no UTC)
+    # Roda a cada 30 minutos
+    - cron: '*/30 10-23 * * *'
+    - cron: '*/30 0-2 * * *'
+    
+    # HORÁRIOS NOTURNOS (23:00 às 07:00 no Brasil = 02:00 às 10:00 no UTC)
+    # Roda a cada 2 horas (04:00, 06:00, 08:00 UTC)
+    - cron: '0 4,6,8 * * *'
+
+  # Permite acionamento manual do fluxo de trabalho direto pelo painel do GitHub
+  workflow_dispatch:
+
+jobs:
+  sync:
+    name: Trigger Next.js Cron Endpoint
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Disparar Sincronização Segura
+        run: |
+          curl -X GET "https://www.teste.lavly.com.br/api/vmpay/cron/sync" \
+          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+          -s -o response.json -w "%{http_code}" > status_code.txt
+          
+          # Lemos o HTTP Status (ex: 200) e checamos sucesso
+          STATUS_CODE=$(cat status_code.txt)
+          if [ "$STATUS_CODE" -eq 200 ]; then
+            echo "Sincronização concluída com sucesso! Status: $STATUS_CODE"
+            cat response.json
+          else
+            echo "Falha na sincronização! Status: $STATUS_CODE"
+            cat response.json
+            exit 1
+          fi

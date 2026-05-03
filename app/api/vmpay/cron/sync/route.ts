@@ -32,6 +32,16 @@ export async function GET(request: Request) {
         const { syncVMPayCustomers } = await import('@/lib/vmpay-client');
         const customers = await syncVMPayCustomers();
 
+        // Refresh materialized views to ensure Financial Dashboard shows new sales immediately
+        if (supabaseClient) {
+            const { error: refreshError } = await supabaseClient.rpc('refresh_lavly_materialized_views');
+            if (refreshError) {
+                console.error(`[Cron API] Error refreshing materialized views: ${refreshError.message}`);
+            } else {
+                console.log(`[Cron API] Materialized views refreshed successfully.`);
+            }
+        }
+
         await logActivity("SYNC_VMPAY_CRON", null, {
             newSalesCount: newSales.length,
             customersCount: customers.length,

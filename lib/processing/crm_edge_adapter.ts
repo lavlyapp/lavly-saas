@@ -131,10 +131,11 @@ export function rehydrateCrmMetrics(sqlProfiles: any[]): CrmSummary {
     };
 }
 
-export function rehydratePeriodStats(sqlProfiles: any[]): PeriodStats {
+export function rehydratePeriodStats(sqlProfiles: any[], sqlGlobalProfiles: any[] = []): PeriodStats {
     let onlyWashCount = 0;
     let onlyDryCount = 0;
     let washAndDryCount = 0;
+    let washAndDryBalancedCount = 0;
 
     const onlyWashList: SegmentedCustomer[] = [];
     const onlyDryList: SegmentedCustomer[] = [];
@@ -142,6 +143,10 @@ export function rehydratePeriodStats(sqlProfiles: any[]): PeriodStats {
     
     let totalRevenue = 0;
     let totalVisits = 0;
+    let newCustomers = 0;
+
+    const globalLookup = new Map<string, any>();
+    sqlGlobalProfiles.forEach(g => globalLookup.set(g.name, g));
     
     sqlProfiles.forEach(p => {
         const wCount = Number(p.w_count) || 0;
@@ -170,6 +175,30 @@ export function rehydratePeriodStats(sqlProfiles: any[]): PeriodStats {
         } else if (wCount > 0 && dCount > 0) {
             washAndDryCount++;
             washAndDryList.push(customer);
+            if (wCount === dCount) {
+                washAndDryBalancedCount++;
+            }
+        }
+
+        // Calculate New Customers and Returning Customers
+        const g = globalLookup.get(p.name);
+        if (g) {
+            const pFirstVisit = new Date(p.first_visit).getTime();
+            const gFirstVisit = new Date(g.first_visit).getTime();
+            
+            // 1. Cliente completamente novo (Primeira visita do mês = Primeira visita da vida)
+            // Tolerância de 1 segundo para evitar bugs de arredondamento de timestamp do Postgres
+            if (Math.abs(pFirstVisit - gFirstVisit) < 1000) {
+                newCustomers++;
+            } 
+            // 2. Cliente de Retorno (Vinha antes, sumiu por 180 dias, e voltou agora)
+            else if (p.last_visit_before_period) {
+                const lastPrior = new Date(p.last_visit_before_period).getTime();
+                const diffDays = (pFirstVisit - lastPrior) / (1000 * 60 * 60 * 24);
+                if (diffDays > 180) {
+                    newCustomers++;
+                }
+            }
         }
     });
 
@@ -177,12 +206,12 @@ export function rehydratePeriodStats(sqlProfiles: any[]): PeriodStats {
 
     return {
         activeCustomers,
-        newCustomers: 0, 
+        newCustomers: newCustomers, 
         newCustomersList: [],
         onlyWashCount,
         onlyDryCount,
         washAndDryCount,
-        washAndDryBalancedCount: 0,
+        washAndDryBalancedCount,
         onlyWashList,
         onlyDryList,
         washAndDryList,

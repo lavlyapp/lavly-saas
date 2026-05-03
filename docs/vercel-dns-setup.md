@@ -1,6 +1,6 @@
 # Guia de Configuração de Domínio (Vercel + Registro.br)
 
-Este guia explica como configurar os domínios `lavly.com.br`, `www.lavly.com.br` e `teste.lavly.com.br` para apontarem corretamente para o projeto na Vercel.
+Este guia explica como configurar os domínios `lavly.com.br`, `teste.lavly.com.br` e `teste.lavly.com.br` para apontarem corretamente para o projeto na Vercel.
 
 ## Passo 1: O que fazer na Vercel
 Você precisa gerar a "credencial de apontamento" na sua conta da Vercel:
@@ -8,7 +8,7 @@ Você precisa gerar a "credencial de apontamento" na sua conta da Vercel:
 1. Abra seu projeto do `vmpay-saas` na **Vercel** (vercel.com).
 2. Vá na aba **Settings** > **Domains**.
 3. No campo em branco, adicione os domínios um por vez e clique em **Add**:
-   - `lavly.com.br` (A Vercel vai recomendar adicionar o `www.lavly.com.br` junto com redirecionamento. É o recomendado, basta aceitar).
+   - `lavly.com.br` (A Vercel vai recomendar adicionar o `teste.lavly.com.br` junto com redirecionamento. É o recomendado, basta aceitar).
    - `teste.lavly.com.br`
 4. Após adicionar, eles vão ficar com a situação de erro vermelho (Invalid Configuration), pois você precisa conectar o DNS. A Vercel mostrará os dados que você deve colar lá no site do seu domínio.
 

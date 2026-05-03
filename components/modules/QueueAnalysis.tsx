@@ -6,9 +6,10 @@ import { calculateMachineAvailability, findFlexibleCustomers } from '@/lib/proce
 import { SaleRecord } from '@/lib/processing/etl';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDay, getHours } from 'date-fns';
+import { useAuth } from '@/components/context/AuthContext';
 import {
     Info, AlertTriangle, TrendingUp, Calendar, Clock,
-    ArrowRight, MessageSquare, Sparkles, UserCheck, Users
+    ArrowRight, MessageSquare, Sparkles, UserCheck, Users, Filter
 } from "lucide-react";
 
 interface QueueAnalysisProps {
@@ -147,15 +148,15 @@ function QueueAnalysisContent({ payload }: { payload: any }) {
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center justify-between">
                                 <span className="flex items-center gap-2">
-                                    <Clock className="w-5 h-5 text-red-400" />
-                                    Ocupação de Máquinas (Gargalo)
+                                    <Clock className="w-5 h-5 text-emerald-400" />
+                                    Ocupação de Lavadoras (Gargalo)
                                 </span>
                                 <div className="flex gap-2 text-[10px] font-normal">
                                     <span className="flex items-center gap-1"><div className="w-2 h-2 bg-emerald-500/20 border border-emerald-500/30 rounded" /> Livre</span>
                                     <span className="flex items-center gap-1"><div className="w-2 h-2 bg-red-500/40 border border-red-500/50 rounded" /> Saturado</span>
                                 </div>
                             </CardTitle>
-                            <CardDescription>O percentual indica a ocupação da máquina mais solicitada (Lavadora ou Secadora)</CardDescription>
+                            <CardDescription>O percentual indica a ocupação histórica de todas as lavadoras da loja no horário.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="overflow-x-auto">
@@ -169,7 +170,53 @@ function QueueAnalysisContent({ payload }: { payload: any }) {
                                                 <div className="h-8 flex items-center justify-end pr-2 font-medium text-neutral-400">{day}</div>
                                                 {activeHours.map(h => {
                                                     const stat = metrics.saturationByHour.find(s => s.day === dIdx && s.hour === h);
-                                                    const sat = stat?.saturation || 0;
+                                                    const sat = stat?.washSaturation || 0;
+                                                    const satPercent = Math.round(sat * 100);
+                                                    return (
+                                                        <div
+                                                            key={h}
+                                                            className={`h-8 rounded-[2px] border transition-all hover:scale-110 cursor-pointer flex items-center justify-center text-[8px] sm:text-[9px] ${getSaturationColor(sat)}`}
+                                                            onClick={() => setSelectedHour({ day: dIdx, hour: h })}
+                                                        >
+                                                            {sat > 0 && `${satPercent}%`}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </React.Fragment>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center justify-between">
+                                <span className="flex items-center gap-2">
+                                    <Clock className="w-5 h-5 text-orange-400" />
+                                    Ocupação de Secadoras (Gargalo)
+                                </span>
+                                <div className="flex gap-2 text-[10px] font-normal">
+                                    <span className="flex items-center gap-1"><div className="w-2 h-2 bg-emerald-500/20 border border-emerald-500/30 rounded" /> Livre</span>
+                                    <span className="flex items-center gap-1"><div className="w-2 h-2 bg-red-500/40 border border-red-500/50 rounded" /> Saturado</span>
+                                </div>
+                            </CardTitle>
+                            <CardDescription>O percentual indica a ocupação histórica de todas as secadoras da loja no horário.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="overflow-x-auto">
+                                <div className="min-w-[700px]">
+                                    <div className="grid gap-1 text-center text-[9px]" style={{ gridTemplateColumns: `80px repeat(${activeHours.length}, 1fr)` }}>
+                                        <div className="h-6 flex items-center justify-end pr-2 font-semibold text-neutral-500">Hora</div>
+                                        {activeHours.map(h => <div key={h} className="h-6 flex items-center justify-center font-mono opacity-50">{h}</div>)}
+
+                                        {WEEKDAYS.map((day, dIdx) => (
+                                            <React.Fragment key={day}>
+                                                <div className="h-8 flex items-center justify-end pr-2 font-medium text-neutral-400">{day}</div>
+                                                {activeHours.map(h => {
+                                                    const stat = metrics.saturationByHour.find(s => s.day === dIdx && s.hour === h);
+                                                    const sat = stat?.drySaturation || 0;
                                                     const satPercent = Math.round(sat * 100);
                                                     return (
                                                         <div
@@ -391,9 +438,12 @@ function QueueAnalysisContent({ payload }: { payload: any }) {
 }
 
 export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
+    const { role } = useAuth();
     const [isLoading, setIsLoading] = useState(true);
     const [payload, setPayload] = useState<any>(null);
     const [debugState, setDebugState] = useState("init");
+    const [period, setPeriod] = useState<string>('last30days');
+    const [customRange, setCustomRange] = useState({ start: '', end: '' });
 
     React.useEffect(() => {
         let isMounted = true;
@@ -404,12 +454,19 @@ export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
         };
 
         const fetchQueue = () => {
+            if (period === 'custom' && (!customRange.start || !customRange.end)) return;
+
             console.log("[QueueAnalysis] Iniciando XHR para loja:", selectedStore || 'Todas');
             updateDebug("xhr_started");
             setIsLoading(true);
 
+            let url = `/api/metrics/queue?store=${encodeURIComponent(selectedStore || 'Todas')}&period=${period}`;
+            if (period === 'custom') {
+                url += `&start=${customRange.start}&end=${customRange.end}`;
+            }
+
             const xhr = new XMLHttpRequest();
-            xhr.open('GET', `/api/metrics/queue?store=${encodeURIComponent(selectedStore || 'Todas')}`, true);
+            xhr.open('GET', url, true);
             xhr.timeout = 15000;
 
             xhr.onload = () => {
@@ -458,20 +515,45 @@ export function QueueAnalysis({ selectedStore }: QueueAnalysisProps) {
             isMounted = false; 
             clearInterval(interval);
         };
-    }, [selectedStore]);
+    }, [selectedStore, period, customRange]);
 
-    if (isLoading) {
-        return <QueueAnalysisSkeleton debugState={debugState} />;
-    }
-
-    if (!payload?.metrics) {
-        return (
-            <div className="flex flex-col items-center justify-center p-12 text-neutral-500">
-                <Clock className="w-12 h-12 mb-4 opacity-50" />
-                <p className="text-lg">Nenhum dado de fila disponível para análise.</p>
+    return (
+        <div className="space-y-6">
+            {/* Filter Bar */}
+            <div className="bg-neutral-900/50 p-2 rounded-xl border border-neutral-800 flex flex-wrap gap-2 items-center">
+                <div className="flex items-center gap-2 px-3 text-neutral-400 border-r border-neutral-800 mr-2">
+                    <Filter className="w-4 h-4" />
+                    <span className="text-sm font-medium">Período</span>
+                </div>
+                {((role === 'atendente' ? ['today', 'yesterday'] : ['last30days', 'thisMonth', 'lastMonth', 'custom'])).map((opt) => (
+                    <button key={opt} onClick={() => setPeriod(opt)} className={`px-4 py-2 text-sm rounded-lg transition-colors ${period === opt ? 'bg-indigo-600 text-white font-medium shadow-lg shadow-indigo-500/20' : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800'}`}>
+                        {opt === 'today' && 'Hoje'}
+                        {opt === 'yesterday' && 'Ontem'}
+                        {opt === 'last30days' && 'Últimos 30 Dias'}
+                        {opt === 'thisMonth' && 'Mês Atual'}
+                        {opt === 'lastMonth' && 'Mês Anterior'}
+                        {opt === 'custom' && 'Customizado'}
+                    </button>
+                ))}
+                {period === 'custom' && (
+                    <div className="flex items-center gap-2 ml-auto animate-in fade-in slide-in-from-left-4 duration-300">
+                        <input type="date" className="bg-neutral-950 border border-neutral-800 text-neutral-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={customRange.start} onChange={(e) => setCustomRange(prev => ({ ...prev, start: e.target.value }))} />
+                        <span className="text-neutral-600">até</span>
+                        <input type="date" className="bg-neutral-950 border border-neutral-800 text-neutral-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={customRange.end} onChange={(e) => setCustomRange(prev => ({ ...prev, end: e.target.value }))} />
+                    </div>
+                )}
             </div>
-        );
-    }
 
-    return <QueueAnalysisContent payload={payload} />;
+            {isLoading ? (
+                <QueueAnalysisSkeleton debugState={debugState} />
+            ) : !payload?.metrics ? (
+                <div className="flex flex-col items-center justify-center p-12 text-neutral-500">
+                    <Clock className="w-12 h-12 mb-4 opacity-50" />
+                    <p className="text-lg">Nenhum dado de fila disponível para análise.</p>
+                </div>
+            ) : (
+                <QueueAnalysisContent payload={payload} />
+            )}
+        </div>
+    );
 }

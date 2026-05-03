@@ -18,6 +18,8 @@ import { useWeatherAlerts } from "@/hooks/useWeatherAlerts"; // New
 import { WeatherAlert } from "./WeatherAlert"; // New
 import { CloudRain } from "lucide-react"; // New
 import { SegmentedCustomer } from "@/lib/processing/crm"; // Existing import needed below
+import { supabase } from "@/lib/supabase";
+import { rehydrateCrmMetrics, rehydratePeriodStats, calculateDemographics } from "@/lib/processing/crm_edge_adapter";
 
 
 interface CrmDashboardProps {
@@ -97,26 +99,68 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
             setFetchError(null);
             try {
                 const storeForApi = (selectedStore === 'Todas as Lojas' || !selectedStore) ? 'Todas' : selectedStore;
-                let params = `?store=${encodeURIComponent(storeForApi)}&period=${period}`;
-                if (period === 'custom') {
+                
+                // Calculate ISO dates for RPC
+                let queryStartIso = '2020-01-01T00:00:00.000Z';
+                let queryEndIso = new Date().toISOString();
+                
+                const nowBrt = new Date(new Date().getTime() - (3 * 3600 * 1000));
+                const todayStr = nowBrt.toISOString().split('T')[0];
+                const yesterdayBrt = new Date(nowBrt.getTime() - (24 * 3600 * 1000));
+                const yesterdayStr = yesterdayBrt.toISOString().split('T')[0];
+
+                if (period === 'today') {
+                    queryStartIso = `${todayStr}T00:00:00.000Z`;
+                    queryEndIso = `${todayStr}T23:59:59.999Z`;
+                } else if (period === 'yesterday') {
+                    queryStartIso = `${yesterdayStr}T00:00:00.000Z`;
+                    queryEndIso = `${yesterdayStr}T23:59:59.999Z`;
+                } else if (period === 'thisMonth') {
+                    const y = nowBrt.getFullYear();
+                    const m = String(nowBrt.getMonth() + 1).padStart(2, '0');
+                    queryStartIso = `${y}-${m}-01T00:00:00.000Z`;
+                    queryEndIso = `${todayStr}T23:59:59.999Z`;
+                } else if (period === 'lastMonth') {
+                    let m = nowBrt.getMonth();
+                    let y = nowBrt.getFullYear();
+                    if (m === 0) { m = 12; y -= 1; }
+                    const mStr = String(m).padStart(2, '0');
+                    const endOfDayLastMonth = new Date(y, m, 0, 23, 59, 59);
+                    queryStartIso = `${y}-${mStr}-01T00:00:00.000Z`;
+                    queryEndIso = endOfDayLastMonth.toISOString();
+                } else if (period === 'custom') {
                     if (!customRange.start || !customRange.end || customRange.start.length !== 10 || customRange.end.length !== 10) {
                         return; // Prevent crash on incomplete keyboard typing
                     }
-                    params += `&start=${customRange.start}&end=${customRange.end}`;
+                    queryStartIso = `${customRange.start}T00:00:00.000Z`;
+                    queryEndIso = `${customRange.end}T23:59:59.999Z`;
                 }
 
-                const res = await fetch(`/api/metrics/crm${params}`);
+                // REVERT: Use the secure Next.js API route instead of direct browser Supabase RPC
+                // Vercel 10s timeout is no longer an issue because we added lavly_patch_v38_timeout_override.sql
+                // The API route takes about 4.8s to respond securely.
+                let apiUrl = `/api/metrics/crm?period=${period}&store=${encodeURIComponent(storeForApi)}`;
+                if (period === 'custom' && customRange.start && customRange.end) {
+                    apiUrl += `&start=${customRange.start}&end=${customRange.end}`;
+                }
+
+                const res = await fetch(apiUrl);
+                if (!res.ok) {
+                    throw new Error(`HTTP error! status: ${res.status}`);
+                }
+
                 const json = await res.json();
+                if (!json.success || !json.payload) {
+                    throw new Error(json.error || "Falha ao processar métricas no servidor AWS Borda.");
+                }
+
+                const finalPayload = json.payload;
 
                 if (isMounted) {
-                    if (json.success && json.payload) {
-                        setMetrics(json.payload);
-                    } else {
-                        setFetchError(`Falha Vercel: ${json.error || 'No data'}`);
-                    }
+                    setMetrics(finalPayload);
                 }
             } catch (err: any) {
-                if (isMounted) setFetchError(`Erro de conexão: ${err.message}`);
+                if (isMounted) setFetchError(`Erro de conexão da Nuvem: ${err.message}`);
             } finally {
                 if (isMounted) setIsLoading(false);
             }
@@ -206,6 +250,49 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
 
     // Top 15 Clients (Always Global)
     const top15 = globalCrmData?.profiles?.slice(0, 15) || [];
+
+    // --- Lazy Load Top 15 Details ---
+    const [top15Details, setTop15Details] = useState<Record<string, CustomerProfile>>({});
+
+    useEffect(() => {
+        if (!top15 || top15.length === 0) return;
+
+        let isMounted = true;
+        const fetchMissingDetails = async () => {
+            const namesToFetch = top15
+                .map((p: any) => p.name)
+                .filter((name: string) => !top15Details[name]);
+
+            if (namesToFetch.length === 0) return;
+
+            // Fetch in chunks to avoid slamming the API, though 15 is small enough for Promise.all
+            try {
+                const results = await Promise.allSettled(
+                    namesToFetch.map((name: string) =>
+                        fetch(`/api/metrics/customer?name=${encodeURIComponent(name)}`).then(res => res.json())
+                    )
+                );
+
+                if (isMounted) {
+                    setTop15Details(prev => {
+                        const next = { ...prev };
+                        results.forEach((result, index) => {
+                            if (result.status === 'fulfilled' && result.value.success && result.value.payload) {
+                                next[namesToFetch[index]] = result.value.payload;
+                            }
+                        });
+                        return next;
+                    });
+                }
+            } catch (e) {
+                console.error("Failed to fetch top 15 details", e);
+            }
+        };
+
+        fetchMissingDetails();
+
+        return () => { isMounted = false; };
+    }, [top15, top15Details]);
 
     if (isLoading) {
         return (
@@ -580,21 +667,28 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
                                             <td className="px-6 py-4 text-center font-bold text-emerald-400">
                                                 {profile.averageTicket.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                             </td>
-                                            <td className="px-6 py-4 text-center text-neutral-600">
-                                                -
+                                            <td className="px-6 py-4 text-center text-neutral-400 font-medium">
+                                                {profile.avgBasketsPerVisit.toFixed(1)}
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <div className="flex items-center justify-center gap-2">
                                                     <Calendar className="w-3 h-3 text-neutral-500" />
-                                                    {profile.topDay}
+                                                    {top15Details[profile.name]?.topDay || (top15Details[profile.name] === undefined ? '...' : profile.topDay)}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <div className="flex items-center justify-center gap-2">
-                                                    {profile.topShift === 'Manhã' && <Sunrise className="w-3 h-3 text-amber-400" />}
-                                                    {profile.topShift === 'Tarde' && <Sun className="w-3 h-3 text-orange-400" />}
-                                                    {profile.topShift === 'Noite' && <Moon className="w-3 h-3 text-blue-400" />}
-                                                    {profile.topShift}
+                                                    {(() => {
+                                                        const shift = top15Details[profile.name]?.topShift || (top15Details[profile.name] === undefined ? '...' : profile.topShift);
+                                                        return (
+                                                            <>
+                                                                {shift === 'Manhã' && <Sunrise className="w-3 h-3 text-amber-400" />}
+                                                                {shift === 'Tarde' && <Sun className="w-3 h-3 text-orange-400" />}
+                                                                {shift === 'Noite' && <Moon className="w-3 h-3 text-blue-400" />}
+                                                                {shift}
+                                                            </>
+                                                        );
+                                                    })()}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-right font-bold text-white">

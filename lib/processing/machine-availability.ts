@@ -11,7 +11,7 @@ export interface MachineUsage {
 
 export interface AvailabilityMetrics {
     totalMachines: { wash: number, dry: number };
-    saturationByHour: { day: number, hour: number, saturation: number, count: number }[]; // 0-1 saturation
+    saturationByHour: { day: number, hour: number, saturation: number, washSaturation: number, drySaturation: number, count: number }[]; // 0-1 saturation
     peakHours: { day: string, hour: string, saturation: number, type: 'wash' | 'dry' | 'all' }[];
     recommendations: string[];
     expansionROI?: {
@@ -267,7 +267,7 @@ export function calculateMachineAvailability(records: SaleRecord[]): Availabilit
     const effectiveTotalWash = Math.max(uniqueWashMachines.size > 1 ? uniqueWashMachines.size : 1, Math.ceil(globalMaxWash));
     const effectiveTotalDry = Math.max(uniqueDryMachines.size > 1 ? uniqueDryMachines.size : 1, Math.ceil(globalMaxDry));
 
-    const saturationByHour: { day: number, hour: number, saturation: number, count: number }[] = [];
+    const saturationByHour: { day: number, hour: number, saturation: number, washSaturation: number, drySaturation: number, count: number }[] = [];
 
     rawStats.forEach(s => {
         const washSat = s.avgWash / effectiveTotalWash;
@@ -280,6 +280,8 @@ export function calculateMachineAvailability(records: SaleRecord[]): Availabilit
             day: s.d,
             hour: s.h,
             saturation,
+            washSaturation: Math.min(1.0, washSat),
+            drySaturation: Math.min(1.0, drySat),
             count: Math.round(s.avgWash + s.avgDry)
         });
     });

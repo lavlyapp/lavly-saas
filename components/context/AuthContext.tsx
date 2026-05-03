@@ -90,11 +90,16 @@ export function AuthProvider({ children, initialSession, initialRole, initialExp
                     details: { 
                         timestamp: new Date().toISOString(),
                         user_email: currentUser.email,
-                        domain: 'www.teste.lavly.com.br' // Replaced www.lavly.com.br with www.teste.lavly.com.br as requested
                     }
                 }]).then(({ error }) => {
                     if (error) console.error("Login audit log error:", error);
                 });
+
+                // Disparar sincronização silenciosa em background assim que o login acontece
+                console.log("[Auth] Disparando Sincronização em Nuvem (Login-Trigger)...");
+                fetch('/api/vmpay/sync?manual=true', { method: 'GET' })
+                    .then(res => console.log("[Auth] Background sync disparado com sucesso no login:", res.status))
+                    .catch(err => console.error("[Auth] Falha ao disparar background sync:", err));
             }
 
             if (currentUser) {
