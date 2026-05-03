@@ -136,47 +136,31 @@ export function CrmDashboard({ data, customers, selectedStore }: CrmDashboardPro
                     queryEndIso = `${customRange.end}T23:59:59.999Z`;
                 }
 
-                // DIRECT SUPABASE BYPASS (Avoids Vercel 10s Timeout limit for 4MB payloads)
-                const { data: rpcData, error: rpcError } = await supabase.rpc('get_crm_backend_metrics', {
-                    p_store: storeForApi,
-                    p_start_date: queryStartIso,
-                    p_end_date: queryEndIso
-                });
-
-                if (rpcError || !rpcData) {
-                    throw new Error(rpcError?.message || "Função RPC get_crm_backend_metrics não instalada no BD!");
+                // REVERT: Use the secure Next.js API route instead of direct browser Supabase RPC
+                // Vercel 10s timeout is no longer an issue because we added lavly_patch_v38_timeout_override.sql
+                // The API route takes about 4.8s to respond securely.
+                let apiUrl = `/api/metrics/crm?period=${period}&store=${encodeURIComponent(storeForApi)}`;
+                if (period === 'custom' && customRange.start && customRange.end) {
+                    apiUrl += `&start=${customRange.start}&end=${customRange.end}`;
                 }
 
-                // Local Rehydration
-                const globalMetrics = rehydrateCrmMetrics(rpcData.globalProfiles);
-                const filteredMetrics = rehydrateCrmMetrics(rpcData.periodProfiles);
-                const periodStats = rehydratePeriodStats(rpcData.periodProfiles, rpcData.globalProfiles);
-                
-                let visitsHeatmapData = Array.from({length: 7}, () => Array(24).fill(0));
-                rpcData.heatmap?.forEach((h: any) => {
-                    if(h.dow >= 0 && h.dow < 7 && h.hod >= 0 && h.hod < 24){
-                         visitsHeatmapData[h.dow][h.hod] = h.count;
-                    }
-                });
+                const res = await fetch(apiUrl);
+                if (!res.ok) {
+                    throw new Error(`HTTP error! status: ${res.status}`);
+                }
 
-                const demographicsStats = calculateDemographics(rpcData.globalProfiles);
+                const json = await res.json();
+                if (!json.success || !json.payload) {
+                    throw new Error(json.error || "Falha ao processar métricas no servidor AWS Borda.");
+                }
 
-                const lightGlobal = { ...globalMetrics }; 
-                const lightFiltered = { ...filteredMetrics, profiles: [] };
-
-                const finalPayload = {
-                    globalMetrics: lightGlobal,
-                    filteredMetrics: lightFiltered,
-                    periodStats,
-                    visitsHeatmapData,
-                    demographics: demographicsStats
-                };
+                const finalPayload = json.payload;
 
                 if (isMounted) {
                     setMetrics(finalPayload);
                 }
             } catch (err: any) {
-                if (isMounted) setFetchError(`Erro de conexão Direta: ${err.message}`);
+                if (isMounted) setFetchError(`Erro de conexão da Nuvem: ${err.message}`);
             } finally {
                 if (isMounted) setIsLoading(false);
             }
