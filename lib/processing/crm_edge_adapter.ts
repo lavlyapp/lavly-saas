@@ -135,6 +135,7 @@ export function rehydratePeriodStats(sqlProfiles: any[], sqlGlobalProfiles: any[
     let onlyWashCount = 0;
     let onlyDryCount = 0;
     let washAndDryCount = 0;
+    let washAndDryBalancedCount = 0;
 
     const onlyWashList: SegmentedCustomer[] = [];
     const onlyDryList: SegmentedCustomer[] = [];
@@ -174,6 +175,9 @@ export function rehydratePeriodStats(sqlProfiles: any[], sqlGlobalProfiles: any[
         } else if (wCount > 0 && dCount > 0) {
             washAndDryCount++;
             washAndDryList.push(customer);
+            if (wCount === dCount) {
+                washAndDryBalancedCount++;
+            }
         }
 
         // Calculate New Customers and Returning Customers
@@ -207,7 +211,7 @@ export function rehydratePeriodStats(sqlProfiles: any[], sqlGlobalProfiles: any[
         onlyWashCount,
         onlyDryCount,
         washAndDryCount,
-        washAndDryBalancedCount: 0,
+        washAndDryBalancedCount,
         onlyWashList,
         onlyDryList,
         washAndDryList,
