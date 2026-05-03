@@ -213,16 +213,22 @@ export function ChurnAnalysis({ data, selectedStore, crmData: passedCrmData }: C
             )}
 
             {/* Indicators */}
-            <div className="grid grid-cols-2 gap-2 mt-auto">
+            <div className="grid grid-cols-3 gap-2 mt-auto">
+                <div className="bg-neutral-950/50 p-2 rounded border border-neutral-800 text-center">
+                    <span className="text-[10px] text-neutral-500 block">Total Gasto</span>
+                    <span className="text-sm font-bold text-emerald-400 truncate block">
+                        {profile.totalSpent.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </span>
+                </div>
                 <div className="bg-neutral-950/50 p-2 rounded border border-neutral-800 text-center">
                     <span className="text-[10px] text-neutral-500 block">Ticket Médio</span>
-                    <span className="text-sm font-bold text-neutral-300">
+                    <span className="text-sm font-bold text-neutral-300 truncate block">
                         {profile.averageTicket.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </span>
                 </div>
                 <div className="bg-neutral-950/50 p-2 rounded border border-neutral-800 text-center">
-                    <span className="text-[10px] text-neutral-500 block">Intervalo Médio</span>
-                    <span className="text-sm font-bold text-neutral-300">
+                    <span className="text-[10px] text-neutral-500 block">Interv. Médio</span>
+                    <span className="text-sm font-bold text-neutral-300 truncate block">
                         {Math.round(profile.averageInterval || 0)} dias
                     </span>
                 </div>
