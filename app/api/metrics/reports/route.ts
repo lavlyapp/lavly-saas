@@ -63,7 +63,7 @@ export async function GET(request: Request) {
         };
 
         // --- 2. Fetch Machine BI via Parallel Pagination ---
-        let countQuery = supabase.from('sales').select('id', { count: 'exact', head: true });
+        let countQuery = supabase.from('sales').select('id', { count: 'exact', head: true }).gte('data', queryStartIso);
         if (store !== 'Todas') countQuery = countQuery.eq('loja', store);
         
         const { count } = await countQuery;
@@ -73,7 +73,8 @@ export async function GET(request: Request) {
         const promises = [];
         for (let i = 0; i < Math.ceil(totalRows / pageSize); i++) {
             let pageQuery = supabase.from('sales')
-                .select('valor, orders(machine, service)')
+                .select('valor, produto, orders(machine, service)')
+                .gte('data', queryStartIso)
                 .order('data', { ascending: false })
                 .range(i * pageSize, (i + 1) * pageSize - 1);
             
@@ -89,7 +90,27 @@ export async function GET(request: Request) {
         for (let i = 0; i < recentRecords.length; i++) {
             const r = recentRecords[i];
             const ordersArray = Array.isArray(r.orders) ? r.orders : (r.orders ? [r.orders] : []);
-            if (ordersArray.length === 0) continue;
+            
+            if (ordersArray.length === 0) {
+                // Fallback for legacy records without orders relation
+                const p = (r.produto || '').toLowerCase();
+                let type = p.includes('sec') || p.includes('45 min') ? 'Secadora' : 'Lavadora';
+                let count = 1;
+                if (r.valor && r.valor >= 15) count = Math.max(1, Math.round(r.valor / 18.0));
+                
+                for(let k = 0; k < count; k++) {
+                    let mId = `Não Identificada ${k+1}`;
+                    let curr = machineMap.get(mId);
+                    if (!curr) {
+                        curr = { id: mId, type, totalMinutes: 0, totalRevenue: 0, cycles: 0 };
+                        machineMap.set(mId, curr);
+                    }
+                    curr.cycles++;
+                    curr.totalRevenue += (r.valor || 0) / count;
+                    curr.totalMinutes += type === 'Lavadora' ? 33.5 : 49;
+                }
+                continue;
+            }
 
             for (let j = 0; j < ordersArray.length; j++) {
                 const item = ordersArray[j];
