@@ -22,7 +22,7 @@ jobs:
     steps:
       - name: Disparar Sincronização Segura
         run: |
-          curl -X GET "https://www.teste.lavly.com.br/api/vmpay/cron/sync" \
+          curl -X GET "https://www.lavly.com.br/api/vmpay/cron/sync" \
           -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
           -s -o response.json -w "%{http_code}" > status_code.txt
           
