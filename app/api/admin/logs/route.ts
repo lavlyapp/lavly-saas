@@ -1,10 +1,33 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
     try {
+        const cookieStore = await cookies();
+        const supabaseAuth = createServerClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+                cookies: {
+                    get(name: string) { return cookieStore.get(name)?.value; }
+                }
+            }
+        );
+
+        const { data: { user } } = await supabaseAuth.auth.getUser();
+        if (!user) {
+            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const { data: profile } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).single();
+        if (!profile || profile.role !== 'admin') {
+            return NextResponse.json({ success: false, error: 'Forbidden: Admins only' }, { status: 403 });
+        }
+
         const { data: logsData, error: logsError } = await supabaseAdmin
             .from('activity_logs')
             .select('*')

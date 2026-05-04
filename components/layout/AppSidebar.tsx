@@ -31,7 +31,7 @@ export function AppSidebar({ activeTab, onTabChange, collapsed, onToggle, isMobi
         { id: 'machines', label: 'Máquinas', icon: WashingMachine, requiredPlan: 'prata', roles: ['proprietario'] }, // Silver+
         { id: 'queue', label: 'Teoria das Filas', icon: Clock, requiredPlan: 'prata', roles: ['proprietario'] }, // Silver+
         { id: 'reports', label: 'Relatórios', icon: FileText, requiredPlan: 'bronze', roles: ['proprietario', 'admin'] },
-        { id: 'logs', label: 'Logs do Sistema', icon: AlertCircle, requiredPlan: 'bronze', roles: ['proprietario', 'admin'] },
+        { id: 'logs', label: 'Logs do Sistema', icon: AlertCircle, requiredPlan: 'bronze', roles: ['admin'] },
         { id: 'admin', label: 'Lavly SaaS Admin', icon: LayoutDashboard, requiredPlan: 'bronze', roles: ['admin'] },
         { id: 'audit', label: 'Auditoria de Acessos', icon: ShieldCheck, requiredPlan: 'bronze', roles: ['admin'] },
         { id: 'settings', label: 'Configurações', icon: Settings, disabled: false, requiredPlan: 'prata', roles: ['proprietario', 'admin'] },

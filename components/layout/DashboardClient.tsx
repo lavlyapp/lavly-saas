@@ -560,8 +560,8 @@ function AppContent({
             )}
           </div>
         </div>
-        {/* Debug Logs Section - ALWAYS SHOW IF LOGS EXIST */}
-        {logs.length > 0 && (
+        {/* Debug Logs Section - ALWAYS SHOW IF LOGS EXIST AND USER IS ADMIN */}
+        {role === 'admin' && logs.length > 0 && (
           <div className="mt-8 p-4 bg-neutral-900 border border-neutral-800 rounded-lg overflow-hidden transition-all duration-300">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-bold text-neutral-400">Debug LOG do Sistema</h3>
