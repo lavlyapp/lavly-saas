@@ -28,14 +28,10 @@ export function CrmCustomerBlock({ periodStats, totalCustomers, globalProfiles =
         // Custom message based on segment context could be added here
         const message = `Olá ${name.split(' ')[0]}! Vimos que você lavou suas roupas na Lavly. Que tal finalizar com uma secagem perfeita? Temos um cupom especial para você! 🧺✨`;
 
-        const result = await sendWhatsAppMessage(phone, message);
-        setSending(null);
-
-        if (result.success) {
-            // Optional: visual feedback
-        } else {
-            alert(`Erro ao enviar: ${result.error}`);
-        }
+        const link = generateWhatsAppLink(phone, message);
+        window.open(link, '_blank');
+        
+        setTimeout(() => setSending(null), 1000);
     };
 
     if (!periodStats) return null;

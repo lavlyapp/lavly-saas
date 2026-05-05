@@ -6,7 +6,7 @@
  * The original recipient's number is requested prepended to the message body for verification.
  */
 
-export const SAFETY_LOCK_ENABLED = true;
+export const SAFETY_LOCK_ENABLED = false;
 // User provided test number: +55 85 99132-3344
 export const SAFETY_LOCK_NUMBER = "5585991323344";
 
