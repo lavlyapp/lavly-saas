@@ -20,9 +20,17 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+      - name: Set API URL based on branch
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "API_URL=https://www.lavly.com.br/api/vmpay/cron/sync" >> $GITHUB_ENV
+          else
+            echo "API_URL=https://teste.lavly.com.br/api/vmpay/cron/sync" >> $GITHUB_ENV
+          fi
+
       - name: Disparar Sincronização Segura
         run: |
-          curl -X GET "https://teste.lavly.com.br/api/vmpay/cron/sync" \
+          curl -X GET "${{ env.API_URL }}" \
           -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
           -s -o response.json -w "%{http_code}" > status_code.txt
           
