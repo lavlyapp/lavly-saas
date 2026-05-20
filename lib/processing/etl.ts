@@ -31,6 +31,7 @@ export interface SaleRecord {
     originalRow: number;
     birthDate?: Date;
     age?: number;
+    gender?: 'M' | 'F' | 'U';
 }
 
 export interface OrderRecord {
@@ -46,6 +47,7 @@ export interface OrderRecord {
     originalRow: number;
     birthDate?: Date;
     age?: number;
+    gender?: 'M' | 'F' | 'U';
 }
 
 export interface CustomerRecord {
@@ -228,6 +230,7 @@ async function parseExcel(buffer: ArrayBuffer, defaultStoreName: string): Promis
     let idxDesconto = -1;
     let idxTelefone = -1;
     let idxNascimento = -1;
+    let idxGenero = -1;
     let idxIdCliente = -1;
 
     // Orders Specific Headers
@@ -325,6 +328,7 @@ async function parseExcel(buffer: ArrayBuffer, defaultStoreName: string): Promis
                         idxNascimento = 18;
                     }
                 }
+                idxGenero = findColumnIndex(headers, 'customerGender');
 
                 idxData = iData;
                 idxValor = iValor;
@@ -381,6 +385,7 @@ async function parseExcel(buffer: ArrayBuffer, defaultStoreName: string): Promis
                 if (idxNascimento === -1 && headers.length > 18) {
                     idxNascimento = 18;
                 }
+                idxGenero = findColumnIndex(headers, 'customerGender');
             }
 
             if (headerRowIndex > -1) {
@@ -509,6 +514,13 @@ async function parseExcel(buffer: ArrayBuffer, defaultStoreName: string): Promis
                             }
                         }
 
+                        let gender: 'M' | 'F' | 'U' | undefined = undefined;
+                        if (idxGenero > -1) {
+                            const rawG = String(row.getCell(idxGenero + 1).value || '').trim().toUpperCase();
+                            if (rawG.startsWith('M') || rawG === 'MASCULINO') gender = 'M';
+                            else if (rawG.startsWith('F') || rawG === 'FEMININO') gender = 'F';
+                        }
+
                         orderRecords.push({
                             data: date,
                             loja: loja || defaultStoreName,
@@ -520,7 +532,8 @@ async function parseExcel(buffer: ArrayBuffer, defaultStoreName: string): Promis
                             customerId: idxIdCliente > -1 ? String(row.getCell(idxIdCliente + 1).value || '') : undefined,
                             originalRow: rowNumber,
                             birthDate,
-                            age
+                            age,
+                            gender
                         });
 
                     } else {
@@ -549,6 +562,13 @@ async function parseExcel(buffer: ArrayBuffer, defaultStoreName: string): Promis
                                 }
                                 if (ageCalc > 0 && ageCalc < 120) age = ageCalc;
                             }
+                        }
+                        
+                        let gender: 'M' | 'F' | 'U' | undefined = undefined;
+                        if (idxGenero > -1) {
+                            const rawG = String(row.getCell(idxGenero + 1).value || '').trim().toUpperCase();
+                            if (rawG.startsWith('M') || rawG === 'MASCULINO') gender = 'M';
+                            else if (rawG.startsWith('F') || rawG === 'FEMININO') gender = 'F';
                         }
 
                         // Composite ID Logic
@@ -634,7 +654,8 @@ async function parseExcel(buffer: ArrayBuffer, defaultStoreName: string): Promis
                             desconto,
                             items: parsedItems,
                             birthDate,
-                            age
+                            age,
+                            gender
                         });
                     }
                 }
@@ -695,7 +716,7 @@ async function parseCSV(buffer: ArrayBuffer, defaultStoreName: string): Promise<
 
                 let idxId = -1, idxData = -1, idxValor = -1, idxLoja = -1, idxCliente = -1, idxProduto = -1;
                 let idxFormaPagamento = -1, idxTipoCartao = -1, idxCategoriaVoucher = -1, idxDesconto = -1;
-                let idxTelefone = -1, idxNascimento = -1, idxIdCliente = -1, idxMaquina = -1, idxServico = -1, idxStatus = -1;
+                let idxTelefone = -1, idxNascimento = -1, idxGenero = -1, idxIdCliente = -1, idxMaquina = -1, idxServico = -1, idxStatus = -1;
                 let idxDateOnly = -1, idxTimeOnly = -1, idxCupom = -1;
 
                 let idxCustName = -1, idxCustGender = -1, idxCustRegDate = -1, idxCustCpf = -1, idxCustEmail = -1, idxCustPhone = -1;
@@ -741,6 +762,7 @@ async function parseCSV(buffer: ArrayBuffer, defaultStoreName: string): Promise<
                                     return norm.includes('nasc') || norm.includes('aniversario');
                                 });
                             }
+                            idxGenero = findColumnIndex(headers, 'customerGender');
 
                             idxData = iData;
                             idxValor = iValor;
@@ -781,6 +803,7 @@ async function parseCSV(buffer: ArrayBuffer, defaultStoreName: string): Promise<
                                     return norm.includes('nasc') || norm.includes('aniversario');
                                 });
                             }
+                            idxGenero = findColumnIndex(headers, 'customerGender');
                         }
 
                         if (headerRowIndex > -1) {
@@ -871,6 +894,13 @@ async function parseCSV(buffer: ArrayBuffer, defaultStoreName: string): Promise<
                                         }
                                     }
 
+                                    let gender: 'M' | 'F' | 'U' | undefined = undefined;
+                                    if (idxGenero > -1) {
+                                        const rawG = String(row[idxGenero] || '').trim().toUpperCase();
+                                        if (rawG.startsWith('M') || rawG === 'MASCULINO') gender = 'M';
+                                        else if (rawG.startsWith('F') || rawG === 'FEMININO') gender = 'F';
+                                    }
+
                                     orderRecords.push({
                                         data: date,
                                         loja: loja || defaultStoreName,
@@ -882,7 +912,8 @@ async function parseCSV(buffer: ArrayBuffer, defaultStoreName: string): Promise<
                                         customerId: idxIdCliente > -1 ? String(row[idxIdCliente] || '') : undefined,
                                         originalRow: r,
                                         birthDate,
-                                        age
+                                        age,
+                                        gender
                                     });
                                 } else {
                                     let telefone = idxTelefone > -1 ? String(row[idxTelefone] || '').trim() : '';
@@ -901,6 +932,13 @@ async function parseCSV(buffer: ArrayBuffer, defaultStoreName: string): Promise<
                                             if (today.getMonth() < parsedBirth.getMonth() || (today.getMonth() === parsedBirth.getMonth() && today.getDate() < parsedBirth.getDate())) ageCalc--;
                                             if (ageCalc > 0 && ageCalc < 120) age = ageCalc;
                                         }
+                                    }
+
+                                    let gender: 'M' | 'F' | 'U' | undefined = undefined;
+                                    if (idxGenero > -1) {
+                                        const rawG = String(row[idxGenero] || '').trim().toUpperCase();
+                                        if (rawG.startsWith('M') || rawG === 'MASCULINO') gender = 'M';
+                                        else if (rawG.startsWith('F') || rawG === 'FEMININO') gender = 'F';
                                     }
 
                                     let id = idxId > -1 ? String(row[idxId] || '').trim() : '';
@@ -943,7 +981,7 @@ async function parseCSV(buffer: ArrayBuffer, defaultStoreName: string): Promise<
                                         valor, formaPagamento,
                                         tipoCartao: idxTipoCartao > -1 ? String(row[idxTipoCartao] || '') : '',
                                         categoriaVoucher: idxCategoriaVoucher > -1 ? String(row[idxCategoriaVoucher] || '') : '',
-                                        desconto, items: parsedItems, birthDate, age
+                                        desconto, items: parsedItems, birthDate, age, gender
                                     });
                                 }
                             }

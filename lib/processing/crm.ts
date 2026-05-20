@@ -431,13 +431,14 @@ export function calculateCrmMetrics(records: SaleRecord[], customerRegistry?: Cu
             if (byId) registryData = byId;
         }
 
-        let gender: 'M' | 'F' | 'U' = 'U';
+        const salesGender = sales.find(s => s.gender && s.gender !== 'U')?.gender;
+        let gender: 'M' | 'F' | 'U' = salesGender || 'U';
         let registrationDate: Date | undefined = undefined;
         let cpf: string | undefined = undefined;
         let email: string | undefined = undefined;
 
         if (registryData) {
-            if (registryData.gender) gender = registryData.gender;
+            if (registryData.gender && registryData.gender !== 'U') gender = registryData.gender;
             if (registryData.registrationDate) registrationDate = registryData.registrationDate;
             if (registryData.cpf) cpf = registryData.cpf;
             if (registryData.email) email = registryData.email;

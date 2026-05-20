@@ -138,7 +138,7 @@ export function CustomerDemographics({ records, customers, selectedStore, orders
                         <div className="h-[200px] flex items-center justify-center relative">
                             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                                 <span className="text-3xl font-black text-white">{totalProfilesCount}</span>
-                                <span className="text-xs font-semibold text-neutral-500 mt-1 uppercase tracking-wider text-center">Clientes<br/><span className="text-[10px] text-neutral-600">(Identificados)</span></span>
+                                <span className="text-xs font-semibold text-neutral-500 mt-1 uppercase tracking-wider text-center">Clientes</span>
                             </div>
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
@@ -163,9 +163,9 @@ export function CustomerDemographics({ records, customers, selectedStore, orders
                                 </PieChart>
                             </ResponsiveContainer>
                         </div>
-                        <div className="grid grid-cols-2 gap-4 mt-6">
+                        <div className="grid grid-cols-2 gap-3 mt-6">
                             {genderData.map((d: any, i: number) => (
-                                <div key={i} className="flex justify-between items-center bg-neutral-900 border border-neutral-800 p-3 rounded-lg">
+                                <div key={i} className={`flex justify-between items-center bg-neutral-900 border border-neutral-800 p-3 rounded-lg ${d.name === 'Não Identificado' ? 'col-span-2' : ''}`}>
                                     <div className="flex items-center gap-2 text-xs text-neutral-400 mb-1">
                                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
                                         {d.name}
