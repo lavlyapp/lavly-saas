@@ -119,7 +119,11 @@ BEGIN
             GROUP BY UPPER(TRIM(name))
         ),
         final_profiles AS (
-            SELECT ca.*, COALESCE(ca.gender, ga.gender, 'U') AS gender
+            SELECT 
+                ca.name, ca.phone, ca.g_total_spent, ca.g_total_visits, ca.g_first_visit, ca.g_last_visit, ca.g_w_count, ca.g_d_count,
+                ca.p_total_spent, ca.p_total_visits, ca.p_first_visit, ca.p_last_visit, ca.p_w_count, ca.p_d_count,
+                ca.last_visit_before_period, ca.birth_date, ca.age,
+                COALESCE(ca.gender, ga.gender, 'U') AS gender
             FROM customer_agg ca
             LEFT JOIN gender_agg ga ON ga.upper_name = UPPER(TRIM(ca.name))
         )
