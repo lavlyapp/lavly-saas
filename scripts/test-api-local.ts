@@ -1,1 +1,0 @@
-import { GET } from './app/api/admin/profiles/route'; async function test() { const req = new Request('http://localhost'); const res = await GET(req); const j = await res.json(); console.log(JSON.stringify(j, null, 2)); } test();  

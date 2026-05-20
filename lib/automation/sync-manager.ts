@@ -308,6 +308,16 @@ export async function runGlobalSync(isManual: boolean = false, force: boolean = 
                     }).eq('cnpj', cred.cnpj);
                  }
             }
+            // Sync customers - Reativado a pedido do cliente para trazer gênero
+            try {
+                const { syncVMPayCustomers } = await import("../vmpay-client");
+                for (const cred of groupCreds) {
+                    await syncVMPayCustomers(cred, db);
+                }
+            } catch (e) {
+                console.warn(`[Sync Manager] Warn: Customer Sync error for group:`, e);
+            }
+
         } catch (groupError) {
             console.error(`[Sync Manager] Falha Crítica na Malha Principal API Key ${apiKey}`, groupError);
         }

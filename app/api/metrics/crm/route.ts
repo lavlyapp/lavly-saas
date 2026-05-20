@@ -78,35 +78,84 @@ export async function GET(request: Request) {
             p_end_date: queryEndIso
         });
 
+        let usedFallback = false;
+        let fbGlobal, fbFiltered, fbPeriod, fbDemographics, fbHeatmap;
+
         if (rpcError || !rpcData) {
-            console.error("[API CRM] RPC Error:", rpcError);
-            throw new Error(rpcError?.message || "Função RPC get_crm_backend_metrics não instalada no BD!");
+            console.warn("[API CRM] RPC Error (Ambiguous Column or Missing). Starting JS Fallback...", rpcError?.message);
+            usedFallback = true;
+            console.time('[API CRM] Fallback Data Fetch');
+            let q = supabase.from('sales').select('*');
+            if (store !== 'Todas') {
+                q = q.eq('loja', store);
+            }
+            
+            // Bring customers to get the genders
+            let qCust = supabase.from('customers').select('*');
+
+            const [ { data: salesRaw, error: sErr }, { data: custRaw } ] = await Promise.all([q, qCust]);
+            console.timeEnd('[API CRM] Fallback Data Fetch');
+
+            if (sErr) throw new Error(sErr.message);
+
+            console.time('[API CRM] Fallback JS Calculation');
+            const { calculateCrmMetrics, calculatePeriodStats, calculateVisitsHeatmap } = await import('@/lib/processing/crm');
+            
+            fbGlobal = calculateCrmMetrics(salesRaw || [], custRaw || []);
+            
+            let filtered = salesRaw || [];
+            if (queryStartIso && queryEndIso) {
+                const sD = new Date(queryStartIso);
+                const eD = new Date(queryEndIso);
+                filtered = filtered.filter((s: any) => {
+                    const d = new Date(s.data);
+                    return d >= sD && d <= eD;
+                });
+            }
+            
+            fbFiltered = calculateCrmMetrics(filtered, custRaw || []);
+            fbPeriod = calculatePeriodStats(filtered, salesRaw || []);
+            fbHeatmap = calculateVisitsHeatmap(filtered);
+            
+            const { calculateDemographics } = await import('@/lib/processing/crm_edge_adapter');
+            fbDemographics = calculateDemographics(fbGlobal.profiles);
+            console.timeEnd('[API CRM] Fallback JS Calculation');
         }
 
-        console.time('[API CRM] Processing Edge JSON Rehydration');
-        
-        const { rehydrateCrmMetrics, rehydratePeriodStats, calculateDemographics } = await import('@/lib/processing/crm_edge_adapter');
+        let globalMetrics, filteredMetrics, periodStats, visitsHeatmapData, demographicsStats;
 
-        const globalMetrics = rehydrateCrmMetrics(rpcData.globalProfiles);
-        const filteredMetrics = rehydrateCrmMetrics(rpcData.periodProfiles);
-        const periodStats = rehydratePeriodStats(rpcData.periodProfiles, rpcData.globalProfiles);
-        
-        // Heatmap Translation
-        let visitsHeatmapData = Array.from({length: 7}, () => Array(24).fill(0));
-        rpcData.heatmap?.forEach((h: any) => {
-            if(h.dow >= 0 && h.dow < 7 && h.hod >= 0 && h.hod < 24){
-                 visitsHeatmapData[h.dow][h.hod] = h.count;
-            }
-        });
+        if (usedFallback) {
+            globalMetrics = fbGlobal;
+            filteredMetrics = fbFiltered;
+            periodStats = fbPeriod;
+            visitsHeatmapData = fbHeatmap;
+            demographicsStats = fbDemographics;
+        } else {
+            console.time('[API CRM] Processing Edge JSON Rehydration');
+            
+            const { rehydrateCrmMetrics, rehydratePeriodStats, calculateDemographics } = await import('@/lib/processing/crm_edge_adapter');
 
-        // Compute Demographics server-side to save browser CPU and bandwidth
-        const demographicsStats = calculateDemographics(globalMetrics.profiles);
+            globalMetrics = rehydrateCrmMetrics(rpcData.globalProfiles);
+            filteredMetrics = rehydrateCrmMetrics(rpcData.periodProfiles);
+            periodStats = rehydratePeriodStats(rpcData.periodProfiles, rpcData.globalProfiles);
+            
+            // Heatmap Translation
+            visitsHeatmapData = Array.from({length: 7}, () => Array(24).fill(0));
+            rpcData.heatmap?.forEach((h: any) => {
+                if(h.dow >= 0 && h.dow < 7 && h.hod >= 0 && h.hod < 24){
+                     visitsHeatmapData[h.dow][h.hod] = h.count;
+                }
+            });
+
+            // Compute Demographics server-side to save browser CPU and bandwidth
+            demographicsStats = calculateDemographics(globalMetrics.profiles);
+            console.timeEnd('[API CRM] Processing Edge JSON Rehydration');
+        }
 
         // Strip heavy arrays to optimize JSON transfer for the filtered metrics, but keep global full for Churn analysis
         const lightGlobal = { ...globalMetrics }; 
         const lightFiltered = { ...filteredMetrics, profiles: [] };
 
-        console.timeEnd('[API CRM] Processing Edge JSON Rehydration');
         console.timeEnd('[API CRM] Total Execution');
 
         return NextResponse.json({
