@@ -36,6 +36,7 @@ export async function upsertSales(records: SaleRecord[], supabaseClient?: any) {
             telefone: r.telefone,
             birth_date: r.birthDate ? r.birthDate.toISOString().split('T')[0] : null,
             age: r.age,
+            gender: r.gender || 'U',
             updated_at: new Date().toISOString()
         }));
 
