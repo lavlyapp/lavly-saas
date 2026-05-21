@@ -2,14 +2,16 @@ name: VMPay Global Sync Automation
 
 on:
   schedule:
-    # HORÁRIOS DIURNOS (07:00 às 23:00 no Brasil = 10:00 às 02:00 no UTC)
+    # HORÁRIOS DIURNOS (07:30 às 22:00 no Brasil = 10:30 às 01:00 no UTC)
     # Roda a cada 30 minutos
-    - cron: '*/30 10-23 * * *'
-    - cron: '*/30 0-2 * * *'
+    - cron: '30 10 * * *'      # 07:30 BRT (10:30 UTC)
+    - cron: '*/30 11-23 * * *' # 08:00 às 20:30 BRT (11:00 às 23:30 UTC)
+    - cron: '*/30 0 * * *'     # 21:00 e 21:30 BRT (00:00 e 00:30 UTC)
+    - cron: '0 1 * * *'        # 22:00 BRT (01:00 UTC)
     
-    # HORÁRIOS NOTURNOS (23:00 às 07:00 no Brasil = 02:00 às 10:00 no UTC)
-    # Roda a cada 2 horas (04:00, 06:00, 08:00 UTC)
-    - cron: '0 4,6,8 * * *'
+    # HORÁRIOS NOTURNOS (De 3 em 3 horas após as 22:00 BRT)
+    # Roda às 01:00 e 04:00 BRT (04:00 e 07:00 UTC)
+    - cron: '0 4,7 * * *'
 
   # Permite acionamento manual do fluxo de trabalho direto pelo painel do GitHub
   workflow_dispatch:
