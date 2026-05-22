@@ -32,6 +32,34 @@ export async function GET(request: Request) {
         const { syncVMPayCustomers } = await import('@/lib/vmpay-client');
         const customers = await syncVMPayCustomers();
 
+        // Upsert Customers into Supabase
+        if (supabaseClient && customers.length > 0) {
+            console.log(`[Cron API] Upserting ${customers.length} customers to database...`);
+            const upsertPayload = customers.map(c => ({
+                customer_id: c.id,
+                name: c.name,
+                phone: c.phone || null,
+                email: c.email || null,
+                cpf: c.cpf || null,
+                gender: c.gender,
+                registration_date: c.registrationDate ? c.registrationDate.toISOString() : null
+            }));
+
+            // Chunk upsert to avoid large payload errors
+            const chunkSize = 500;
+            for (let i = 0; i < upsertPayload.length; i += chunkSize) {
+                const chunk = upsertPayload.slice(i, i + chunkSize);
+                const { error: upsertError } = await supabaseClient
+                    .from('customers')
+                    .upsert(chunk, { onConflict: 'customer_id' });
+
+                if (upsertError) {
+                    console.error(`[Cron API] Error upserting customers chunk ${i}:`, upsertError.message);
+                }
+            }
+            console.log(`[Cron API] Customers upsert completed.`);
+        }
+
         // Refresh materialized views to ensure Financial Dashboard shows new sales immediately
         if (supabaseClient) {
             const { error: refreshError } = await supabaseClient.rpc('refresh_lavly_materialized_views');
