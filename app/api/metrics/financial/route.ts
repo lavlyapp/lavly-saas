@@ -157,21 +157,11 @@ export async function GET(request: Request) {
         const daysInViewMonth = getDaysInMonth(viewDate);
         const projection = last30DaysAvg * daysInViewMonth;
 
-// Fix Clientes Atendidos (Unique Customers) heuristic for physical totems missing customer_id
-let uniqueC = metrics.period.uniqueCustomers || 0;
+// Force ticket recalculation outside SQL to prevent discrepancies with BRLD exclusions
+const uniqueC = metrics.period.uniqueCustomers || 0;
 const totalT = metrics.salesMetrics.totalTransactions || 0;
 
-// Se os clientes únicos registrados no banco forem muito baixos (menos que a metade das transações),
-// significa que a maioria das vendas veio do totem sem identificação. 
-// Aplicamos a heurística de 0.85 (aproximadamente 1.17 cestos por cliente).
-if (uniqueC < totalT * 0.4) {
-    uniqueC = Math.max(uniqueC, Math.floor(totalT * 0.85));
-}
-if (uniqueC === 0 && totalT > 0) {
-    uniqueC = Math.floor(totalT * 0.85) || 1;
-}
-
-// O Ticket Médio REAL é o Faturamento dividido pelo número de Clientes Atendidos
+// O Ticket Médio REAL é o Faturamento dividido pelo número de Clientes Atendidos (Visitas reais)
 const finalTicket = uniqueC > 0 ? (metrics.salesMetrics.totalRevenue / uniqueC) : 0;
 
 return NextResponse.json({
