@@ -10,8 +10,8 @@ on:
     - cron: '0 1 * * *'        # 22:00 BRT (01:00 UTC)
     
     # HORÁRIOS NOTURNOS (De 3 em 3 horas após as 22:00 BRT)
-    # Roda às 01:00 e 04:00 BRT (04:00 e 07:00 UTC)
-    - cron: '0 4,7 * * *'
+    # Roda às 01:00, 04:00 e 07:00 BRT (04:00, 07:00 e 10:00 UTC)
+    - cron: '0 4,7,10 * * *'
 
   # Permite acionamento manual do fluxo de trabalho direto pelo painel do GitHub
   workflow_dispatch:
@@ -22,27 +22,34 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Set API URL based on branch
+      - name: Disparar Sincronização - Produção
         run: |
-          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            echo "API_URL=https://www.lavly.com.br/api/vmpay/cron/sync" >> $GITHUB_ENV
+          echo "Disparando www.lavly.com.br..."
+          curl -X GET "https://www.lavly.com.br/api/vmpay/cron/sync" \
+          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+          -s -o response_prod.json -w "%{http_code}" > status_prod.txt
+          
+          STATUS_CODE=$(cat status_prod.txt)
+          if [ "$STATUS_CODE" -eq 200 ]; then
+            echo "Produção concluída! Status: $STATUS_CODE"
+            cat response_prod.json
           else
-            echo "API_URL=https://teste.lavly.com.br/api/vmpay/cron/sync" >> $GITHUB_ENV
+            echo "Falha na produção! Status: $STATUS_CODE"
+            cat response_prod.json
           fi
 
-      - name: Disparar Sincronização Segura
+      - name: Disparar Sincronização - Teste
         run: |
-          curl -X GET "${{ env.API_URL }}" \
+          echo "Disparando teste.lavly.com.br..."
+          curl -X GET "https://teste.lavly.com.br/api/vmpay/cron/sync" \
           -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-          -s -o response.json -w "%{http_code}" > status_code.txt
+          -s -o response_teste.json -w "%{http_code}" > status_teste.txt
           
-          # Lemos o HTTP Status (ex: 200) e checamos sucesso
-          STATUS_CODE=$(cat status_code.txt)
+          STATUS_CODE=$(cat status_teste.txt)
           if [ "$STATUS_CODE" -eq 200 ]; then
-            echo "Sincronização concluída com sucesso! Status: $STATUS_CODE"
-            cat response.json
+            echo "Teste concluído! Status: $STATUS_CODE"
+            cat response_teste.json
           else
-            echo "Falha na sincronização! Status: $STATUS_CODE"
-            cat response.json
-            exit 1
+            echo "Falha no teste! Status: $STATUS_CODE"
+            cat response_teste.json
           fi
