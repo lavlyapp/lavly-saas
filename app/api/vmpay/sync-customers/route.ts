@@ -5,7 +5,7 @@ import { upsertCustomers } from '@/lib/persistence';
 import { createClient } from '@supabase/supabase-js';
 import { logActivity } from '@/lib/logger';
 
-export const maxDuration = 300; // 5 minutes for Vercel
+export const maxDuration = 60; // 60 segundos (limite Hobby)
 
 export async function GET(request: Request) {
     try {
