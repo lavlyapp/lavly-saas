@@ -159,7 +159,8 @@ export async function GET(request: Request) {
 
 // Force ticket recalculation outside SQL to prevent discrepancies with BRLD exclusions
 const uniqueC = metrics.period.uniqueCustomers || 0;
-const finalTicket = uniqueC > 0 ? (metrics.salesMetrics.totalRevenue / uniqueC) : 0;
+const totalT = metrics.salesMetrics.totalTransactions || 0;
+const finalTicket = totalT > 0 ? (metrics.salesMetrics.totalRevenue / totalT) : 0;
 
 return NextResponse.json({
             success: true,
