@@ -93,15 +93,20 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
     let shouldSync = false;
     let syncIntervalReason = "";
 
-    // Se for manual, sempre sincroniza. Se for automático, verifica as regras originais.
+    // Se for manual, sempre sincroniza. Se for automático, verifica as regras.
     if (isManual) {
         shouldSync = true;
         syncIntervalReason = "Acionamento Manual";
     } else {
-        // Lógica de sync automático baseada na regra de AC ou tempo (Restaurada)
+        // Bloqueia sincronização automática conforme pedido do usuário
+        console.log(`[Sync Manager] ⛔ Sincronização automática para ${cred.name} IGNORADA (Configuração do Usuário).`);
+        return [];
+
+        /* 
+        // Lógica original de sync automático desativada:
         if (!cred.hasAcSubscription || !acTurnOffAt || now >= acTurnOffAt) {
             shouldSync = true;
-            syncIntervalReason = "Standby (CRON Automático)";
+            syncIntervalReason = "Standby (1min)";
         } else {
             const minutesRemaining = (acTurnOffAt.getTime() - now.getTime()) / 60000;
             const minutesSinceSync = (now.getTime() - lastSync.getTime()) / 60000;
@@ -111,6 +116,7 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
                 syncIntervalReason = minutesRemaining <= 3 ? "Near Expiry (2-3min)" : "30min Refresh";
             }
         }
+        */
     }
 
     if (shouldSync) {
@@ -195,9 +201,9 @@ export async function runGlobalSync(isManual: boolean = false, force: boolean = 
         return [];
     }
 
-    // Sincronização Automática Reativada conforme solicitação
     if (!isManual) {
-        console.log(`[Sync Manager] ✅ Sincronização automática (CRON) detectada. Prosseguindo...`);
+        console.log(`[Sync Manager] ⛔ Sincronização automática para grupo ignorada (Configuração de Plataforma).`);
+        return [];
     }
 
     console.log(`[Sync Manager] Processing ${credentials.length} stores. Agrupando por API Key para max performance...`);
