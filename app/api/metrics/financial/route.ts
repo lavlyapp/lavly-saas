@@ -118,7 +118,7 @@ export async function GET(request: Request) {
         const metrics = rpcData;
 
         // --- 3. Compute Legacy Data Forms (Translate array to expected Object) ---
-        const paymentStats = { debit: 0, credit: 0, pix: 0, voucher: 0, voucherDetails: {} as Record<string, number>, coupons: 0, others: 0, otherTypes: [] as string[] };
+        const paymentStats = { debit: 0, credit: 0, pix: 0, voucher: 0, app: 0, voucherDetails: {} as Record<string, number>, coupons: 0, others: 0, otherTypes: [] as string[] };
         
         metrics.paymentStats.forEach((r: any) => {
             const raw  = String(r.method || 'não identificado');
@@ -141,9 +141,9 @@ export async function GET(request: Request) {
             ) {
                 paymentStats.voucher += value;
 
-            // --- App (PIX pelo app ou crédito online) → classifica como crédito ---
+            // --- App (pagamento pelo app) → categoria própria ---
             } else if (type === 'app') {
-                paymentStats.credit += value;
+                paymentStats.app += value;
 
             // --- TEF Crédito (maquininha crédito) ---
             } else if (
