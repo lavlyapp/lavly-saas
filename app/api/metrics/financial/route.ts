@@ -121,32 +121,66 @@ export async function GET(request: Request) {
         const paymentStats = { debit: 0, credit: 0, pix: 0, voucher: 0, voucherDetails: {} as Record<string, number>, coupons: 0, others: 0, otherTypes: [] as string[] };
         
         metrics.paymentStats.forEach((r: any) => {
-            const raw = String(r.method || 'não identificado');
-            const type = raw.toLowerCase().replace(/_/g, ' '); // normaliza CARTAO_DEBITO → cartao debito
+            const raw  = String(r.method || 'não identificado');
+            const type = raw.toLowerCase().replace(/_/g, ' ');
             const value = Number(r.valor) || 0;
 
-            if (type.includes('pix') || type.includes('qrcode') || type.includes('qr code')) {
+            // --- PIX / QR Code ---
+            if (
+                type === 'pix' ||
+                type.includes('qrcode') || type.includes('qr code') || type.includes('qr_code')
+            ) {
                 paymentStats.pix += value;
+
+            // --- Voucher / Pré-pago ---
             } else if (
-                type.includes('voucher') || type.includes('prepago') || type.includes('pré-pago') || 
-                type.includes('pre pago') || type.includes('saldo') || type.includes('credito loja') ||
+                type === 'voucher' ||
+                type.includes('prepago') || type.includes('pré-pago') || type.includes('pre pago') ||
+                type.includes('saldo') || type.includes('credito loja') ||
                 type.includes('fidelidade') || type.includes('wallet')
             ) {
                 paymentStats.voucher += value;
+
+            // --- App (PIX pelo app ou crédito online) → classifica como crédito ---
+            } else if (type === 'app') {
+                paymentStats.credit += value;
+
+            // --- TEF Crédito (maquininha crédito) ---
             } else if (
-                type.includes('credito') || type.includes('crédito') || type.includes('credit') ||
-                type.includes('cartao credito') || type.includes('cartão crédito') ||
-                type.includes('mastercard cre') || type.includes('visa cre') || type.includes('elo cre') ||
-                type.includes('app') || type.includes('online')
+                type.includes('tef') && (
+                    type.includes('credito') || type.includes('crédito') ||
+                    type.includes('credit') || type.includes('cred')
+                )
             ) {
                 paymentStats.credit += value;
+
+            // --- TEF Débito (maquininha débito) ---
             } else if (
-                type.includes('debito') || type.includes('débito') || type.includes('debit') ||
-                type.includes('cartao debito') || type.includes('cartão débito') ||
-                type.includes('mastercard deb') || type.includes('visa deb') || type.includes('elo deb') ||
-                type.includes('classico') || type.includes('clássico') || type.includes('electron')
+                type === 'tef' || // TEF sem tipo_cartao = tratar como débito (mais comum em lavanderias)
+                (type.includes('tef') && (
+                    type.includes('debito') || type.includes('débito') ||
+                    type.includes('debit') || type.includes('deb') || type.includes('electron')
+                ))
             ) {
                 paymentStats.debit += value;
+
+            // --- Cartão crédito (outros formatos) ---
+            } else if (
+                type.includes('credito') || type.includes('crédito') || type.includes('credit') ||
+                type.includes('mastercard cre') || type.includes('visa cre') || type.includes('elo cre') ||
+                type.includes('online')
+            ) {
+                paymentStats.credit += value;
+
+            // --- Cartão débito (outros formatos) ---
+            } else if (
+                type.includes('debito') || type.includes('débito') || type.includes('debit') ||
+                type.includes('mastercard deb') || type.includes('visa deb') || type.includes('elo deb') ||
+                type.includes('classico') || type.includes('clássico')
+            ) {
+                paymentStats.debit += value;
+
+            // --- Não mapeado ---
             } else {
                 paymentStats.others += value;
                 if (!paymentStats.otherTypes.includes(raw)) {
@@ -154,6 +188,7 @@ export async function GET(request: Request) {
                 }
             }
         });
+
 
         // --- 4. Compute last30DaysAvg using parallel result ---
         let last30DaysAvg = 0;
