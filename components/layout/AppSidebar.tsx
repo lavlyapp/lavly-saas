@@ -22,7 +22,7 @@ export function AppSidebar({ activeTab, onTabChange, collapsed, onToggle, isMobi
     const { role, logout, user } = useAuth();
 
     const menuItems = [
-        { id: 'financial', label: 'Financeiro', icon: LayoutDashboard, requiredPlan: 'bronze', roles: ['proprietario', 'atendente'] },
+        { id: 'financial', label: 'FinanceiroE', icon: LayoutDashboard, requiredPlan: 'bronze', roles: ['proprietario', 'atendente'] },
         { id: 'comparative', label: 'Fin. Comparativo (12M)', icon: BarChart2, requiredPlan: 'prata', roles: ['proprietario'] }, // New Comparative Dashboard
         { id: 'crm', label: 'CRM & Clientes', icon: Users, requiredPlan: 'prata', roles: ['proprietario'] }, // Silver+
         { id: 'demographics', label: 'Quem é o Cliente?', icon: Fingerprint, requiredPlan: 'bronze', roles: ['proprietario'] }, // Visible to all (Bronze+), blocked inside
