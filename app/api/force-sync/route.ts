@@ -5,7 +5,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 300; // 5 minutes for Vercel Hobby
+export const maxDuration = 60; // 60 seconds maximum for Vercel Hobby
 
 export async function GET(request: Request) {
     const cookieStore = await cookies();

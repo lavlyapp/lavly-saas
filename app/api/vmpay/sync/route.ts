@@ -3,7 +3,7 @@ import { runGlobalSync } from '@/lib/automation/sync-manager';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-export const maxDuration = 300; // 5 minutos (limite Pro) para garantir que o sync completo não sofra timeout
+export const maxDuration = 60; // 60 segundos (limite Hobby)
 import { logActivity } from '@/lib/logger';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';

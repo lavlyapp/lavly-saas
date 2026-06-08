@@ -453,6 +453,14 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                                     <td className="p-4 text-right font-mono text-neutral-200 font-medium">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(paymentStats.voucher)}</td>
                                     <td className="p-4 text-right text-neutral-500">{summary.totalValue > 0 ? ((paymentStats.voucher / summary.totalValue) * 100).toFixed(1) : 0}%</td>
                                 </tr>
+                                {/* App */}
+                                {paymentStats.app > 0 && (
+                                    <tr className="hover:bg-neutral-800/30 transition-colors">
+                                        <td className="p-4 text-neutral-300">App</td>
+                                        <td className="p-4 text-right font-mono text-neutral-200">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(paymentStats.app)}</td>
+                                        <td className="p-4 text-right text-neutral-500">{summary.totalValue > 0 ? ((paymentStats.app / summary.totalValue) * 100).toFixed(1) : 0}%</td>
+                                    </tr>
+                                )}
                                 {/* Voucher Details */}
                                 {Object.entries(paymentStats.voucherDetails).map(([cat, val]) => (
                                     <tr key={cat} className="hover:bg-neutral-800/30 transition-colors">

@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { startOfMonth, subMonths, endOfMonth, getDaysInMonth } from 'date-fns';
+import { getDaysInMonth } from 'date-fns';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // Aumenta o limite de 10s para 60s na Vercel
 
 export async function GET(request: Request) {
     try {
@@ -61,10 +62,10 @@ export async function GET(request: Request) {
         let queryEndIso: string | null = null;
 
         // Convert boundary strings to ISO boundaries for PostgreSQL
-        function getBrtIsoStart(dateStr) {
+        function getBrtIsoStart(dateStr: string) {
             return new Date(`${dateStr}T00:00:00-03:00`).toISOString();
         }
-        function getBrtIsoEnd(dateStr) {
+        function getBrtIsoEnd(dateStr: string) {
             return new Date(`${dateStr}T23:59:59.999-03:00`).toISOString();
         }
 
@@ -85,13 +86,29 @@ export async function GET(request: Request) {
             queryEndIso = getBrtIsoEnd(endCustom);
         }
 
-        // --- 2. Call Native Database RPC (Supabase Backend) ---
+        // --- 2. SINGLE RPC Call (corrige o bug de dupla chamada ao banco) ---
+        const thirtyDaysAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
         console.log(`[API Metrics] Running RPC for ${period} on ${store}...`);
-        const { data: rpcData, error: rpcError } = await supabase.rpc('get_financial_dashboard_metrics', {
-            p_store: store,
-            p_start_date: queryStartIso,
-            p_end_date: queryEndIso
-        });
+
+        // Executa as duas queries em PARALELO (ao mesmo tempo) ao invés de sequencial
+        const [mainResult, last30Result] = await Promise.all([
+            supabase.rpc('get_financial_dashboard_metrics', {
+                p_store: store,
+                p_start_date: queryStartIso,
+                p_end_date: queryEndIso
+            }),
+            // Só busca os dados de 30 dias para períodos que precisam de projeção
+            (period === 'thisMonth' || period === 'today' || period === 'yesterday')
+                ? supabase.rpc('get_financial_dashboard_metrics', {
+                    p_store: store,
+                    p_start_date: thirtyDaysAgoIso,
+                    p_end_date: now.toISOString()
+                })
+                : Promise.resolve({ data: null, error: null })
+        ]);
+
+        const { data: rpcData, error: rpcError } = mainResult;
 
         if (rpcError || !rpcData) {
             console.error("RPC Error:", rpcError);
@@ -101,67 +118,110 @@ export async function GET(request: Request) {
         const metrics = rpcData;
 
         // --- 3. Compute Legacy Data Forms (Translate array to expected Object) ---
-        const paymentStats = { debit: 0, credit: 0, pix: 0, voucher: 0, voucherDetails: {} as Record<string, number>, coupons: 0, others: 0, otherTypes: [] as string[] };
+        const paymentStats = { debit: 0, credit: 0, pix: 0, voucher: 0, app: 0, voucherDetails: {} as Record<string, number>, coupons: 0, others: 0, otherTypes: [] as string[] };
         
         metrics.paymentStats.forEach((r: any) => {
-            const type = String(r.method || 'não identificado').toLowerCase();
+            const raw  = String(r.method || 'não identificado');
+            const type = raw.toLowerCase().replace(/_/g, ' ');
             const value = Number(r.valor) || 0;
-            if (type.includes('pix') || type.includes('qrcode')) paymentStats.pix += value;
-            else if (type.includes('voucher') || type.includes('prepago') || type.includes('saldo')) paymentStats.voucher += value;
-            else if (type.includes('credito') || type.includes('crédito') || type.includes('app') || type.includes('online')) paymentStats.credit += value;
-            else if (type.includes('debito') || type.includes('débito') || type.includes('classico')) paymentStats.debit += value;
-            else paymentStats.others += value;
+
+            // --- PIX / QR Code ---
+            if (
+                type === 'pix' ||
+                type.includes('qrcode') || type.includes('qr code') || type.includes('qr_code')
+            ) {
+                paymentStats.pix += value;
+
+            // --- Voucher / Pré-pago ---
+            } else if (
+                type === 'voucher' ||
+                type.includes('prepago') || type.includes('pré-pago') || type.includes('pre pago') ||
+                type.includes('saldo') || type.includes('credito loja') ||
+                type.includes('fidelidade') || type.includes('wallet')
+            ) {
+                paymentStats.voucher += value;
+
+            // --- App (pagamento pelo app) → categoria própria ---
+            } else if (type === 'app') {
+                paymentStats.app += value;
+
+            // --- TEF Crédito (maquininha crédito) ---
+            } else if (
+                type.includes('tef') && (
+                    type.includes('credito') || type.includes('crédito') ||
+                    type.includes('credit') || type.includes('cred')
+                )
+            ) {
+                paymentStats.credit += value;
+
+            // --- TEF Débito (maquininha débito) ---
+            } else if (
+                type === 'tef' || // TEF sem tipo_cartao = tratar como débito (mais comum em lavanderias)
+                (type.includes('tef') && (
+                    type.includes('debito') || type.includes('débito') ||
+                    type.includes('debit') || type.includes('deb') || type.includes('electron')
+                ))
+            ) {
+                paymentStats.debit += value;
+
+            // --- Cartão crédito (outros formatos) ---
+            } else if (
+                type.includes('credito') || type.includes('crédito') || type.includes('credit') ||
+                type.includes('mastercard cre') || type.includes('visa cre') || type.includes('elo cre') ||
+                type.includes('online')
+            ) {
+                paymentStats.credit += value;
+
+            // --- Cartão débito (outros formatos) ---
+            } else if (
+                type.includes('debito') || type.includes('débito') || type.includes('debit') ||
+                type.includes('mastercard deb') || type.includes('visa deb') || type.includes('elo deb') ||
+                type.includes('classico') || type.includes('clássico')
+            ) {
+                paymentStats.debit += value;
+
+            // --- Não mapeado ---
+            } else {
+                paymentStats.others += value;
+                if (!paymentStats.otherTypes.includes(raw)) {
+                    paymentStats.otherTypes.push(raw);
+                }
+            }
         });
 
-        // --- 4. Parallel Quick Counts (Averages & Coupons) ---
-        const thirtyDaysAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-        const baseQuery = store !== 'Todas' ? supabase.from('sales').select('valor').eq('loja', store) : supabase.from('sales').select('valor');
-        
-        const qCoupons = supabase.from('sales').select('*', {count: 'exact', head: true}).gt('desconto', 0);
-        if (store !== 'Todas') qCoupons.eq('loja', store);
-        if (queryStartIso) qCoupons.gte('data', queryStartIso);
-        if (queryEndIso) qCoupons.lte('data', queryEndIso);
 
-        const qLast30 = baseQuery.gte('data', thirtyDaysAgoIso);
-        
-        let couponsRes = { count: 0 };
+        // --- 4. Compute last30DaysAvg using parallel result ---
         let last30DaysAvg = 0;
-        
+
         if (period === 'thisMonth' || period === 'today' || period === 'yesterday') {
-            const [l30] = await Promise.all([
-                supabase.rpc('get_financial_dashboard_metrics', { p_store: store, p_start_date: thirtyDaysAgoIso, p_end_date: now.toISOString() })
-            ]);
-            if (l30?.data?.salesMetrics) {
-                last30DaysAvg = l30.data.salesMetrics.totalRevenue / 30;
+            if (last30Result?.data?.salesMetrics) {
+                last30DaysAvg = last30Result.data.salesMetrics.totalRevenue / 30;
             }
         } else if (period === 'lastMonth') {
-            // Para meses passados completos (lastMonth), a média é Base / Dias do Mês Visto
             const vDate = metrics.period?.startDate ? new Date(metrics.period.startDate) : new Date();
             const daysInMonth = getDaysInMonth(vDate);
             if (metrics.salesMetrics?.totalRevenue) {
                 last30DaysAvg = metrics.salesMetrics.totalRevenue / (daysInMonth || 30);
             }
         } else {
-             // Para 'custom' e 'all'
-             const daysDiff = metrics.period?.startDate && metrics.period?.endDate ? 
+            const daysDiff = metrics.period?.startDate && metrics.period?.endDate ? 
                 Math.max(1, Math.round((new Date(metrics.period.endDate).getTime() - new Date(metrics.period.startDate).getTime()) / 86400000)) 
                 : 30;
-             if (metrics.salesMetrics?.totalRevenue) {
-                 last30DaysAvg = metrics.salesMetrics.totalRevenue / daysDiff;
-             }
+            if (metrics.salesMetrics?.totalRevenue) {
+                last30DaysAvg = metrics.salesMetrics.totalRevenue / daysDiff;
+            }
         }
-        
-        paymentStats.coupons = couponsRes.count || 0;
 
         const viewDate = metrics.period?.startDate ? new Date(metrics.period.startDate) : new Date();
         const daysInViewMonth = getDaysInMonth(viewDate);
         const projection = last30DaysAvg * daysInViewMonth;
 
-// Force ticket recalculation outside SQL to prevent discrepancies with BRLD exclusions
-const uniqueC = metrics.period.uniqueCustomers || 0;
-const finalTicket = uniqueC > 0 ? (metrics.salesMetrics.totalRevenue / uniqueC) : 0;
+        // Force ticket recalculation outside SQL to prevent discrepancies with BRLD exclusions
+        const uniqueC = metrics.period.uniqueCustomers || 0;
+        const totalT = metrics.salesMetrics.totalTransactions || 0;
+        const finalTicket = totalT > 0 ? (metrics.salesMetrics.totalRevenue / totalT) : 0;
 
-return NextResponse.json({
+        return NextResponse.json({
             success: true,
             payload: {
                 summary: {
