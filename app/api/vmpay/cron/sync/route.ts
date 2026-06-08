@@ -3,6 +3,9 @@ import { runGlobalSync } from '@/lib/automation/sync-manager';
 import { logActivity } from '@/lib/logger';
 import { createClient } from '@supabase/supabase-js';
 
+// Aumenta o limite de 10s (default Hobby) para 60s — necessário para sync + refresh views
+export const maxDuration = 60;
+
 // This endpoint is meant to be called by a CRON job (e.g. Vercel Cron or external service)
 export async function GET(request: Request) {
     try {
