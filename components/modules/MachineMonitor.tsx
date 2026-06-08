@@ -64,7 +64,6 @@ export function MachineMonitor({ allRecords, allOrders, selectedStore }: Machine
 
     // Cloud-native priority: Combine current API orders with historical records to prevent dropping machines that haven't been used in the last 48h
     const rawTargetArray = [...apiOrders, ...(allOrders || []), ...(allRecords || [])];
-    console.log(`[MachineMonitor-DEBUG] isLoading=${isLoading} | apiOrders=${apiOrders.length} | allOrders=${(allOrders||[]).length} | allRecords=${(allRecords||[]).length} | rawTarget=${rawTargetArray.length}`);
     if (isLoading && rawTargetArray.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center p-8 mt-6 bg-neutral-900/50 rounded-xl border border-neutral-800">
@@ -210,7 +209,6 @@ export function MachineMonitor({ allRecords, allOrders, selectedStore }: Machine
             const endTime = addMinutes(record.data, duration);
             const isRunning = isAfter(endTime, now);
             const remaining = isRunning ? differenceInMinutes(endTime, now) : 0;
-            if (isRunning) console.log(`[MachineMonitor-DEBUG] RUNNING: ${name} @ ${store} | lastUse=${record.data?.toISOString?.()} | endTime=${endTime?.toISOString?.()} | now=${now.toISOString()}`);
 
             // Stats
             if (type === 'washer') {
