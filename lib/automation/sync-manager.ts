@@ -177,8 +177,8 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
 /**
  * Global entry point for the Sync loop
  */
-export async function runGlobalSync(isManual: boolean = false, force: boolean = false, supabaseClient?: any, cnpj?: string) {
-    console.log(`[Sync Manager] Starting global loop at ${new Date().toISOString()} (Manual: ${isManual}, Force: ${force}, Filter: ${cnpj || 'None'})`);
+export async function runGlobalSync(isManual: boolean = false, force: boolean = false, supabaseClient?: any, cnpj?: string, lookbackHours?: number) {
+    console.log(`[Sync Manager] Starting global loop at ${new Date().toISOString()} (Manual: ${isManual}, Force: ${force}, Filter: ${cnpj || 'None'}, Lookback: ${lookbackHours || 12}h)`);
     const allNewSales: any[] = [];
 
     // 1. Handle AC Turn Off for expired timers (independente do sync de vendas)
@@ -243,10 +243,13 @@ export async function runGlobalSync(isManual: boolean = false, force: boolean = 
 
             if (!minDateObj) minDateObj = new Date(fallbackDateStr);
 
-            // Janela de Cura: 12h (cron roda a cada 30min, 12h garante que nenhuma venda seja perdida)
+            // Janela de Cura: 12h por padrão (cron roda a cada 30min).
+            // lookbackHours permite backfill manual de períodos maiores (ex: ?hours=96)
             if (!force) {
-                const safeDate = new Date(now.getTime() - 12 * 60 * 60 * 1000);
+                const windowHours = lookbackHours && lookbackHours > 0 ? lookbackHours : 12;
+                const safeDate = new Date(now.getTime() - windowHours * 60 * 60 * 1000);
                 if (minDateObj < safeDate) minDateObj = safeDate;
+                else if (lookbackHours && lookbackHours > 0) minDateObj = safeDate; // backfill explícito sempre usa a janela pedida
             }
 
             console.log(`[Sync Manager] Data limiar conjunta da Rede: ${minDateObj.toISOString()}`);
