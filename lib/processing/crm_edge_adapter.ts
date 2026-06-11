@@ -100,7 +100,8 @@ export function rehydrateCrmMetrics(sqlProfiles: any[]): CrmSummary {
     return {
         profiles,
         globalAvgBasketsPerVisit: totalVisitsGlobal > 0 ? totalCyclesGlobal / totalVisitsGlobal : 0,
-        globalAverageTicket: totalVisitsGlobal > 0 ? totalRevenue / totalVisitsGlobal : 0,
+        // Ticket Médio = Faturamento / Clientes Atendidos (definição de negócio Lavly)
+        globalAverageTicket: totalUniqueCustomers > 0 ? totalRevenue / totalUniqueCustomers : 0,
         totalUniqueCustomers,
         totalCycles: totalCyclesGlobal,
         totalRevenue,

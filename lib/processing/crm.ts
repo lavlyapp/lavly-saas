@@ -543,7 +543,8 @@ export function calculateCrmMetrics(records: SaleRecord[], customerRegistry?: Cu
     }
 
     const avgTypeFrequency = freqCount > 0 ? sumFreq / freqCount : 0;
-    const globalAverageTicket = totalVisitsGlobal > 0 ? totalRevenue / totalVisitsGlobal : 0;
+    // Ticket Médio = Faturamento / Clientes Atendidos (definição de negócio Lavly)
+    const globalAverageTicket = totalUniqueCustomers > 0 ? totalRevenue / totalUniqueCustomers : 0;
     const globalAvgBasketsPerVisit = 0;
     const avgLtv = totalUniqueCustomers > 0 ? (totalRevenue / totalUniqueCustomers) : 0;
     const retentionRate = totalUniqueCustomers > 0 ? recurring / totalUniqueCustomers : 0;
