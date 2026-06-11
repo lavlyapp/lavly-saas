@@ -15,6 +15,22 @@ finanças, CRM de clientes, climatização e automações.
 > Histórico: IAs anteriores "corrigiram" fuso por conta própria e quebraram os cálculos.
 > Se algum horário parecer errado, REPORTAR ao Eduardo antes de alterar qualquer código.
 
+## ⛔ Fórmulas de negócio invioláveis
+> Estas fórmulas foram definidas pelo Eduardo e são VERDADE ABSOLUTA do projeto.
+> IAs anteriores as alteravam "por conta própria" repetidamente. NUNCA mudá-las sem pedido explícito.
+
+1. **Ticket Médio = Faturamento ÷ Clientes Atendidos (únicos)**
+   - NUNCA dividir por número de transações. Onde está implementado:
+     `app/api/metrics/financial/route.ts`, `app/api/metrics/comparative/route.ts`,
+     `lib/processing/crm.ts` (globalAverageTicket), `lib/processing/crm_edge_adapter.ts`
+2. **Cestos (lavagens/secagens)** — classificação canônica por `service`:
+   - Lavagem: `upper(service) LIKE '%LAV%' OR '%30 MIN%'`
+   - Secagem: `upper(service) LIKE '%SEC%' OR '%45 MIN%'`
+   - Fonte: `mv_orders_daily` somando `qtd_ciclos`. NUNCA reescrever essa classificação.
+3. **Gênero dos clientes** — valores `M`/`F`/`U` na coluna `customers.gender`.
+   - O sync de clientes (`syncVMPayCustomers`) DEVE sempre preservar/gravar o gender.
+   - NUNCA remover o campo gender de upserts da tabela customers.
+
 ## Regra de ouro de branches
 > **Todo desenvolvimento vai para `staging` primeiro.**
 > Só vai para `main` quando Eduardo aprovar explicitamente com "pode subir para produção".

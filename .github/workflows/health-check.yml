@@ -1,0 +1,61 @@
+name: Lavly Health Sentinel
+
+on:
+  schedule:
+    # Roda 15 minutos após cada sync (offset :15/:45) das 07:15 às 22:15 BRT
+    - cron: '15,45 10-23 * * *' # 07:15 às 20:45 BRT
+    - cron: '15,45 0 * * *'     # 21:15 e 21:45 BRT
+    - cron: '15 1 * * *'        # 22:15 BRT
+    - cron: '15 4 * * *'        # 01:15 BRT (após o sync noturno)
+
+  workflow_dispatch:
+
+jobs:
+  health:
+    name: Verificar Pipeline de Dados
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Health Check - Teste (staging)
+        run: |
+          echo "Verificando teste.lavly.com.br/api/health..."
+          STATUS_CODE=$(curl -X GET "https://teste.lavly.com.br/api/health" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "x-vercel-protection-bypass: ${{ secrets.VERCEL_BYPASS_SECRET }}" \
+            -s -o health_teste.json -w "%{http_code}")
+
+          echo "Status: $STATUS_CODE"
+          cat health_teste.json
+
+          if [ "$STATUS_CODE" -eq 404 ]; then
+            echo "::warning::Endpoint /api/health ainda não publicado no teste."
+            exit 0
+          fi
+
+          if [ "$STATUS_CODE" -ne 200 ]; then
+            echo "::error::SENTINELA (teste): pipeline de dados com problema! Veja os checks acima."
+            exit 1
+          fi
+          echo "Teste saudável!"
+
+      - name: Health Check - Produção
+        if: always()
+        run: |
+          echo "Verificando www.lavly.com.br/api/health..."
+          STATUS_CODE=$(curl -X GET "https://www.lavly.com.br/api/health" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -s -o health_prod.json -w "%{http_code}")
+
+          echo "Status: $STATUS_CODE"
+          cat health_prod.json
+
+          if [ "$STATUS_CODE" -eq 404 ]; then
+            echo "::warning::Endpoint /api/health ainda não publicado em produção (aguardando merge aprovado)."
+            exit 0
+          fi
+
+          if [ "$STATUS_CODE" -ne 200 ]; then
+            echo "::error::SENTINELA (produção): pipeline de dados com problema! Veja os checks acima."
+            exit 1
+          fi
+          echo "Produção saudável!"
