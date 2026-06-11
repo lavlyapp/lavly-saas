@@ -14,6 +14,9 @@ export async function GET(request: Request) {
         const cnpj = searchParams.get('store') || searchParams.get('cnpj') || undefined;
         const force = searchParams.get('force') === 'true';
         const isManual = searchParams.get('manual') === 'true' || searchParams.get('isManual') === 'true' || searchParams.get('source') === 'manual';
+        // Backfill: ?hours=96 amplia a janela de busca (padrão 12h)
+        const hoursParam = parseInt(searchParams.get('hours') || '0', 10);
+        const lookbackHours = hoursParam > 0 && hoursParam <= 240 ? hoursParam : undefined;
 
         // We MUST use the service role key for cron jobs and background syncs
         // because RLS blocking will silently drop the sales but return success
@@ -46,7 +49,7 @@ export async function GET(request: Request) {
 
         let newSales: any[] = [];
         try {
-           newSales = await runGlobalSync(isManual, force, supabaseClient, cnpj);
+           newSales = await runGlobalSync(isManual, force, supabaseClient, cnpj, lookbackHours);
         } finally {
            console.log = originalLog;
            console.error = originalError;
