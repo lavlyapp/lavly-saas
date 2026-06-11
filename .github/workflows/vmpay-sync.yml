@@ -2,16 +2,14 @@ name: VMPay Global Sync Automation
 
 on:
   schedule:
-    # HORÁRIOS DIURNOS (07:30 às 22:00 no Brasil = 10:30 às 01:00 no UTC)
-    # Roda a cada 30 minutos
-    - cron: '30 10 * * *'      # 07:30 BRT (10:30 UTC)
-    - cron: '*/30 11-23 * * *' # 08:00 às 20:30 BRT (11:00 às 23:30 UTC)
+    # HORÁRIOS DIURNOS — a cada 30 minutos das 07:00 às 22:00 BRT
+    # (BRT = UTC-3, portanto 10:00 UTC às 01:00 UTC do dia seguinte)
+    - cron: '*/30 10-23 * * *' # 07:00 às 20:30 BRT (10:00 às 23:30 UTC)
     - cron: '*/30 0 * * *'     # 21:00 e 21:30 BRT (00:00 e 00:30 UTC)
     - cron: '0 1 * * *'        # 22:00 BRT (01:00 UTC)
-    
-    # HORÁRIOS NOTURNOS (De 3 em 3 horas após as 22:00 BRT)
-    # Roda às 01:00 e 04:00 BRT (04:00 e 07:00 UTC)
-    - cron: '0 4,7 * * *'
+
+    # HORÁRIO NOTURNO — uma única execução às 01:00 BRT
+    - cron: '0 4 * * *'        # 01:00 BRT (04:00 UTC)
 
   # Permite acionamento manual do fluxo de trabalho direto pelo painel do GitHub
   workflow_dispatch:
@@ -20,29 +18,51 @@ jobs:
   sync:
     name: Trigger Next.js Cron Endpoint
     runs-on: ubuntu-latest
-    
-    steps:
-      - name: Set API URL based on branch
-        run: |
-          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            echo "API_URL=https://www.lavly.com.br/api/vmpay/cron/sync" >> $GITHUB_ENV
-          else
-            echo "API_URL=https://teste.lavly.com.br/api/vmpay/cron/sync" >> $GITHUB_ENV
-          fi
 
-      - name: Disparar Sincronização Segura
+    steps:
+      - name: Disparar Sincronização - Produção
         run: |
-          curl -X GET "${{ env.API_URL }}" \
-          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-          -s -o response.json -w "%{http_code}" > status_code.txt
-          
-          # Lemos o HTTP Status (ex: 200) e checamos sucesso
-          STATUS_CODE=$(cat status_code.txt)
-          if [ "$STATUS_CODE" -eq 200 ]; then
-            echo "Sincronização concluída com sucesso! Status: $STATUS_CODE"
-            cat response.json
-          else
-            echo "Falha na sincronização! Status: $STATUS_CODE"
-            cat response.json
+          echo "Disparando www.lavly.com.br..."
+          STATUS_CODE=$(curl -X GET "https://www.lavly.com.br/api/vmpay/cron/sync" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -s -o response_prod.json -w "%{http_code}")
+
+          echo "Status: $STATUS_CODE"
+          cat response_prod.json
+
+          if [ "$STATUS_CODE" -ne 200 ]; then
+            echo "::error::Falha na produção! Status HTTP: $STATUS_CODE"
             exit 1
           fi
+
+          # Detecta resposta HTML (página de login da Vercel = Deployment Protection ativa)
+          if grep -qi "<html\|Vercel Authentication" response_prod.json; then
+            echo "::error::Produção retornou página de autenticação da Vercel em vez da API. Verifique o Deployment Protection."
+            exit 1
+          fi
+
+          echo "Produção concluída com sucesso!"
+
+      - name: Disparar Sincronização - Teste
+        if: always()
+        run: |
+          echo "Disparando teste.lavly.com.br..."
+          STATUS_CODE=$(curl -X GET "https://teste.lavly.com.br/api/vmpay/cron/sync" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "x-vercel-protection-bypass: ${{ secrets.VERCEL_BYPASS_SECRET }}" \
+            -s -o response_teste.json -w "%{http_code}")
+
+          echo "Status: $STATUS_CODE"
+          cat response_teste.json
+
+          if [ "$STATUS_CODE" -ne 200 ]; then
+            echo "::error::Falha no teste! Status HTTP: $STATUS_CODE"
+            exit 1
+          fi
+
+          if grep -qi "<html\|Vercel Authentication" response_teste.json; then
+            echo "::error::Teste retornou página de autenticação da Vercel em vez da API. Configure o VERCEL_BYPASS_SECRET ou desative o Deployment Protection."
+            exit 1
+          fi
+
+          echo "Teste concluído com sucesso!"
