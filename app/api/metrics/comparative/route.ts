@@ -62,22 +62,38 @@ export async function GET(request: Request) {
 
         const rawMonthly = dbData?.monthlyStats || [];
         const rawHeatmap = dbData?.heatmap || [];
+        const rawServices = dbData?.services || [];
+        const rawGender = dbData?.gender || [];
 
         // Build guaranteed 12-month sequential array for chart
         const monthlyStats = last12Months.map(month => {
              const row = rawMonthly.find((r: any) => r.year_month === month.yearMonth);
+             const svc = rawServices.find((r: any) => r.year_month === month.yearMonth);
+             const gen = rawGender.find((r: any) => r.year_month === month.yearMonth);
+
              const revenue = parseFloat(row?.revenue || 0);
              const transactions = parseInt(row?.transactions || 0, 10);
              const uniqueCustomers = parseInt(row?.unique_customers || 0, 10);
-             
+
+             const washes = parseInt(svc?.washes || 0, 10);
+             const dries = parseInt(svc?.dries || 0, 10);
+
+             const males = parseInt(gen?.males || 0, 10);
+             const females = parseInt(gen?.females || 0, 10);
+             const totalGender = males + females;
+
              return {
                  name: month.label,
                  revenue,
                  transactions,
                  uniqueCustomers,
-                 ticket: transactions > 0 ? revenue / transactions : 0, 
-                 baskets: 0, washes: 0, dries: 0,
-                 malePct: 0, femalePct: 0
+                 // Ticket Médio = Faturamento / Clientes Atendidos (definição de negócio Lavly)
+                 ticket: uniqueCustomers > 0 ? revenue / uniqueCustomers : 0,
+                 baskets: washes + dries,
+                 washes,
+                 dries,
+                 malePct: totalGender > 0 ? Math.round((males / totalGender) * 1000) / 10 : 0,
+                 femalePct: totalGender > 0 ? Math.round((females / totalGender) * 1000) / 10 : 0
              };
         });
 

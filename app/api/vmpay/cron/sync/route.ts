@@ -3,6 +3,9 @@ import { runGlobalSync } from '@/lib/automation/sync-manager';
 import { logActivity } from '@/lib/logger';
 import { createClient } from '@supabase/supabase-js';
 
+// Aumenta o limite de 10s (default Hobby) para 60s — necessário para sync + refresh views
+export const maxDuration = 60;
+
 // This endpoint is meant to be called by a CRON job (e.g. Vercel Cron or external service)
 export async function GET(request: Request) {
     try {
@@ -31,6 +34,34 @@ export async function GET(request: Request) {
         // Sync customers as part of the daily routine
         const { syncVMPayCustomers } = await import('@/lib/vmpay-client');
         const customers = await syncVMPayCustomers();
+
+        // Upsert Customers into Supabase
+        if (supabaseClient && customers.length > 0) {
+            console.log(`[Cron API] Upserting ${customers.length} customers to database...`);
+            const upsertPayload = customers.map(c => ({
+                customer_id: c.id,
+                name: c.name,
+                phone: c.phone || null,
+                email: c.email || null,
+                cpf: c.cpf || null,
+                gender: c.gender,
+                registration_date: c.registrationDate ? c.registrationDate.toISOString() : null
+            }));
+
+            // Chunk upsert to avoid large payload errors
+            const chunkSize = 500;
+            for (let i = 0; i < upsertPayload.length; i += chunkSize) {
+                const chunk = upsertPayload.slice(i, i + chunkSize);
+                const { error: upsertError } = await supabaseClient
+                    .from('customers')
+                    .upsert(chunk, { onConflict: 'customer_id' });
+
+                if (upsertError) {
+                    console.error(`[Cron API] Error upserting customers chunk ${i}:`, upsertError.message);
+                }
+            }
+            console.log(`[Cron API] Customers upsert completed.`);
+        }
 
         // Refresh materialized views to ensure Financial Dashboard shows new sales immediately
         if (supabaseClient) {

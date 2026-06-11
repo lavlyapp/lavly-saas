@@ -75,7 +75,7 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
     // Limitador Intransponível: Nunca baixar mais que a safeWindow (Cura)
     if (!force && lastSync) {
         const currentHour = now.getHours();
-        let lookbackHours = isManual ? 72 : 12; // Auto-Sync: 12h, Manual: 72h
+        let lookbackHours = isManual ? 12 : 12; // Auto-Sync: 12h, Manual: 12h (cron roda a cada 30min, 12h cobre qualquer lacuna)
         
         if (!isManual && currentHour === 3) lookbackHours = 120; // Madrugada extra profundo
         
@@ -93,20 +93,15 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
     let shouldSync = false;
     let syncIntervalReason = "";
 
-    // Se for manual, sempre sincroniza. Se for automático, verifica as regras.
+    // Se for manual, sempre sincroniza. Se for automático, verifica as regras originais.
     if (isManual) {
         shouldSync = true;
         syncIntervalReason = "Acionamento Manual";
     } else {
-        // Bloqueia sincronização automática conforme pedido do usuário
-        console.log(`[Sync Manager] ⛔ Sincronização automática para ${cred.name} IGNORADA (Configuração do Usuário).`);
-        return [];
-
-        /* 
-        // Lógica original de sync automático desativada:
+        // Lógica de sync automático baseada na regra de AC ou tempo (Restaurada)
         if (!cred.hasAcSubscription || !acTurnOffAt || now >= acTurnOffAt) {
             shouldSync = true;
-            syncIntervalReason = "Standby (1min)";
+            syncIntervalReason = "Standby (CRON Automático)";
         } else {
             const minutesRemaining = (acTurnOffAt.getTime() - now.getTime()) / 60000;
             const minutesSinceSync = (now.getTime() - lastSync.getTime()) / 60000;
@@ -116,7 +111,6 @@ export async function processStoreSync(cred: VMPayCredential, isManual: boolean 
                 syncIntervalReason = minutesRemaining <= 3 ? "Near Expiry (2-3min)" : "30min Refresh";
             }
         }
-        */
     }
 
     if (shouldSync) {
@@ -201,9 +195,9 @@ export async function runGlobalSync(isManual: boolean = false, force: boolean = 
         return [];
     }
 
+    // Sincronização Automática Reativada conforme solicitação
     if (!isManual) {
-        console.log(`[Sync Manager] ⛔ Sincronização automática para grupo ignorada (Configuração de Plataforma).`);
-        return [];
+        console.log(`[Sync Manager] ✅ Sincronização automática (CRON) detectada. Prosseguindo...`);
     }
 
     console.log(`[Sync Manager] Processing ${credentials.length} stores. Agrupando por API Key para max performance...`);
@@ -221,21 +215,22 @@ export async function runGlobalSync(isManual: boolean = false, force: boolean = 
     const { upsertSales } = await import("../persistence");
     const db = supabaseClient || supabase;
 
-    for (const [apiKey, groupCreds] of groupsByApiKey.entries()) {
+    // Processa grupos em PARALELO para reduzir tempo total dentro do limite de 60s da Vercel Hobby
+    await Promise.all(Array.from(groupsByApiKey.entries()).map(async ([apiKey, groupCreds]) => {
         try {
             console.log(`\n[Sync Manager] --- Iniciando Grupo API: ${apiKey.substring(0, 6)}... (${groupCreds.length} lojas) ---`);
-            
+
             const storeCnpjs = groupCreds.map(c => c.cnpj);
             const { data: storesInfo } = await db.from('stores')
                 .select('cnpj, last_sync_sales')
                 .in('cnpj', storeCnpjs);
-                
+
             const syncMap = new Map();
             if (storesInfo) storesInfo.forEach((s: any) => syncMap.set(s.cnpj, s.last_sync_sales));
 
             const now = new Date();
             const fallbackDateStr = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000).toISOString();
-            
+
             let minDateObj: Date | null = null;
             for (const c of groupCreds) {
                 let sSync = syncMap.get(c.cnpj);
@@ -248,15 +243,15 @@ export async function runGlobalSync(isManual: boolean = false, force: boolean = 
 
             if (!minDateObj) minDateObj = new Date(fallbackDateStr);
 
-            // Janela de Cura Restrita (72h para sanar bugs do hardware da VMPay)
-            if (!force && isManual) {
-                const safeDate = new Date(now.getTime() - 72 * 60 * 60 * 1000);
-                if (minDateObj > safeDate) minDateObj = safeDate;
+            // Janela de Cura: 12h (cron roda a cada 30min, 12h garante que nenhuma venda seja perdida)
+            if (!force) {
+                const safeDate = new Date(now.getTime() - 12 * 60 * 60 * 1000);
+                if (minDateObj < safeDate) minDateObj = safeDate;
             }
 
             console.log(`[Sync Manager] Data limiar conjunta da Rede: ${minDateObj.toISOString()}`);
             console.log(`[Sync Manager] Extraindo banco da VMPay de uma só vez para ${groupCreds.length} CNPJs...`);
-            
+
             // SINGLE NETWORK CALL FOR ALL STORES IN THIS API KEY!
             const sales = await syncVMPaySales(minDateObj, now, groupCreds[0]);
 
@@ -268,8 +263,8 @@ export async function runGlobalSync(isManual: boolean = false, force: boolean = 
                 }
                 allNewSales.push(...sales);
 
-                console.log(`[Sync Manager] Upsert finalizado. Acionando Automações Locais e Atualizando Clientes...`);
-                for (const cred of groupCreds) {
+                console.log(`[Sync Manager] Upsert finalizado. Atualizando timestamps das lojas...`);
+                await Promise.all(groupCreds.map(async (cred) => {
                     await db.from('stores').upsert({
                         cnpj: cred.cnpj,
                         name: getCanonicalStoreName(cred.name),
@@ -282,11 +277,11 @@ export async function runGlobalSync(isManual: boolean = false, force: boolean = 
                     if (cred.hasAcSubscription) {
                         const storeName = getCanonicalStoreName(cred.name);
                         const storeSales = sales.filter((s: any) => s.loja === storeName);
-                        
+
                         if (storeSales.length > 0) {
                             let maxEndTime = now;
                             for (const sale of storeSales) {
-                                const isDry = sale.produto?.toUpperCase().includes("SEC") || 
+                                const isDry = sale.produto?.toUpperCase().includes("SEC") ||
                                               sale.items?.some((i: any) => i.service.toUpperCase().includes("SEC"));
                                 const duration = isDry ? 70 : 50;
                                 const saleEndTime = new Date(sale.data.getTime() + duration * 60000);
@@ -297,31 +292,24 @@ export async function runGlobalSync(isManual: boolean = false, force: boolean = 
                             }
                         }
                     }
-                }
+                }));
                 console.log(`[Sync Manager] Grupo de ${groupCreds.length} lojas Sincronizado integralmente!`);
             } else {
                  console.log(`[Sync Manager] Nenhuma venda nova localizada no grupo.`);
-                 for (const cred of groupCreds) {
-                    await db.from('stores').update({ 
+                 await Promise.all(groupCreds.map(cred =>
+                    db.from('stores').update({
                         last_sync_sales: now.toISOString(),
-                        updated_at: now.toISOString() 
-                    }).eq('cnpj', cred.cnpj);
-                 }
+                        updated_at: now.toISOString()
+                    }).eq('cnpj', cred.cnpj)
+                 ));
             }
-            // Sync customers - Reativado a pedido do cliente para trazer gênero
-            try {
-                const { syncVMPayCustomers } = await import("../vmpay-client");
-                for (const cred of groupCreds) {
-                    await syncVMPayCustomers(cred, db);
-                }
-            } catch (e) {
-                console.warn(`[Sync Manager] Warn: Customer Sync error for group:`, e);
-            }
+            // Nota: syncVMPayCustomers foi removido deste loop para não ultrapassar o limite de 60s
+            // da Vercel Hobby. Use o endpoint /api/vmpay/sync-customers para sincronizar clientes.
 
         } catch (groupError) {
             console.error(`[Sync Manager] Falha Crítica na Malha Principal API Key ${apiKey}`, groupError);
         }
-    }
+    }));
 
     return allNewSales;
 }

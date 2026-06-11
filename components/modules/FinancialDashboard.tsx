@@ -34,20 +34,11 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
         setRenderTime(format(new Date(), "dd/MM/yyyy HH:mm"));
     }, [data, allRecords, allOrders]);
 
-    // DEBUG: Inject precise length check
-    console.log(`[DEBUG-FinancialDashboard] Mounted. Stores: ${selectedStore}`);
-    console.log(`[DEBUG-FinancialDashboard] data.records: ${data?.records?.length} | data.orders: ${data?.orders?.length}`);
-    console.log(`[DEBUG-FinancialDashboard] allRecords: ${allRecords?.length} | allOrders: ${allOrders?.length}`);
-
     // --- State for Filters ---
     // --- Smart Date Initialization (Lazy State) ---
     const [period, setPeriod] = useState<PeriodOption>(() => {
         if (role === 'atendente') return 'today';
         if (!data?.records || data.records.length === 0) return 'thisMonth';
-
-        // DEBUG: Check first record
-        const first = data.records[0];
-        console.log(`[FinancialDashboard] First record store: "${first.loja}" | Selected: "${selectedStore}" | Records: ${data.records.length}`);
 
         const now = new Date();
         const startOfCurrentMonth = startOfMonth(now);
@@ -118,10 +109,6 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
     useEffect(() => {
         let isMounted = true;
         const fetchMetrics = async () => {
-            const ts = new Date().toISOString().substring(11, 23); // HH:mm:ss.SSS
-            console.log(`[${ts}] [FinancialDashboard] Iniciando fetchMetrics na borda AWS para período: ${period}...`);
-            const startTime = performance.now();
-            
             setFetchError(null);
             setIsLoading(true);
             try {
@@ -132,28 +119,19 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                 }
                 params += `&t=${Date.now()}`;
 
-                console.log(`[${new Date().toISOString().substring(11, 23)}] [FinancialDashboard] Enviando requisição HTTP: /api/metrics/financial${params}`);
                 const res = await fetch(`/api/metrics/financial${params}`);
-                
-                const jsonStart = performance.now();
-                console.log(`[${new Date().toISOString().substring(11, 23)}] [FinancialDashboard] Resposta HTTP ${res.status} recebida em ${((jsonStart - startTime) / 1000).toFixed(2)}s. Extraindo JSON...`);
                 const json = await res.json();
-                
-                const endTime = performance.now();
-                console.log(`[${new Date().toISOString().substring(11, 23)}] [FinancialDashboard] JSON decodificado. Tempo Total: ${((endTime - startTime) / 1000).toFixed(2)}s.`);
-                
+
                 if (isMounted) {
                     if (json.success) {
                         setMetrics(json.payload);
-                        console.log(`[${new Date().toISOString().substring(11, 23)}] [FinancialDashboard] O Gráfico foi renderizado e os dados foram aplicados na tela com sucesso.`);
                     } else {
-                        setFetchError(`Vercel API falhou: ${json.error}`);
+                        setFetchError(json.error || 'Erro desconhecido ao carregar as métricas.');
                     }
                 }
             } catch (err: any) {
-                if (isMounted) setFetchError(`Falha TRÁGICA no Fetch: ${err.message}`);
-                const errTime = new Date().toISOString().substring(11, 23);
-                console.error(`[${errTime}] [FinancialDashboard] Falha TRÁGICA no Fetch após ${((performance.now() - startTime) / 1000).toFixed(2)}s.`, err);
+                if (isMounted) setFetchError(err.message);
+                console.error(`[FinancialDashboard] Falha ao buscar métricas:`, err);
             } finally {
                 if (isMounted) setIsLoading(false);
             }
@@ -181,10 +159,10 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                 <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-4">
                     <span className="text-red-500 font-bold text-2xl">X</span>
                 </div>
-                <h3 className="text-xl font-bold font-mono text-red-400">Erro Fatal na Borda AWS</h3>
+                <h3 className="text-xl font-bold text-red-400">Não foi possível carregar as métricas</h3>
                 <p className="text-neutral-400 text-center max-w-lg mb-4">{fetchError}</p>
                 <div className="group">
-                    <p className="text-neutral-500 text-sm">Parece que a API Serverless bloqueou a operação. Verifique o problema ou contate o suporte.</p>
+                    <p className="text-neutral-500 text-sm">Tente recarregar a página. Se o problema persistir, contate o suporte.</p>
                 </div>
             </div>
         );
@@ -194,8 +172,8 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
         return (
             <div className="space-y-6 animate-in fade-in duration-500 min-h-[500px] flex flex-col items-center justify-center">
                 <RefreshCw className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
-                <p className="text-neutral-400 font-medium">Buscando métricas na borda da AWS...</p>
-                <p className="text-neutral-600 text-sm">Calculando centenas de milhares de linhas instantaneamente.</p>
+                <p className="text-neutral-400 font-medium">Carregando métricas financeiras...</p>
+                <p className="text-neutral-600 text-sm">Consolidando vendas, cestos e formas de pagamento.</p>
             </div>
         );
     }
@@ -266,7 +244,7 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                                 <div className="p-2 bg-neutral-800 rounded-lg"><TrendingUp className="w-4 h-4 text-neutral-400" /></div>
                                 <span className="text-sm font-medium">Transações</span>
                             </div>
-                            <div className="text-3xl font-bold text-neutral-100">{summary.totalSales}</div>
+                            <div className="text-3xl font-bold text-neutral-100">{new Intl.NumberFormat('pt-BR').format(summary.totalSales)}</div>
                         </div>
 
                         {/* 3. Ticket Médio */}
@@ -292,15 +270,15 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                         <span className="text-sm font-medium">Cestos</span>
                     </div>
                     <div className="relative z-10">
-                        <div className="text-3xl font-bold text-neutral-100 mb-2">{basketsMetrics.totalBaskets}</div>
-                        <div className="flex gap-4 text-xs font-medium">
-                            <div className="flex items-center gap-1.5 text-sky-400/80 bg-sky-400/10 px-2 py-1 rounded-md">
+                        <div className="text-3xl font-bold text-neutral-100 mb-2">{new Intl.NumberFormat('pt-BR').format(basketsMetrics.totalBaskets)}</div>
+                        <div className="flex gap-3 text-xs font-medium">
+                            <div className="flex items-center gap-1.5 text-sky-400/80 bg-sky-400/10 px-2 py-1 rounded-md" title="Lavagens">
                                 <Waves className="w-3 h-3" />
-                                <span>{basketsMetrics.totalWashes}</span>
+                                <span>{new Intl.NumberFormat('pt-BR').format(basketsMetrics.totalWashes)} lav.</span>
                             </div>
-                            <div className="flex items-center gap-1.5 text-orange-400/80 bg-orange-400/10 px-2 py-1 rounded-md">
+                            <div className="flex items-center gap-1.5 text-orange-400/80 bg-orange-400/10 px-2 py-1 rounded-md" title="Secagens">
                                 <Wind className="w-3 h-3" />
-                                <span>{basketsMetrics.totalDries}</span>
+                                <span>{new Intl.NumberFormat('pt-BR').format(basketsMetrics.totalDries)} sec.</span>
                             </div>
                         </div>
                     </div>
@@ -314,9 +292,9 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                                 <div className="p-2 bg-pink-500/10 rounded-lg"><Users className="w-4 h-4 text-pink-400" /></div>
                                 <span className="text-sm font-medium">Clientes Atendidos</span>
                             </div>
-                            <div className="text-3xl font-bold text-neutral-100">{summary.uniqueCustomers}</div>
+                            <div className="text-3xl font-bold text-neutral-100">{new Intl.NumberFormat('pt-BR').format(summary.uniqueCustomers)}</div>
                             <p className="text-xs text-neutral-500">
-                                {summary.uniqueCustomers > 0 ? (basketsMetrics.totalBaskets / summary.uniqueCustomers).toFixed(1) : 0} cestos / cliente
+                                {summary.uniqueCustomers > 0 ? (basketsMetrics.totalBaskets / summary.uniqueCustomers).toFixed(1).replace('.', ',') : 0} cestos / cliente
                             </p>
                         </div>
 
@@ -329,19 +307,23 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                             <div className="text-xl font-bold text-cyan-400">
                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(globalMetrics.last30DaysAvg)}
                             </div>
-                            <p className="text-[10px] text-neutral-600">Últimos 30 dias</p>
+                            <p className="text-[10px] text-neutral-600">
+                                {period === 'lastMonth' ? 'Média diária do mês anterior'
+                                    : (period === 'thisMonth' || period === 'today' || period === 'yesterday') ? 'Média dos últimos 30 dias'
+                                    : 'Média diária do período'}
+                            </p>
                         </div>
 
                         {/* 7. Projeção Mensal */}
                         <div className="bg-neutral-900/50 p-6 rounded-xl border border-neutral-800 flex flex-col justify-between">
                             <div className="flex items-center gap-3 text-neutral-500 mb-2">
                                 <div className="p-2 bg-emerald-500/10 rounded-lg"><BarChart3 className="w-4 h-4 text-emerald-400" /></div>
-                                <span className="text-sm font-medium">Projeção</span>
+                                <span className="text-sm font-medium">Projeção Mensal</span>
                             </div>
                             <div className="text-xl font-bold text-emerald-400">
                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(globalMetrics.projection)}
                             </div>
-                            <p className="text-[10px] text-neutral-600">Mês {globalMetrics.daysInViewMonth} dias</p>
+                            <p className="text-[10px] text-neutral-600">Média diária × {globalMetrics.daysInViewMonth} dias do mês</p>
                         </div>
                     </>
                 )}
@@ -380,7 +362,7 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                                             return `${d}/${m}/${y.substring(2)}`;
                                         }}
                                     />
-                                    <Bar dataKey={isMultiStoreView ? "totalRevenue" : "value"} fill="#10b981" radius={[4, 4, 0, 0] as [number, number, number, number]} />
+                                    <Bar dataKey={isMultiStoreView ? "totalRevenue" : "valor"} fill="#10b981" radius={[4, 4, 0, 0] as [number, number, number, number]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -479,12 +461,14 @@ export function FinancialDashboard({ data, allRecords, allOrders, selectedStore 
                                         <td className="p-4 text-right text-red-500">{summary.totalValue > 0 ? ((paymentStats.others / summary.totalValue) * 100).toFixed(1) : 0}%</td>
                                     </tr>
                                 )}
-                                {/* Coupons */}
-                                <tr className="bg-blue-500/5 hover:bg-blue-500/10 transition-colors border-t border-blue-500/20">
-                                    <td className="p-4 text-blue-300 font-medium">Cupons de Desconto Utilizados</td>
-                                    <td className="p-4 text-right font-mono text-blue-300 font-bold">{paymentStats.coupons}</td>
-                                    <td className="p-4 text-right text-blue-500/50 text-xs">(Quantidade)</td>
-                                </tr>
+                                {/* Coupons - exibido apenas quando houver dado */}
+                                {paymentStats.coupons > 0 && (
+                                    <tr className="bg-blue-500/5 hover:bg-blue-500/10 transition-colors border-t border-blue-500/20">
+                                        <td className="p-4 text-blue-300 font-medium">Cupons de Desconto Utilizados</td>
+                                        <td className="p-4 text-right font-mono text-blue-300 font-bold">{paymentStats.coupons}</td>
+                                        <td className="p-4 text-right text-blue-500/50 text-xs">(Quantidade)</td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
                         </div>
