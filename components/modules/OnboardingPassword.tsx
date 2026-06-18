@@ -47,24 +47,23 @@ export function OnboardingPassword({ onSuccess, onDismiss }: OnboardingPasswordP
         setLoading(true);
 
         try {
-            // Promise.race to prevent infinite network hang
-            const updatePromise = fetch('/api/auth/set-password', {
+            // Client-side password update preserves the active session.
+            // Using admin.updateUserById server-side would revoke the session (Supabase v2 behavior).
+            const { error: updateError } = await supabase.auth.updateUser({ password });
+
+            if (updateError) {
+                setError(updateError.message || 'Erro ao atualizar a senha.');
+                return;
+            }
+
+            // Clear the force_password_change flag via server route (admin-only operation)
+            await fetch('/api/auth/set-password', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password })
-            }).then(res => res.json());
-
-            const timeoutPromise = new Promise<{error: string}>((_, reject) => {
-                setTimeout(() => reject(new Error('Timeout na comunicação com o servidor. Verifique sua internet.')), 10000);
+                body: JSON.stringify({ clearFlagOnly: true })
             });
 
-            const response = await Promise.race([updatePromise, timeoutPromise]) as any;
-
-            if (!response.success) {
-                setError(response.error || 'Erro ao atualizar a senha.');
-            } else {
-                onSuccess();
-            }
+            onSuccess();
         } catch (err: any) {
             console.error("Password update error:", err);
             setError(err.message || 'Problema de conexão com o servidor. Tente novamente mais tarde.');
