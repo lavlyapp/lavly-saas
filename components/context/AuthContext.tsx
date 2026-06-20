@@ -77,37 +77,44 @@ export function AuthProvider({ children, initialSession, initialRole, initialExp
             setIsLoading(false);
         }
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             const currentUser = session?.user ?? null;
             setUser(currentUser);
             setToken(session?.access_token ?? null);
 
-            if (event === 'SIGNED_IN' && currentUser) {
-                // Log login action
-                supabase.from('activity_logs').insert([{
-                    user_id: currentUser.id,
-                    action: 'LOGIN',
-                    details: { 
-                        timestamp: new Date().toISOString(),
-                        user_email: currentUser.email,
-                    }
-                }]).then(({ error }) => {
-                    if (error) console.error("Login audit log error:", error);
-                });
+            // IMPORTANT: never call other supabase.* methods (or await) directly inside
+            // onAuthStateChange. The callback runs while the GoTrue auth lock is held, so an
+            // awaited Supabase call here re-acquires the same lock and DEADLOCKS — which froze
+            // `supabase.auth.updateUser()` on the first-access password change (USER_UPDATED
+            // event) and left the new password unsaved. Defer all such work out of the lock.
+            setTimeout(() => {
+                if (event === 'SIGNED_IN' && currentUser) {
+                    // Log login action
+                    supabase.from('activity_logs').insert([{
+                        user_id: currentUser.id,
+                        action: 'LOGIN',
+                        details: {
+                            timestamp: new Date().toISOString(),
+                            user_email: currentUser.email,
+                        }
+                    }]).then(({ error }) => {
+                        if (error) console.error("Login audit log error:", error);
+                    });
 
-                // Disparar sincronização silenciosa em background assim que o login acontece
-                console.log("[Auth] Disparando Sincronização em Nuvem (Login-Trigger)...");
-                fetch('/api/vmpay/sync?manual=true', { method: 'GET' })
-                    .then(res => console.log("[Auth] Background sync disparado com sucesso no login:", res.status))
-                    .catch(err => console.error("[Auth] Falha ao disparar background sync:", err));
-            }
+                    // Disparar sincronização silenciosa em background assim que o login acontece
+                    console.log("[Auth] Disparando Sincronização em Nuvem (Login-Trigger)...");
+                    fetch('/api/vmpay/sync?manual=true', { method: 'GET' })
+                        .then(res => console.log("[Auth] Background sync disparado com sucesso no login:", res.status))
+                        .catch(err => console.error("[Auth] Falha ao disparar background sync:", err));
+                }
 
-            if (currentUser) {
-                await fetchProfile(currentUser.id);
-            } else {
-                setRole(null);
-                setIsLoading(false);
-            }
+                if (currentUser) {
+                    fetchProfile(currentUser.id);
+                } else {
+                    setRole(null);
+                    setIsLoading(false);
+                }
+            }, 0);
         });
 
         return () => subscription.unsubscribe();
