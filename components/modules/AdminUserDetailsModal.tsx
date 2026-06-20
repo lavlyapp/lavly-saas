@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Calendar, User, Store, Clock, Users, MessageCircle, AlertCircle, ShieldAlert, Ban, Trash2 } from 'lucide-react';
+import { X, Calendar, User, Store, Clock, Users, MessageCircle, AlertCircle, ShieldAlert, Ban, Trash2, KeyRound, CheckCircle } from 'lucide-react';
 import { AdminPasswordPrompt } from './AdminPasswordPrompt';
 
 interface SubUser {
@@ -44,13 +44,48 @@ export function AdminUserDetailsModal({ isOpen, onClose, payer }: AdminUserDetai
     const [editLifetime, setEditLifetime] = useState(!!payer?.is_lifetime_access);
     const [isSavingSub, setIsSavingSub] = useState(false);
 
+    const [showResetPassword, setShowResetPassword] = useState(false);
+    const [newPassword, setNewPassword] = useState('');
+    const [isResettingPassword, setIsResettingPassword] = useState(false);
+    const [resetPasswordMsg, setResetPasswordMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+    const handleResetPassword = async () => {
+        if (newPassword.length < 8) {
+            setResetPasswordMsg({ type: 'error', text: 'A senha deve ter pelo menos 8 caracteres.' });
+            return;
+        }
+        setIsResettingPassword(true);
+        setResetPasswordMsg(null);
+        try {
+            const res = await fetch('/api/admin/profiles/reset-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targetId: payer.id, newPassword })
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                setResetPasswordMsg({ type: 'error', text: data.error || 'Erro ao redefinir senha.' });
+            } else {
+                setResetPasswordMsg({ type: 'success', text: `Senha redefinida. O usuário precisará criar uma nova senha pessoal no próximo acesso.` });
+                setNewPassword('');
+            }
+        } catch (e: any) {
+            setResetPasswordMsg({ type: 'error', text: e.message || 'Erro de conexão.' });
+        } finally {
+            setIsResettingPassword(false);
+        }
+    };
+
     // Reset sync state when modal closes/opens
     React.useEffect(() => {
-        if (!isOpen) { 
-            setShowKeyInput(false); 
-            setSyncKey(''); 
-            setSyncError(null); 
-            setSyncSuccess(null); 
+        if (!isOpen) {
+            setShowKeyInput(false);
+            setSyncKey('');
+            setSyncError(null);
+            setSyncSuccess(null);
+            setShowResetPassword(false);
+            setNewPassword('');
+            setResetPasswordMsg(null);
         } else if (payer) {
             setEditExpiresAt(payer.expires_at ? payer.expires_at.split('T')[0] : '');
             setEditLifetime(!!payer.is_lifetime_access);
@@ -396,6 +431,60 @@ export function AdminUserDetailsModal({ isOpen, onClose, payer }: AdminUserDetai
                         </div>
                     )}
 
+                    {/* Redefinir Senha */}
+                    {payer.status !== 'deleted' && (
+                        <div className="mt-8 pt-6 border-t border-neutral-800">
+                            <h3 className="text-sm font-bold text-neutral-400 flex items-center gap-2 uppercase tracking-wide mb-4">
+                                <KeyRound className="w-4 h-4 text-indigo-400" />
+                                Redefinir Senha do Usuário
+                            </h3>
+                            {!showResetPassword ? (
+                                <button
+                                    onClick={() => setShowResetPassword(true)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded-lg text-sm font-medium transition-colors"
+                                >
+                                    <KeyRound className="w-4 h-4" /> Definir nova senha temporária
+                                </button>
+                            ) : (
+                                <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-4 space-y-3">
+                                    {resetPasswordMsg && (
+                                        <div className={`flex items-start gap-2 text-sm p-3 rounded-lg border ${resetPasswordMsg.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' : 'bg-red-500/10 border-red-500/20 text-red-300'}`}>
+                                            {resetPasswordMsg.type === 'success' ? <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" /> : <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />}
+                                            {resetPasswordMsg.text}
+                                        </div>
+                                    )}
+                                    <div>
+                                        <label className="block text-xs font-semibold text-neutral-400 mb-1">Nova senha temporária</label>
+                                        <input
+                                            type="text"
+                                            value={newPassword}
+                                            onChange={e => setNewPassword(e.target.value)}
+                                            placeholder="Ex: Lavly2024!"
+                                            className="w-full bg-black border border-neutral-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-lg p-2.5 text-white font-mono text-sm transition-all"
+                                        />
+                                        <p className="text-[11px] text-neutral-600 mt-1">O usuário será obrigado a criar uma senha pessoal no próximo login.</p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={handleResetPassword}
+                                            disabled={isResettingPassword || !newPassword}
+                                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-neutral-800 disabled:text-neutral-500 text-white text-sm font-bold rounded-lg transition-colors flex items-center gap-2"
+                                        >
+                                            {isResettingPassword ? <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" /> : <KeyRound className="w-4 h-4" />}
+                                            {isResettingPassword ? 'Redefinindo...' : 'Confirmar Redefinição'}
+                                        </button>
+                                        <button
+                                            onClick={() => { setShowResetPassword(false); setNewPassword(''); setResetPasswordMsg(null); }}
+                                            className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-sm font-medium rounded-lg transition-colors"
+                                        >
+                                            Cancelar
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* Security Frame */}
                     {payer.status !== 'deleted' ? (
                         <div className="mt-8 pt-6 border-t border-neutral-800">
@@ -404,13 +493,13 @@ export function AdminUserDetailsModal({ isOpen, onClose, payer }: AdminUserDetai
                                 Zona de Perigo (Ações do Administrador)
                             </h3>
                             <div className="flex gap-4">
-                                <button 
+                                <button
                                     onClick={() => setPromptType('block')}
                                     className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 rounded-lg text-sm font-medium transition-colors"
                                 >
                                     <Ban className="w-4 h-4" /> Suspender Acesso (Bloquear)
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => setPromptType('delete')}
                                     className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 rounded-lg text-sm font-medium transition-colors"
                                 >
