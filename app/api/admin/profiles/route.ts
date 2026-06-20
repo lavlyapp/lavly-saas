@@ -1,18 +1,15 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin'; // Use admin to bypass RLS and read auth.users
+import { requireAdmin, isAuthError } from '@/lib/api-auth';
 
 export const revalidate = 0; // Prevent caching
 
 export async function GET(request: Request) {
+    // Server-side authorization: must be an authenticated admin.
+    const auth = await requireAdmin(request);
+    if (isAuthError(auth)) return auth;
+
     try {
-        // Authenticate the request: Must be an Admin
-        const authHeader = request.headers.get('Authorization');
-        const token = authHeader?.split(' ')[1] || '';
-        
-        // This is a basic check. In production, you'd verify the token properly against Supabase.
-        // For Lavly, the frontend is calling this route. We assume the frontend checked the admin role.
-        // However, to be extra safe, let's just make sure they sent something.
-        
         // 1. Get ALL Auth Users for Emails and Last Sign In
         const { data: { users }, error: authError } = await supabaseAdmin.auth.admin.listUsers({
             perPage: 1000
@@ -134,6 +131,9 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+    const auth = await requireAdmin(request);
+    if (isAuthError(auth)) return auth;
+
     try {
         const body = await request.json();
         const { id, admin_alias, expires_at, is_lifetime_access } = body;
@@ -161,6 +161,9 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+    const auth = await requireAdmin(request);
+    if (isAuthError(auth)) return auth;
+
     try {
         const url = new URL(request.url);
         const id = url.searchParams.get('id');

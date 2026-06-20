@@ -1,32 +1,40 @@
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { calculateCrmMetrics } from '@/lib/processing/crm';
+import { requireAuth, isAuthError } from '@/lib/api-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
+    // This route returns customer PII (phone + purchase history). Require auth
+    // and scope results to the caller's own stores.
+    const auth = await requireAuth(request);
+    if (isAuthError(auth)) return auth;
+
     try {
         const { searchParams } = new URL(request.url);
         const name = searchParams.get('name');
-        
+
         if (!name) {
             return NextResponse.json({ success: false, error: 'Name parameter is required' }, { status: 400 });
         }
 
-        // Bypass RLS for this internal metrics fetch since we're using ilike which causes timeouts with RLS
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-        
-        const supabase = createClient(supabaseUrl, supabaseKey);
-
-        const { data, error } = await supabase
+        // Uses the service-role client from the auth context (RLS bypass) but only
+        // AFTER restricting rows to the caller's assigned stores for non-admins.
+        let query = auth.admin
             .from('sales')
             .select('id, data, loja, cliente, telefone, valor, produto')
             .ilike('cliente', name)
             .order('data', { ascending: false });
+
+        if (auth.role !== 'admin') {
+            if (!auth.assignedStores || auth.assignedStores.length === 0) {
+                return NextResponse.json({ success: true, payload: null });
+            }
+            query = query.in('loja', auth.assignedStores);
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
 

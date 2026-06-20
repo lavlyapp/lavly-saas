@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { requireAdmin, isAuthError } from '@/lib/api-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
+    const auth = await requireAdmin(request);
+    if (isAuthError(auth)) return auth;
     try {
         const cookieStore = await cookies();
         const authHeader = request.headers.get('Authorization');

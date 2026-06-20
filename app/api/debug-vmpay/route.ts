@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 import { VMPAY_API_BASE_URL } from '@/lib/vmpay-config';
+import { requireAdmin, isAuthError } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
+    const auth = await requireAdmin(request);
+    if (isAuthError(auth)) return auth;
     try {
         const { searchParams } = new URL(request.url);
         const apiKey = searchParams.get('key');

@@ -1,20 +1,27 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getCanonicalStoreName } from '@/lib/vmpay-config';
+import { requireAuth, isAuthError } from '@/lib/api-auth';
 
 const VMPAY_API_BASE_URL = process.env.NEXT_PUBLIC_VMPAY_API_BASE_URL || "https://apps.vmhub.vmtecnologia.io/vmlav/api/externa/v1";
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
+    // Must be authenticated; always act on the CALLER's own profile.
+    // (Previously trusted a userId from the body — an IDOR allowing edits to any profile.)
+    const auth = await requireAuth(req);
+    if (isAuthError(auth)) return auth;
+
     try {
         const body = await req.json();
-        const { apiKey, userId } = body;
+        const { apiKey } = body;
+        const userId = auth.userId;
 
         console.log(`[Onboarding] Validating API Key for User ${userId}...`);
 
-        if (!apiKey || !userId) {
-            return NextResponse.json({ error: 'API Key and User ID are required' }, { status: 400 });
+        if (!apiKey) {
+            return NextResponse.json({ error: 'API Key is required' }, { status: 400 });
         }
 
         const apiKeys = apiKey ? apiKey.split(/[\n,]+/).map((k: string) => k.trim()).filter((k: string) => k.length > 0) : [];
