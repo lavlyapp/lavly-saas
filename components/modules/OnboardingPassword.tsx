@@ -47,21 +47,17 @@ export function OnboardingPassword({ onSuccess, onDismiss }: OnboardingPasswordP
         setLoading(true);
 
         try {
-            // Client-side password update preserves the active session.
-            // Using admin.updateUserById server-side would revoke the session (Supabase v2 behavior).
-            const { error: updateError } = await supabase.auth.updateUser({ password });
+            // Single client-side call: changes password AND clears the flag.
+            // supabase.auth.updateUser preserves the active session (unlike admin.updateUserById).
+            const { error: updateError } = await supabase.auth.updateUser({
+                password,
+                data: { force_password_change: null }
+            });
 
             if (updateError) {
                 setError(updateError.message || 'Erro ao atualizar a senha.');
                 return;
             }
-
-            // Clear the force_password_change flag via server route (admin-only operation)
-            await fetch('/api/auth/set-password', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ clearFlagOnly: true })
-            });
 
             onSuccess();
         } catch (err: any) {
