@@ -5,15 +5,14 @@ import { cookies } from 'next/headers';
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { password } = body;
+        const { password, clearFlagOnly } = body;
 
-        if (!password) {
+        if (!clearFlagOnly && !password) {
             return NextResponse.json({ success: false, error: 'Senha é obrigatória' }, { status: 400 });
         }
 
         const cookieStore = await cookies();
-        
-        // Use ANON client to get the current logged-in user
+
         const supabaseAuth = createServerClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -30,21 +29,20 @@ export async function POST(req: Request) {
             return NextResponse.json({ success: false, error: 'Usuário não autenticado' }, { status: 401 });
         }
 
-        // Use SERVICE ROLE client to update password without triggering user email rate limits
-        const supabaseAdmin = createServerClient(
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabaseAdmin = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!,
-            {
-                cookies: {
-                    get(name: string) { return cookieStore.get(name)?.value; }
-                }
-            }
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
         );
 
-        const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
-            password: password,
-            user_metadata: { force_password_change: null }
-        });
+        // When clearFlagOnly=true the password was already changed client-side (supabase.auth.updateUser),
+        // so we only need to clear the force_password_change flag via admin.
+        const updatePayload: Record<string, any> = { user_metadata: { force_password_change: null } };
+        if (!clearFlagOnly) {
+            updatePayload.password = password;
+        }
+
+        const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, updatePayload);
 
         if (updateError) {
             console.error("Admin Update Error:", updateError);
