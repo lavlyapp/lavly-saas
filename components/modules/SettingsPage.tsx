@@ -35,7 +35,8 @@ export interface StoreCredential {
 }
 
 export function SettingsPage() {
-    const { user } = useAuth();
+    const { user, role } = useAuth();
+    const isAdmin = role === 'admin';
     const { storeSettings, setStoreAddress, automationSettings, setAutomationSettings } = useSettings();
 
     // VMPay Account State
@@ -84,20 +85,23 @@ export function SettingsPage() {
         try {
             console.log("SettingsPage: Loading configuration data...");
             if (user) {
-                // 1. Fetch Profile (VMPay Master Account)
-                const { data: profile, error: profileErr } = await supabase
-                    .from('profiles')
-                    .select('vmpay_user, vmpay_password')
-                    .eq('id', user.id)
-                    .single();
+                // 1. Fetch Profile (VMPay Master Account) — ADMIN ONLY.
+                // A master account is a system-wide secret; tenants (proprietario) must never load it.
+                if (isAdmin) {
+                    const { data: profile, error: profileErr } = await supabase
+                        .from('profiles')
+                        .select('vmpay_user, vmpay_password')
+                        .eq('id', user.id)
+                        .single();
 
-                if (profileErr && profileErr.code !== 'PGRST116') {
-                    console.error("SettingsPage: Profile fetch error", profileErr);
-                }
+                    if (profileErr && profileErr.code !== 'PGRST116') {
+                        console.error("SettingsPage: Profile fetch error", profileErr);
+                    }
 
-                if (profile) {
-                    setVmpayUser(profile.vmpay_user || "");
-                    setVmpayPass(profile.vmpay_password || "");
+                    if (profile) {
+                        setVmpayUser(profile.vmpay_user || "");
+                        setVmpayPass(profile.vmpay_password || "");
+                    }
                 }
 
                 // 2. Fetch Stores Native via Server API Proxy (Bypasses Supabase RLS policies entirely)
@@ -283,8 +287,8 @@ export function SettingsPage() {
         try {
             console.log("SettingsPage: Initiating save process...");
 
-            // 1. Save VMPay Account to Profile (Master Account)
-            if (user && (vmpayUser || vmpayPass)) {
+            // 1. Save VMPay Account to Profile (Master Account) — ADMIN ONLY
+            if (isAdmin && user && (vmpayUser || vmpayPass)) {
                 console.log("SettingsPage: Updating user profile...");
                 const { error: profileError } = await supabase.from('profiles').upsert({
                     id: user.id,
@@ -500,7 +504,9 @@ export function SettingsPage() {
                 </div>
             </div>
 
-            {/* VMPay Account Credentials (MASTER) */}
+            {/* VMPay Account Credentials (MASTER) — visível apenas para ADMIN.
+                Conta mestra é um segredo global do sistema; nunca deve aparecer para um proprietário/lojista. */}
+            {isAdmin && (
             <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 shadow-lg">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
                     <User className="w-5 h-5 text-indigo-500" />
@@ -511,6 +517,10 @@ export function SettingsPage() {
                         <label className="text-[10px] font-bold text-neutral-500 uppercase">E-mail da Conta</label>
                         <input
                             type="email"
+                            name="lavly-vmpay-master-user"
+                            autoComplete="off"
+                            data-1p-ignore
+                            data-lpignore="true"
                             className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none"
                             placeholder="seu@email.com.br"
                             value={vmpayUser}
@@ -522,6 +532,10 @@ export function SettingsPage() {
                         <div className="relative">
                             <input
                                 type={showPass ? "text" : "password"}
+                                name="lavly-vmpay-master-pass"
+                                autoComplete="new-password"
+                                data-1p-ignore
+                                data-lpignore="true"
                                 className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none"
                                 placeholder="********"
                                 value={vmpayPass}
@@ -537,6 +551,7 @@ export function SettingsPage() {
                     * Essas credenciais permitem ao Lavly sincronizar todas as lojas de forma centralizada.
                 </p>
             </div>
+            )}
 
             {/* VMPay Stores (INDIVIDUAL) */}
             <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 shadow-lg">
@@ -595,6 +610,10 @@ export function SettingsPage() {
                                         <div className="flex gap-2">
                                             <input
                                                 type="password"
+                                                name={`store-api-key-${idx}`}
+                                                autoComplete="new-password"
+                                                data-1p-ignore
+                                                data-lpignore="true"
                                                 className="flex-1 bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white"
                                                 value={store.api_key}
                                                 onChange={(e) => handleStoreChange(idx, 'api_key', e.target.value)}
