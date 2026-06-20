@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createClient } from '@supabase/supabase-js';
+import { requireAdmin, isAuthError } from '@/lib/api-auth';
 
 export async function POST(request: Request) {
+    // Must be an authenticated admin.
+    const auth = await requireAdmin(request);
+    if (isAuthError(auth)) return auth;
+
     try {
         const body = await request.json();
         const { targetId, action, password } = body;
@@ -15,22 +20,25 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: 'Ação inválida' }, { status: 400 });
         }
 
-        // Validate admin password
+        // Second factor: re-confirm the CALLER's own admin password (no hardcoded override).
+        if (!auth.email) {
+            return NextResponse.json({ success: false, error: 'Sessão de administrador inválida.' }, { status: 401 });
+        }
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
         const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-        const MASTER_OVERRIDE = process.env.ADMIN_MASTER_PASSWORD || 'eduardo!admin25';
-        
-        if (password !== MASTER_OVERRIDE) {
-            const tempClient = createClient(supabaseUrl, supabaseAnonKey);
-            const { error: signInError } = await tempClient.auth.signInWithPassword({
-                email: 'eduardofbmoura@gmail.com', // Replace with dynamic if needed
-                password: password
-            });
+        const tempClient = createClient(supabaseUrl, supabaseAnonKey);
+        const { error: signInError } = await tempClient.auth.signInWithPassword({
+            email: auth.email,
+            password: password
+        });
+        if (signInError) {
+            console.error('Password validation failed:', signInError.message);
+            return NextResponse.json({ success: false, error: 'Senha de Administrador incorreta.' }, { status: 401 });
+        }
 
-            if (signInError) {
-                 console.error('Password validation failed:', signInError.message);
-                 return NextResponse.json({ success: false, error: 'Senha de Administrador incorreta.' }, { status: 401 });
-            }
+        // Prevent an admin from deleting/blocking their own account by mistake.
+        if (targetId === auth.userId) {
+            return NextResponse.json({ success: false, error: 'Você não pode bloquear/excluir a própria conta.' }, { status: 400 });
         }
 
         // Action is authorized! Perform soft delete or block using the Service Role Admin

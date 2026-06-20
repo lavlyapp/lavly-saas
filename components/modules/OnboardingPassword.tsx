@@ -49,10 +49,17 @@ export function OnboardingPassword({ onSuccess, onDismiss }: OnboardingPasswordP
         try {
             // Single client-side call: changes password AND clears the flag.
             // supabase.auth.updateUser preserves the active session (unlike admin.updateUserById).
-            const { error: updateError } = await supabase.auth.updateUser({
+            // Defensive timeout: if the call ever stalls, surface an error instead of an
+            // infinite spinner so the user can retry.
+            const updatePromise = supabase.auth.updateUser({
                 password,
                 data: { force_password_change: null }
             });
+            const timeoutPromise = new Promise<{ error: { message: string } }>((resolve) =>
+                setTimeout(() => resolve({ error: { message: 'Tempo esgotado. Verifique sua conexão e tente novamente.' } }), 15000)
+            );
+
+            const { error: updateError } = await Promise.race([updatePromise, timeoutPromise]) as any;
 
             if (updateError) {
                 setError(updateError.message || 'Erro ao atualizar a senha.');

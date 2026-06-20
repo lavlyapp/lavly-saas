@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getCanonicalStoreName } from '@/lib/vmpay-config';
+import { requireAdmin, isAuthError } from '@/lib/api-auth';
 
 const VMPAY_API_BASE_URL = process.env.NEXT_PUBLIC_VMPAY_API_BASE_URL || "https://apps.vmhub.vmtecnologia.io/vmlav/api/externa/v1";
 
@@ -10,12 +11,19 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
+    // Only an authenticated admin may create accounts.
+    const auth = await requireAdmin(req);
+    if (isAuthError(auth)) return auth;
+
     try {
         const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
         const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
         const body = await req.json();
-        const { email, apiKey, password, plan = 'ouro', role = 'proprietario', maxStores = 1 } = body;
+        const { email, apiKey, password, plan = 'ouro', maxStores = 1 } = body;
+        // Never accept the role from the request body (privilege-escalation vector).
+        // New accounts created via the admin invite flow are always tenant owners.
+        const role = 'proprietario';
 
         console.log(`[Admin Invite] Starting invite for: ${email} with plan: ${plan}, maxStores: ${maxStores}`);
         if (!email || !password) {
